@@ -1,0 +1,310 @@
+question_id,question_title,created_at,predictor_id,predictor_username,prediction_time,prediction_value,resolution,question_weight
+25519,Will a high fidelity fermentation test that costs under $10 be commercially available before 2035?,2024-06-19 10:39:55.946305+00,111805,galen,2024-07-06 14:33:12.991641+00,0.084,,1.0
+25519,Will a high fidelity fermentation test that costs under $10 be commercially available before 2035?,2024-06-19 10:39:55.946305+00,115975,johnnycaffeine,2024-07-03 20:27:00.660855+00,0.1,,1.0
+25519,Will a high fidelity fermentation test that costs under $10 be commercially available before 2035?,2024-06-19 10:39:55.946305+00,119188,exmateriae,2024-07-30 19:22:58.758729+00,0.1,,1.0
+25519,Will a high fidelity fermentation test that costs under $10 be commercially available before 2035?,2024-06-19 10:39:55.946305+00,121719,TemetNosce,2024-07-10 06:25:58.258345+00,0.05,,1.0
+25519,Will a high fidelity fermentation test that costs under $10 be commercially available before 2035?,2024-06-19 10:39:55.946305+00,135380,lubossaloky,2024-07-04 10:47:03.529144+00,0.05,,1.0
+25519,Will a high fidelity fermentation test that costs under $10 be commercially available before 2035?,2024-06-19 10:39:55.946305+00,144872,tresell02,2024-07-10 17:58:47.19997+00,0.06,,1.0
+25519,Will a high fidelity fermentation test that costs under $10 be commercially available before 2035?,2024-06-19 10:39:55.946305+00,169130,owentyingling,2024-07-05 22:50:24.321275+00,0.1,,1.0
+25519,Will a high fidelity fermentation test that costs under $10 be commercially available before 2035?,2024-06-19 10:39:55.946305+00,188107,Cassie,2024-08-30 09:56:27.27875+00,0.275,,1.0
+25519,Will a high fidelity fermentation test that costs under $10 be commercially available before 2035?,2024-06-19 10:39:55.946305+00,191975,jkraybill_bot,2024-07-10 14:11:20.311601+00,0.9,,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,101465,Jgalt,2024-06-20 11:10:17.969133+00,0.8,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,101465,Jgalt,2024-06-20 17:38:01.132967+00,0.9,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,101465,Jgalt,2024-06-21 21:32:32.185517+00,0.9,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,101465,Jgalt,2024-06-22 12:47:22.262626+00,0.9,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,101465,Jgalt,2024-06-24 16:41:33.161635+00,0.95,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,101465,Jgalt,2024-07-02 09:14:36.943784+00,0.97,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,103297,dimaklenchin,2024-06-21 14:54:11.305574+00,0.95,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,103297,dimaklenchin,2024-06-22 21:15:59.227904+00,0.95,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,103297,dimaklenchin,2024-06-23 18:47:16.130045+00,0.95,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,103297,dimaklenchin,2024-06-29 04:28:59.031621+00,0.98,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,103777,datscilly,2024-06-22 17:40:48.71741+00,0.8,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,111805,galen,2024-06-21 22:45:28.720697+00,0.864,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,112024,aristophanes,2024-06-22 15:11:51.014026+00,0.75,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,112024,aristophanes,2024-06-22 15:12:11.599927+00,0.68,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,112024,aristophanes,2024-06-27 08:48:22.644382+00,0.75,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,112655,Alexander230,2024-06-22 19:54:16.418261+00,0.7,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,113830,tjaffe3,2024-06-24 02:31:47.644283+00,0.7,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,114017,Kaleem,2024-06-20 14:12:14.259811+00,0.9,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,115375,citizen,2024-06-21 17:32:06.983573+00,0.75,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,115375,citizen,2024-06-21 23:16:45.541468+00,0.85,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,116988,palcu,2024-06-21 21:51:31.179011+00,0.99,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,116988,palcu,2024-06-22 22:56:45.141091+00,0.85,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,116988,palcu,2024-06-28 19:29:51.080164+00,0.95,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,119020,jmason,2024-06-28 16:41:09.647515+00,0.99,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,121041,norick,2024-06-23 22:21:57.441928+00,0.8,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,121719,TemetNosce,2024-06-22 19:45:24.839048+00,0.8,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,121719,TemetNosce,2024-06-23 01:45:47.391205+00,0.9,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,123012,doracle,2024-07-03 18:17:25.473594+00,0.99,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,126110,the_wub,2024-06-21 12:39:16.763031+00,0.75,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,126666,vakrasiak,2024-06-20 11:00:04.096742+00,0.99,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,126666,vakrasiak,2024-06-20 11:00:09.906058+00,0.999,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,135380,lubossaloky,2024-06-20 18:12:16.603638+00,0.9,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,136990,TheAGI,2024-07-04 07:10:53.599331+00,0.99,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,137244,darron,2024-06-25 14:06:12.612615+00,0.9,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,139161,Zaldath,2024-06-23 09:55:07.555307+00,0.9,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,141680,MaximusMinimus,2024-06-20 17:30:18.876069+00,0.67,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,142078,VioletHour,2024-06-25 13:01:59.577569+00,0.76,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,145394,Haiku,2024-06-25 08:25:47.519433+00,0.85,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,145394,Haiku,2024-07-04 09:36:56.956627+00,0.95,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,146248,GOLDEN-BLUE,2024-06-21 14:51:46.68655+00,0.95,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,146248,GOLDEN-BLUE,2024-06-21 14:52:37.685351+00,0.9,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,146248,GOLDEN-BLUE,2024-06-27 09:29:31.509605+00,0.95,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,146248,GOLDEN-BLUE,2024-06-27 18:40:46.753074+00,0.92,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,146248,GOLDEN-BLUE,2024-06-28 14:05:36.294635+00,0.86,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,146248,GOLDEN-BLUE,2024-06-28 19:24:47.783006+00,0.9,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,149171,rheber,2024-06-21 11:46:29.512041+00,0.6,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,149171,rheber,2024-06-23 10:30:07.774541+00,0.73,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,156288,rcoaster2000,2024-06-24 03:43:49.00727+00,0.91,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,156288,rcoaster2000,2024-06-27 19:48:06.328467+00,0.91,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,157762,fallanga,2024-06-22 09:11:29.01957+00,0.55,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,162200,Cr1N,2024-06-23 18:48:39.213157+00,0.72,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,163915,ryansil,2024-06-22 08:39:54.164656+00,0.999,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,164951,blind_forecaster,2024-06-26 16:25:07.354651+00,0.77,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,164951,blind_forecaster,2024-06-27 22:10:09.795305+00,0.81,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,168191,ADQ,2024-06-21 06:44:22.453538+00,0.96,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,168191,ADQ,2024-06-21 06:52:26.868372+00,0.95,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,168191,ADQ,2024-06-22 02:01:30.490361+00,0.96,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,168819,stupldiot,2024-06-22 22:41:32.385405+00,0.8,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,168819,stupldiot,2024-06-30 18:50:22.164343+00,0.9,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,169130,owentyingling,2024-06-22 04:30:36.511543+00,0.8,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,169130,owentyingling,2024-06-22 04:30:58.211619+00,0.74,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,169130,owentyingling,2024-06-22 04:31:10.252126+00,0.8,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,169130,owentyingling,2024-06-25 21:55:12.524198+00,0.9,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,169130,owentyingling,2024-06-28 20:53:45.840833+00,0.95,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,169130,owentyingling,2024-06-29 02:49:33.40871+00,0.95,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,169130,owentyingling,2024-06-29 02:49:41.37433+00,0.9,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,169130,owentyingling,2024-07-02 18:33:00.070886+00,0.95,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,174826,chipm,2024-07-03 18:43:41.72653+00,0.95,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,179531,roli5,2024-06-23 20:22:59.557979+00,0.83,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,182926,rfoggo,2024-06-21 13:36:33.010375+00,0.72,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,182926,rfoggo,2024-06-21 22:02:50.157156+00,0.77,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,182926,rfoggo,2024-06-21 22:02:57.040748+00,0.78,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,182926,rfoggo,2024-06-21 22:04:17.643385+00,0.85,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,182926,rfoggo,2024-06-22 12:40:31.054408+00,0.75,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,182926,rfoggo,2024-06-22 23:40:33.745183+00,0.77,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,182926,rfoggo,2024-06-24 23:03:57.285233+00,0.8,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,182926,rfoggo,2024-06-24 23:04:08.029909+00,0.83,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,186801,paidpear,2024-06-25 12:50:10.347965+00,0.85,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,186801,paidpear,2024-06-27 14:41:23.404053+00,0.8,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,186801,paidpear,2024-06-27 22:01:35.156554+00,0.78,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,186801,paidpear,2024-07-01 17:06:47.397178+00,0.8,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,186801,paidpear,2024-07-02 19:16:34.936493+00,0.8,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,186801,paidpear,2024-07-03 21:17:07.894894+00,0.8,yes,1.0
+25520,Will Nigel Farage be elected as a Member of Parliament in the July 4 2024 UK General Election?,2024-06-19 12:50:46.876535+00,188244,DiamondCB05,2024-06-22 09:56:13.017592+00,0.8,yes,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,101465,Jgalt,2024-06-23 17:42:25.609307+00,0.6,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,101465,Jgalt,2024-06-27 17:40:41.303017+00,0.6,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,101465,Jgalt,2024-06-27 18:34:49.976092+00,0.6,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,101465,Jgalt,2024-07-04 06:07:10.149668+00,0.6,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,101465,Jgalt,2024-07-04 22:07:12.471929+00,0.6,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,101465,Jgalt,2024-08-10 08:18:25.870188+00,0.6,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,101465,Jgalt,2024-12-10 08:39:39.611292+00,0.666,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,111073,Skapis9999,2024-06-28 08:44:12.5487+00,0.001,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,111805,galen,2024-07-01 21:27:23.335975+00,0.11,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,116988,palcu,2024-06-28 19:29:24.97465+00,0.1,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,116988,palcu,2024-07-04 22:08:48.420646+00,0.2,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,117552,aqsalose,2024-07-28 22:25:08.526689+00,0.1,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,117552,aqsalose,2024-07-28 22:25:21.287209+00,0.085,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,119020,jmason,2024-06-28 16:40:39.408362+00,0.05,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,119188,exmateriae,2024-07-03 06:08:47.687702+00,0.13,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,119839,DaAdCh,2024-06-23 14:43:23.989187+00,0.018,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,121560,Dumbledores_Army,2024-06-29 10:34:43.555518+00,0.01,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,121560,Dumbledores_Army,2024-07-13 10:01:49.156034+00,0.01,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,121560,Dumbledores_Army,2024-08-13 14:10:28.574755+00,0.01,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,121560,Dumbledores_Army,2024-11-09 22:29:53.489922+00,0.01,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,121719,TemetNosce,2024-06-27 19:21:13.720767+00,0.1,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,121996,Bervie,2024-06-27 18:18:06.661826+00,0.05,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,124884,satisficer,2024-07-04 22:18:29.407671+00,0.05,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,125016,valentin.vincendon,2024-08-03 11:38:42.611912+00,0.07,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,126666,vakrasiak,2024-06-22 19:08:17.391492+00,0.1,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,135380,lubossaloky,2024-06-22 13:03:01.547768+00,0.25,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,135380,lubossaloky,2024-06-28 04:10:44.1653+00,0.18,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,135380,lubossaloky,2024-07-05 16:27:49.530092+00,0.1,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,139161,Zaldath,2024-06-23 09:52:16.925165+00,0.05,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,145394,Haiku,2024-06-25 08:25:20.351899+00,0.1,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,145394,Haiku,2024-08-25 19:04:46.875196+00,0.07,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,146248,GOLDEN-BLUE,2024-06-23 10:39:13.509371+00,0.1,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,146248,GOLDEN-BLUE,2024-07-06 17:12:53.420695+00,0.05,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,149171,rheber,2024-06-23 10:30:32.897715+00,0.05,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,149171,rheber,2024-11-03 02:11:50.585419+00,0.03,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,154578,TimeTraveller34,2024-11-08 14:33:44.150563+00,0.07,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,156288,rcoaster2000,2024-06-27 19:47:02.693795+00,0.14,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,156288,rcoaster2000,2024-07-04 11:00:16.086907+00,0.06,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,156288,rcoaster2000,2024-07-06 07:35:36.389013+00,0.06,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,162200,Cr1N,2024-06-23 18:49:34.170189+00,0.24,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,162200,Cr1N,2024-07-05 00:45:43.087086+00,0.19,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,168191,ADQ,2024-06-23 04:02:11.148387+00,0.17,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,168191,ADQ,2024-06-23 04:02:17.682358+00,0.185,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,168191,ADQ,2024-06-26 20:53:53.54344+00,0.16,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,168191,ADQ,2024-07-04 21:17:43.94207+00,0.08,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,168191,ADQ,2024-07-05 18:09:41.330752+00,0.11,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,168191,ADQ,2024-08-19 04:48:54.663082+00,0.14,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,168191,ADQ,2024-08-25 13:21:00.173131+00,0.16,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,168191,ADQ,2024-11-28 05:09:41.548703+00,0.13,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,188103,botaska,2024-06-23 01:59:54.820614+00,0.25,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,188103,botaska,2024-06-23 02:12:07.808619+00,0.2,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,188107,Cassie,2024-08-30 09:58:57.489149+00,0.2,,1.0
+25523,"Will Nigel Farage become Prime Minister of the United Kingdom before January 1, 2035?",2024-06-19 16:42:28.795762+00,192466,1051890,2024-07-10 23:24:20.739081+00,0.99,,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,100333,Wineclaw,2024-06-22 15:19:28.400053+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,100333,Wineclaw,2024-06-27 11:48:14.043177+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,103777,datscilly,2024-06-24 15:39:42.503151+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,103907,darkives,2024-06-23 00:31:08.845123+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,103907,darkives,2024-06-27 01:21:32.265082+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,112655,Alexander230,2024-06-26 21:42:33.600723+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,113860,RuslanBes,2024-06-24 21:00:44.676219+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,113860,RuslanBes,2024-06-27 10:26:33.984154+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,115725,Sergio,2024-06-22 16:28:35.184772+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,115725,Sergio,2024-06-24 14:01:12.789308+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,115725,Sergio,2024-06-24 16:37:53.044099+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,115725,Sergio,2024-06-25 12:30:27.503232+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,115725,Sergio,2024-06-27 11:12:07.792976+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,118622,kqr,2024-06-24 04:29:34.551784+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,118622,kqr,2024-06-24 04:30:16.557497+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,118622,kqr,2024-06-24 04:30:44.682791+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,118622,kqr,2024-06-28 05:07:52.611342+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,121041,norick,2024-06-22 23:20:09.139528+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,121041,norick,2024-06-23 22:33:25.244665+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,121041,norick,2024-06-24 12:09:09.034393+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,121041,norick,2024-06-27 11:18:26.294456+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,121041,norick,2024-06-30 10:18:01.478835+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,121719,TemetNosce,2024-06-22 19:49:58.684317+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,121719,TemetNosce,2024-06-22 19:50:01.222666+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,121719,TemetNosce,2024-06-24 07:39:07.338219+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,121719,TemetNosce,2024-06-27 05:41:41.861706+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,123064,forecastooor,2024-06-22 16:53:36.514591+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,123064,forecastooor,2024-06-22 16:56:56.337342+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,123064,forecastooor,2024-06-22 16:57:00.45363+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,123064,forecastooor,2024-06-23 14:25:33.043236+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,123064,forecastooor,2024-06-23 14:25:48.185744+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,123064,forecastooor,2024-06-23 14:26:51.599663+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,123064,forecastooor,2024-06-24 04:38:34.017205+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,123064,forecastooor,2024-06-24 09:32:02.184087+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,123064,forecastooor,2024-06-25 11:52:38.130614+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,123064,forecastooor,2024-06-27 14:37:47.307237+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-22 15:23:34.238346+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-24 03:15:39.400117+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-24 09:34:01.584857+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-24 09:35:36.345392+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-24 09:39:39.612204+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-24 23:38:10.900433+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-25 22:31:33.223331+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-25 22:32:26.019887+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-27 11:30:41.071847+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-27 11:31:23.628929+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-27 16:08:18.513848+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-27 16:10:25.922507+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-27 16:11:43.696854+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,126626,skmmcj,2024-06-30 21:50:29.250448+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,127582,lbiii,2024-06-22 21:43:01.487353+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,127582,lbiii,2024-06-23 17:50:28.707028+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,127582,lbiii,2024-06-24 10:59:59.449845+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,127582,lbiii,2024-06-26 12:06:18.522921+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,127582,lbiii,2024-06-27 07:17:09.160776+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,127582,lbiii,2024-06-27 07:17:58.285156+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,127582,lbiii,2024-06-27 07:18:17.249964+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,127582,lbiii,2024-06-27 07:18:23.722331+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,127582,lbiii,2024-06-30 12:42:34.786638+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,127582,lbiii,2024-06-30 12:43:23.541119+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,127582,lbiii,2024-06-30 12:43:59.262143+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,127582,lbiii,2024-06-30 12:44:10.612283+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,129413,zachary.r.bullard,2024-06-25 02:29:10.299732+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,135380,lubossaloky,2024-06-22 16:32:45.221785+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,135380,lubossaloky,2024-06-24 08:27:17.093442+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,135380,lubossaloky,2024-06-27 04:50:36.320495+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,135380,lubossaloky,2024-06-27 04:51:30.38426+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,135380,lubossaloky,2024-06-27 04:53:55.506357+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-22 16:32:39.02524+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-22 16:33:18.961674+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-23 13:25:09.071163+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-24 03:31:33.985644+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-24 11:19:44.671292+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-24 11:19:54.941278+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-24 11:20:40.708313+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-25 05:45:46.697577+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-25 05:45:54.143513+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-25 05:46:06.157764+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-25 05:46:19.968278+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-27 13:52:39.300573+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-27 13:53:14.017321+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,139161,Zaldath,2024-06-27 13:53:28.477904+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,144022,Langley,2024-06-24 08:56:12.316478+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,145394,Haiku,2024-06-23 20:03:44.745807+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,145394,Haiku,2024-06-24 05:14:25.633787+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,145394,Haiku,2024-06-24 17:25:05.493624+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,145394,Haiku,2024-06-27 08:24:44.639585+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,145394,Haiku,2024-06-27 16:04:31.593211+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,158946,rationalTrader,2024-06-24 18:41:53.072118+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,163328,DigitumDei,2024-06-24 11:28:58.654339+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,163328,DigitumDei,2024-06-24 11:30:12.6443+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,163634,tomo_za,2024-06-24 07:41:34.814969+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-22 22:00:58.04551+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-22 22:09:59.415021+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-22 22:10:03.326424+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-22 22:10:43.499534+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-23 06:08:46.638497+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-23 06:09:09.598647+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-23 06:09:25.844202+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-23 06:09:29.158983+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-24 00:06:59.903073+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-24 00:07:14.867651+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-24 04:36:41.928346+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-24 04:37:59.291943+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-24 04:38:30.52833+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-24 04:39:57.947019+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-24 04:55:27.628177+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-24 04:55:43.483388+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-24 05:12:41.647502+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-24 05:12:51.966654+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-25 04:35:11.475873+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-25 04:35:40.957624+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,168191,ADQ,2024-06-27 05:05:05.225687+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,174017,MaxA,2024-06-23 18:57:11.081336+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,174017,MaxA,2024-06-24 06:47:08.054937+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,174017,MaxA,2024-06-24 18:23:03.257178+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,174017,MaxA,2024-06-26 02:34:06.035563+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,174017,MaxA,2024-06-27 05:54:04.630945+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,174017,MaxA,2024-06-27 15:50:13.663082+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,180079,ChamberOfReflection,2024-06-24 23:00:51.869304+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,180079,ChamberOfReflection,2024-06-24 23:01:13.459054+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,180079,ChamberOfReflection,2024-06-24 23:01:32.145419+00,,1101.0,1.0
+25524,How many cases of severe invasive streptococcal infections (TSLS) will be reported in Japan on July 2?,2024-06-19 17:04:19.990898+00,181888,harshitbiitk,2024-06-29 08:12:45.551683+00,,1101.0,1.0
+25530,When will these countries adopt the Euro? (Denmark),2024-06-20 02:47:58.289795+00,119188,exmateriae,2024-07-02 08:13:30.484001+00,,,1.0
+25530,When will these countries adopt the Euro? (Denmark),2024-06-20 02:47:58.289795+00,121719,TemetNosce,2024-07-09 22:08:52.510627+00,,,1.0
+25530,When will these countries adopt the Euro? (Denmark),2024-06-20 02:47:58.289795+00,135380,lubossaloky,2024-06-22 12:41:26.961468+00,,,1.0
+25531,When will these countries adopt the Euro? (Hungary),2024-06-20 02:47:58.289893+00,119188,exmateriae,2024-07-05 10:01:15.586445+00,,,1.0
+25531,When will these countries adopt the Euro? (Hungary),2024-06-20 02:47:58.289893+00,121719,TemetNosce,2024-07-09 22:08:53.088401+00,,,1.0
+25531,When will these countries adopt the Euro? (Hungary),2024-06-20 02:47:58.289893+00,135380,lubossaloky,2024-06-22 12:39:06.698421+00,,,1.0
+25531,When will these countries adopt the Euro? (Hungary),2024-06-20 02:47:58.289893+00,157762,fallanga,2024-06-22 09:10:00.144143+00,,,1.0
+25533,When will these countries adopt the Euro? (Romania),2024-06-20 02:47:58.290089+00,119188,exmateriae,2024-07-05 10:01:52.155856+00,,,1.0
+25533,When will these countries adopt the Euro? (Romania),2024-06-20 02:47:58.290089+00,121719,TemetNosce,2024-07-09 22:08:54.347291+00,,,1.0
+25533,When will these countries adopt the Euro? (Romania),2024-06-20 02:47:58.290089+00,135380,lubossaloky,2024-06-22 12:38:02.78076+00,,,1.0
+25535,When will these countries adopt the Euro? (United Kingdom),2024-06-20 02:47:58.290284+00,119188,exmateriae,2024-07-01 11:48:55.738336+00,,,1.0
+25535,When will these countries adopt the Euro? (United Kingdom),2024-06-20 02:47:58.290284+00,119188,exmateriae,2024-07-01 11:49:09.630159+00,,,1.0
+25535,When will these countries adopt the Euro? (United Kingdom),2024-06-20 02:47:58.290284+00,119839,DaAdCh,2024-07-13 13:39:08.821357+00,,,1.0
+25535,When will these countries adopt the Euro? (United Kingdom),2024-06-20 02:47:58.290284+00,121719,TemetNosce,2024-07-09 22:08:55.483603+00,,,1.0
+25535,When will these countries adopt the Euro? (United Kingdom),2024-06-20 02:47:58.290284+00,126666,vakrasiak,2024-06-22 19:08:42.075405+00,,,1.0
+25535,When will these countries adopt the Euro? (United Kingdom),2024-06-20 02:47:58.290284+00,135380,lubossaloky,2024-06-22 12:40:31.165295+00,,,1.0
+25535,When will these countries adopt the Euro? (United Kingdom),2024-06-20 02:47:58.290284+00,139161,Zaldath,2024-06-23 09:57:38.308968+00,,,1.0
+25535,When will these countries adopt the Euro? (United Kingdom),2024-06-20 02:47:58.290284+00,139161,Zaldath,2024-06-23 09:57:54.60384+00,,,1.0
+25535,When will these countries adopt the Euro? (United Kingdom),2024-06-20 02:47:58.290284+00,157762,fallanga,2024-06-22 09:10:02.02285+00,,,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,103777,datscilly,2024-07-11 03:50:15.440457+00,0.72,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,117580,MaciekK,2024-07-10 05:14:20.100837+00,0.85,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,117580,MaciekK,2024-07-11 07:19:24.637018+00,0.8,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,119215,rappatoni,2024-07-10 21:43:25.361585+00,0.85,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,119215,rappatoni,2024-07-11 11:33:39.301119+00,0.87,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,120160,OpenSystem,2024-07-10 09:26:45.071891+00,0.8,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,126626,skmmcj,2024-07-09 13:44:04.150202+00,0.72,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,126626,skmmcj,2024-07-11 11:51:39.453361+00,0.84,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,126626,skmmcj,2024-07-11 11:51:52.78776+00,0.845,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,126626,skmmcj,2024-07-11 11:59:38.066655+00,0.885,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,131306,draaglom,2024-07-09 21:36:44.038889+00,0.85,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,133827,partlygloudy,2024-07-11 01:43:10.166207+00,0.9,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,133827,partlygloudy,2024-07-11 01:49:04.091937+00,0.82,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,139161,Zaldath,2024-07-08 23:30:12.73463+00,0.2,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,139161,Zaldath,2024-07-09 11:22:52.494442+00,0.55,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,139161,Zaldath,2024-07-09 11:25:37.099646+00,0.7,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,139161,Zaldath,2024-07-09 15:00:08.340938+00,0.75,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,139161,Zaldath,2024-07-09 22:15:11.915338+00,0.8,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,139161,Zaldath,2024-07-11 11:57:21.516429+00,0.9,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,139876,Perspectus,2024-07-09 20:27:24.612297+00,0.89,yes,1.0
+25970,"Will the Prime Minister of France belong to the Together coalition on July 30, 2024?",2024-07-08 21:04:58.936676+00,139876,Perspectus,2024-07-11 14:12:19.823378+00,0.92,yes,1.0
