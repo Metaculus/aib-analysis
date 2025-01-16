@@ -1,10 +1,10 @@
 Rank,Forecaster,Weighted_Baseline,Count,Weighted Count
-1,pro_median,2436.0,77,55.9
+1,pro_median,2454.6,77,55.9
 2,pgodzinai,1563.3,77,55.9
 3,mf-bot-4,1499.3,77,55.9
 4,estr.ai,1278.5,67,45.9
 5,MWG,1268.5,67,48.9
-6,bot_median,1248.8,77,55.9
+6,bot_median,1239.4,77,55.9
 7,histerio,1215.6,77,55.9
 8,VeritasAI,1158.1,58,40.9
 9,twsummerbot,1116.5,77,55.9
