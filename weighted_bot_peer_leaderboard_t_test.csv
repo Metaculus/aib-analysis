@@ -1,6 +1,6 @@
 Rank,Bot,W_ave,W_count,lower_bound,upper_bound
 1,pgodzinai,12.8,333.9,8.7,17.0
-2,MWG,9.2,298.2,4.7,13.6
+2,MWG,9.2,298.2,4.8,13.6
 3,annabot,7.1,273.5,4.4,9.9
 4,histerio,7.1,333.9,3.6,10.5
 5,GreeneiBot2,7.0,333.9,3.4,10.5
@@ -20,7 +20,7 @@ Rank,Bot,W_ave,W_count,lower_bound,upper_bound
 19,gnosis-ai,2.7,311.2,-4.6,10.0
 20,estr.ai,1.4,294.9,-5.1,7.8
 21,karamazov,1.9,118.4,-5.2,9.0
-22,HunchexBot,10.6,22.5,-5.9,27.2
+22,HunchexBot,10.6,22.5,-5.8,27.0
 23,silicoqr,1.3,127.6,-6.0,8.7
 24,tombot61,1.2,111.5,-6.2,8.6
 25,Bot_Pepa,-0.9,256.4,-6.8,5.1
@@ -28,7 +28,7 @@ Rank,Bot,W_ave,W_count,lower_bound,upper_bound
 27,SaraBase,-0.8,317.4,-7.4,5.8
 28,archipelago,-2.2,315.5,-7.8,3.4
 29,bestworldbot,-2.8,314.9,-7.9,2.3
-30,jkraybill_bot,-1.2,196.1,-9.5,7.2
+30,jkraybill_bot,-1.2,196.1,-9.5,7.1
 31,Grizeu_Bot,-3.9,185.3,-11.0,3.2
 32,SynapseSeer,-4.9,329.9,-12.0,2.2
 33,000_bot,-6.2,282.5,-12.5,0.2
@@ -38,8 +38,8 @@ Rank,Bot,W_ave,W_count,lower_bound,upper_bound
 37,mf-bot-3,-9.9,323.1,-17.6,-2.2
 38,RonanMcGovern,-13.4,211.7,-22.6,-4.2
 39,lostandfound,-10.8,51.4,-24.8,3.1
-40,ProfessorSP,-7.3,52.9,-30.0,15.4
-41,lookahead,-9.2,23.7,-30.7,12.3
-42,predictomatic,-15.5,39.9,-38.1,7.0
-43,biak_bot,-139.1,51.8,-212.0,-66.3
+40,ProfessorSP,-7.3,52.9,-29.9,15.3
+41,lookahead,-9.2,23.7,-30.6,12.1
+42,predictomatic,-15.5,39.9,-38.0,6.9
+43,biak_bot,-139.1,51.8,-211.9,-66.3
 44,hlb-bot,27.2,1.0,,
