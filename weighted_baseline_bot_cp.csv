@@ -1,6 +1,6 @@
 Rank,Forecaster,Weighted_Baseline,Count,Weighted Count
 1,pro_median,620.6,43,32.1
-2,cp_baseline_score,525.9,43,32.1
+2,cp_baseline_score,541.2,43,32.1
 3,estr.ai,370.4,32,23.2
 4,manticAI,313.0,41,30.1
 5,mf-bot-4,247.2,43,32.1
