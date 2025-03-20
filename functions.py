@@ -11,7 +11,15 @@ import random
 import math
 
 def convert_baseline_to_forecasts(df):
-    # Assumes columns: 'bot_question_id' 'resolution'
+    """
+    Converts baseline scores to forecasts based on resolution.
+
+    Args:
+        df (pandas.DataFrame): DataFrame with columns 'bot_question_id', 'resolution', and 'score'.
+
+    Returns:
+        pandas.DataFrame: DataFrame with an additional 'forecast' column.
+    """
     result_df = df.copy()
 
     def score_to_forecast(score, resolution):
@@ -33,6 +41,12 @@ def add_is_median(df):
     Marks exactly one row per question_id as the median.
     Guarantees one median per question by taking the forecaster with 
     the actual median value for that question.
+
+    Args:
+        df (pandas.DataFrame): DataFrame with 'question_id' and 'forecast' columns.
+
+    Returns:
+        pandas.DataFrame: DataFrame with an additional 'is_median' column.
     """
     # Initialize median column
     df['is_median'] = False
@@ -53,13 +67,14 @@ def add_is_median(df):
 
 def add_median_rows(df, prefix):
     """
-    For each row where is_median=True, creates a duplicate row with forecaster='median'
-    
+    For each row where is_median=True, creates a duplicate row with forecaster='median'.
+
     Args:
-        df (pandas.DataFrame): DataFrame with 'is_median' and 'forecaster' columns
-    
+        df (pandas.DataFrame): DataFrame with 'is_median' and 'forecaster' columns.
+        prefix (str): Prefix to add to the 'forecaster' column for median rows.
+
     Returns:
-        pandas.DataFrame: Original dataframe plus duplicate rows for medians
+        pandas.DataFrame: Original DataFrame plus duplicate rows for medians.
     """
     # Get the median rows
     median_rows = df[df['is_median']].copy()
@@ -73,6 +88,15 @@ def add_median_rows(df, prefix):
     return whole
 
 def calculate_weighted_stats(df):
+    """
+    Calculates weighted statistics (mean, sum, standard error, confidence intervals) for each forecaster.
+
+    Args:
+        df (pandas.DataFrame): DataFrame with 'forecaster', 'score', and 'question_weight' columns.
+
+    Returns:
+        pandas.DataFrame: DataFrame with weighted statistics for each forecaster.
+    """
     results = []
 
     # For each forecaster
@@ -112,39 +136,58 @@ def calculate_weighted_stats(df):
 
 
 def make_wide(df_bot_peer, df_pro_bot_resolved_questions):
-  df_pivoted = df_bot_peer.pivot(index='bot_question_id', columns='forecaster', values='score')
-  df_pivoted = df_pivoted.reset_index()
-  df_pivoted = df_pivoted.reindex(sorted(df_pivoted.columns), axis=1)
+    """
+    Converts a long-format DataFrame to a wide-format DataFrame and merges question weights.
 
-  # Step 4: Move 'question_id' to be the first column
-  cols = df_pivoted.columns.tolist()
-  cols = ['bot_question_id'] + [col for col in cols if col != 'bot_question_id']
-  df_pivoted = df_pivoted[cols]
+    Args:
+        df_bot_peer (pandas.DataFrame): DataFrame with 'bot_question_id', 'forecaster', and 'score' columns.
+        df_pro_bot_resolved_questions (pandas.DataFrame): DataFrame with 'bot_question_id' and 'question_weight' columns.
 
-  all_columns = df_pivoted.columns.tolist()
-  ## Remove 'question_id' and 'bot_median' from the list if they exist
-  all_columns = [col for col in all_columns if col not in ['bot_question_id']]
-  new_column_order = ['bot_question_id'] + all_columns
-  df_pivoted = df_pivoted[new_column_order]
-  df_bot_peer_wide = df_pivoted
-  df_bot_peer_wide['bot_question_id'] = pd.to_numeric(df_bot_peer_wide['bot_question_id'], errors='coerce')
+    Returns:
+        pandas.DataFrame: Wide-format DataFrame with question weights merged.
+    """
+    df_pivoted = df_bot_peer.pivot(index='bot_question_id', columns='forecaster', values='score')
+    df_pivoted = df_pivoted.reset_index()
+    df_pivoted = df_pivoted.reindex(sorted(df_pivoted.columns), axis=1)
 
-  # Join with df_pro_bot_resolved_questions to get question weights
-  df_bot_peer_wide = pd.merge(
-      df_bot_peer_wide,
-      df_pro_bot_resolved_questions[['bot_question_id', 'question_weight']],
-      on='bot_question_id',
-      how='left'
-  )
+    # Step 4: Move 'question_id' to be the first column
+    cols = df_pivoted.columns.tolist()
+    cols = ['bot_question_id'] + [col for col in cols if col != 'bot_question_id']
+    df_pivoted = df_pivoted[cols]
 
-  return df_bot_peer_wide
+    all_columns = df_pivoted.columns.tolist()
+    ## Remove 'question_id' and 'bot_median' from the list if they exist
+    all_columns = [col for col in all_columns if col not in ['bot_question_id']]
+    new_column_order = ['bot_question_id'] + all_columns
+    df_pivoted = df_pivoted[new_column_order]
+    df_bot_peer_wide = df_pivoted
+    df_bot_peer_wide['bot_question_id'] = pd.to_numeric(df_bot_peer_wide['bot_question_id'], errors='coerce')
 
-# @title function t_critical_value
-# Example usage
-#print(f"Critical t-value for df=3.5: {t_critical_value(3.5)}")
-#print(f"Critical t-value for df=35: {t_critical_value(35)}")
-#print(f"Critical t-value for df=200: {t_critical_value(200)}")
+    # Join with df_pro_bot_resolved_questions to get question weights
+    df_bot_peer_wide = pd.merge(
+        df_bot_peer_wide,
+        df_pro_bot_resolved_questions[['bot_question_id', 'question_weight']],
+        on='bot_question_id',
+        how='left'
+    )
+
+    return df_bot_peer_wide
+
 def t_critical_value(df):
+    """
+    Calculates the critical t-value for a given degrees of freedom (df) for a 95% confidence interval.
+
+    Args:
+        df (int or float): Degrees of freedom.
+
+    Returns:
+        float: Critical t-value.
+    
+    Example usage:
+        print(f"Critical t-value for df=3.5: {t_critical_value(3.5)}")
+        print(f"Critical t-value for df=35: {t_critical_value(35)}")
+        print(f"Critical t-value for df=200: {t_critical_value(200)}")
+    """
     # Dictionary containing t-values for 95% confidence interval (2-tailed)
     t_table = {
         1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571,
@@ -184,20 +227,55 @@ the bias in the sample variance.
 """
 
 def calc_weighted_std_dev(df3, bot, weighted_score, weighted_count, weight_col):
-  """(A) aka Molly's Way"""
-  weighted_average = weighted_score / weighted_count
-  return np.sqrt(((df3[bot] - weighted_average) ** 2 * df3[weight_col]).sum() / (weighted_count - 1))
+    """
+    Calculates the weighted standard deviation using Molly's method - (A) from stack exchange post.
+
+    Args:
+        df3 (pandas.DataFrame): DataFrame containing the data.
+        bot (str): Column name for the bot's scores.
+        weighted_score (float): Weighted score.
+        weighted_count (int): Weighted count.
+        weight_col (str): Column name for the weights.
+
+    Returns:
+        float: Weighted standard deviation.
+    """
+    weighted_average = weighted_score / weighted_count
+    return np.sqrt(((df3[bot] - weighted_average) ** 2 * df3[weight_col]).sum() / (weighted_count - 1))
   
 def calc_weighted_std_dev2(df3, bot, weighted_score, weighted_count, weight_col):
-  """(C) aka Claude's Way via Nikos"""
-  weighted_average = weighted_score / weighted_count
-  return np.sqrt(
-    (df3[weight_col] * (df3[bot] - weighted_average) ** 2).sum() / 
-    (df3[weight_col].sum() * (1 - (df3[weight_col] ** 2).sum() / (df3[weight_col].sum() ** 2)))
-  )
+    """
+    Calculates the weighted standard deviation using Claude (via Nikos) method - (C) from stack exchange post.
 
-# @title Bootstrapping
+    Args:
+        df3 (pandas.DataFrame): DataFrame containing the data.
+        bot (str): Column name for the bot's scores.
+        weighted_score (float): Weighted score.
+        weighted_count (int): Weighted count.
+        weight_col (str): Column name for the weights.
+
+    Returns:
+        float: Weighted standard deviation.
+    """
+    weighted_average = weighted_score / weighted_count
+    return np.sqrt(
+        (df3[weight_col] * (df3[bot] - weighted_average) ** 2).sum() / 
+        (df3[weight_col].sum() * (1 - (df3[weight_col] ** 2).sum() / (df3[weight_col].sum() ** 2)))
+    )
+
 def weighted_bootstrap_analysis(df_bot_peer_wide, bots, NUM, ITER):
+    """
+    Performs weighted bootstrap analysis to calculate confidence intervals and medians.
+
+    Args:
+        df_bot_peer_wide (pandas.DataFrame): DataFrame with bot scores and question weights.
+        bots (list): List of bot column names.
+        NUM (int): Number of samples to draw in each bootstrap iteration.
+        ITER (int): Number of bootstrap iterations.
+
+    Returns:
+        pandas.DataFrame: DataFrame with confidence intervals and medians for each bot.
+    """
     # Function to perform a single bootstrap iteration
     def single_bootstrap(df):
         # Weighted sampling of questions
@@ -232,11 +310,30 @@ def weighted_bootstrap_analysis(df_bot_peer_wide, bots, NUM, ITER):
 
     return output_df
 
-# Function to calculate median forecast for a given number of bots
 def calculate_median_forecast(df, bots):
+    """
+    Calculates the median forecast for a given set of bots.
+
+    Args:
+        df (pandas.DataFrame): DataFrame with bot forecast columns.
+        bots (list): List of bot column names.
+
+    Returns:
+        pandas.Series: Median forecast for each row.
+    """
     return df[bots].median(axis=1)
 
 def calculate_weighted_scores(df_bot_team_forecasts, teams):
+    """
+    Calculates weighted scores for each team based on their forecasts and question weights.
+
+    Args:
+        df_bot_team_forecasts (pandas.DataFrame): DataFrame with team forecasts and question weights.
+        teams (list): List of team column names.
+
+    Returns:
+        pandas.Series: Weighted scores for each team.
+    """
     # Initialize a dictionary to store the weighted scores for each team
     team_scores = {team: 0 for team in teams}
 
@@ -266,8 +363,16 @@ def calculate_weighted_scores(df_bot_team_forecasts, teams):
     return pd.Series(team_scores)
 
 def calculate_head_to_head(row, a, b):
-    """ Calculate the head-to-head score for a given row. If positive, a did better than b; if
-    negative, b did better than a. E.g. when comparing bots to pros, a is bot and b is pros.
+    """
+    Calculates the head-to-head score for two forecasters. If positive, a did better than b; if negative, a did worse than b.
+
+    Args:
+        row (pandas.Series): Row of the DataFrame containing 'resolution' and forecaster columns.
+        a (str): Column name for the first forecaster.
+        b (str): Column name for the second forecaster.
+
+    Returns:
+        float: Head-to-head score.
     """
     if (row['resolution'] == 'yes') | (row['resolution'] == 1):
         return 100* np.log(row[a] / row[b])
@@ -276,42 +381,63 @@ def calculate_head_to_head(row, a, b):
     else:
         return np.nan
 
-# Assuming df_top_bot_pro_forecasts is already defined and contains the 'head_to_head' column
 def plot_head_to_head_distribution(df_forecasts, col='head_to_head', vs=('Bot Team', 'Pros')):
-  # Extract the 'head_to_head' data
-  data = df_forecasts[col]
+    """
+    Plots the distribution of head-to-head scores and fits a Gaussian curve.
 
-  # Calculate the mean and standard deviation
-  mean = np.mean(data)
-  std = np.std(data)
+    Args:
+        df_forecasts (pandas.DataFrame): DataFrame with head-to-head scores.
+        col (str): Column name for head-to-head scores.
+        vs (tuple): Tuple of labels for the comparison (e.g., ('Bot Team', 'Pros')), for plot title.
 
-  # Create the histogram
-  plt.figure(figsize=(10, 6))
-  n, bins, patches = plt.hist(data, bins=30, density=True, alpha=0.7, color='skyblue')
+    Returns:
+        None
+    """
+    # Extract the 'head_to_head' data
+    data = df_forecasts[col]
 
-  # Generate points for the fitted Gaussian curve
-  x = np.linspace(min(data), max(data), 100)
-  y = norm.pdf(x, mean, std)
+    # Calculate the mean and standard deviation
+    mean = np.mean(data)
+    std = np.std(data)
 
-  # Plot the fitted Gaussian curve
-  plt.plot(x, y, 'r-', linewidth=2, label='Fitted Gaussian')
+    # Create the histogram
+    plt.figure(figsize=(10, 6))
+    n, bins, patches = plt.hist(data, bins=30, density=True, alpha=0.7, color='skyblue')
 
-  # Customize the plot
-  plt.title(f'{vs[0]} Head-to-Head Scores vs {vs[1]}')
-  plt.xlabel('Head-to-Head Score')
-  plt.ylabel('Density')
-  plt.legend()
+    # Generate points for the fitted Gaussian curve
+    x = np.linspace(min(data), max(data), 100)
+    y = norm.pdf(x, mean, std)
 
-  # Add text annotation for the mean
-  #plt.text(0.95, 0.95, f'Mean: {mean:.2f}', transform=plt.gca().transAxes, verticalalignment='top', horizontalalignment='right')
+    # Plot the fitted Gaussian curve
+    plt.plot(x, y, 'r-', linewidth=2, label='Fitted Gaussian')
 
-  # Display the plot
-  plt.show()
+    # Customize the plot
+    plt.title(f'{vs[0]} Head-to-Head Scores vs {vs[1]}')
+    plt.xlabel('Head-to-Head Score')
+    plt.ylabel('Density')
+    plt.legend()
 
-  # Print the average
-  print(f"The average of 'head_to_head' is: {mean:.2f}")
+    # Add text annotation for the mean
+    #plt.text(0.95, 0.95, f'Mean: {mean:.2f}', transform=plt.gca().transAxes, verticalalignment='top', horizontalalignment='right')
 
-def calculate_calibration_curve(forecasts: list[float], resolutions: list[int], weights: list[float]) -> dict:
+    # Display the plot
+    plt.show()
+
+    # Print the average
+    print(f"The average of 'head_to_head' is: {mean:.2f}")
+
+def calculate_calibration_curve(forecasts, resolutions, weights):
+    """
+    Calculates a calibration curve for forecasts.
+
+    Args:
+        forecasts (list[float]): List of forecast probabilities.
+        resolutions (list[int]): List of actual outcomes (0 or 1).
+        weights (list[float]): List of weights for each forecast.
+
+    Returns:
+        dict: Calibration curve data.
+    """
     calibration_curve = []
     # Same number of forecasts in each bin
     quintiles = np.quantile(forecasts, [0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
@@ -357,8 +483,19 @@ def calculate_calibration_curve(forecasts: list[float], resolutions: list[int], 
         "calibration_curve": calibration_curve,
     }
 
-
 def plot_calibration_curve(df, column_name, label, color):
+    """
+    Plots a calibration curve with confidence intervals.
+
+    Args:
+        df (pandas.DataFrame): DataFrame with forecast and resolution data.
+        column_name (str): Column name for forecast probabilities.
+        label (str): Label for the plot.
+        color (str): Color for the plot.
+
+    Returns:
+        None
+    """
     y_true = df['resolution']
     y_pred = df[column_name]
     weights = [1.0 for _ in y_true]
@@ -381,14 +518,16 @@ def plot_calibration_curve(df, column_name, label, color):
                     color=color,
                     fontsize=8)
 
-# Assuming df_top_bot_pro_forecasts is already defined
 def calculate_confidence(predictions, outcomes):
     """
-    Calculate over- or under-confidence for a set of predictions.
+    Calculates over- or under-confidence for a set of predictions.
 
-    :param predictions: Series of predicted probabilities
-    :param outcomes: Series of actual outcomes (0 or 1)
-    :return: Confidence score (positive for overconfidence, negative for underconfidence)
+    Args:
+        predictions (pandas.Series): Series of predicted probabilities.
+        outcomes (pandas.Series): Series of actual outcomes (0 or 1).
+
+    Returns:
+        float: Confidence score (positive for overconfidence, negative for underconfidence).
     """
     # Bin predictions into 10 equally spaced bins
     bins = pd.cut(predictions, bins=10)
@@ -404,8 +543,16 @@ def calculate_confidence(predictions, outcomes):
     # Return the average difference (excluding NaN values)
     return np.nanmean(confidence_diff)
 
-# Interpret the results
 def interpret_confidence(score):
+    """
+    Interprets the confidence score.
+
+    Args:
+        score (float): Confidence score.
+
+    Returns:
+        str: Interpretation of the confidence score.
+    """
     if score > 0:
         return f"Overconfident by {score:.4f}"
     elif score < 0:
@@ -414,36 +561,18 @@ def interpret_confidence(score):
         return "Perfectly calibrated"
 
 def create_discrimination_histogram(df, bot_col, pro_col, resolution_col):
-    # Create figure and axes
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
+    """
+    Creates histograms to compare discrimination between bot and pro teams.
 
-    # Define bin edges
-    #bins = np.linspace(0, 1, 11)
-    bins = np.linspace(0, 1, 6)
+    Args:
+        df (pandas.DataFrame): DataFrame with forecast and resolution data.
+        bot_col (str): Column name for bot forecasts.
+        pro_col (str): Column name for pro forecasts.
+        resolution_col (str): Column name for resolutions.
 
-    # Bot team histogram
-    ax1.hist([df[df[resolution_col] == 0][bot_col],
-              df[df[resolution_col] == 1][bot_col]],
-             bins=bins, label=['Resolved 0', 'Resolved 1'], alpha=0.7)
-    ax1.set_title('Bot Team Discrimination Histogram')
-    ax1.set_xlabel('Probability')
-    ax1.set_ylabel('Frequency')
-    ax1.legend()
-
-    # Pro team histogram
-    ax2.hist([df[df[resolution_col] == 0][pro_col],
-              df[df[resolution_col] == 1][pro_col]],
-             bins=bins, label=['Resolved 0', 'Resolved 1'], alpha=0.7)
-    ax2.set_title('Pro Team Discrimination Histogram')
-    ax2.set_xlabel('Probability')
-    ax2.set_ylabel('Frequency')
-    ax2.legend()
-
-    # Adjust layout and display
-    plt.tight_layout()
-    plt.show()
-
-def create_discrimination_histogram(df, bot_col, pro_col, resolution_col):
+    Returns:
+        None
+    """
     # Create figure and axes
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
     
@@ -480,26 +609,45 @@ def create_discrimination_histogram(df, bot_col, pro_col, resolution_col):
     plt.tight_layout()
     plt.show()
 
-def get_weighted_score(df_forecasts):  # TK: Interval? Might come later
-  # Calculate the weighted score for each row
-  df_forecasts['weighted_score'] = df_forecasts['head_to_head'] * df_forecasts['question_weight']
+def get_weighted_score(df_forecasts):
+    """
+    Calculates the weighted total score for forecasts.
 
-  # Calculate the total weighted score
-  total_weighted_score = df_forecasts['weighted_score'].sum()
+    Args:
+        df_forecasts (pandas.DataFrame): DataFrame with 'head_to_head' and 'question_weight' columns.
 
-  # Calculate the sum of weights
-  total_weight = df_forecasts['question_weight'].sum()
+    Returns:
+        float: Weighted total score.
+    """
+    # Calculate the weighted score for each row
+    df_forecasts['weighted_score'] = df_forecasts['head_to_head'] * df_forecasts['question_weight']
 
-  # Calculate the weighted total score
-  weighted_total_score = total_weighted_score / total_weight
+    # Calculate the total weighted score
+    total_weighted_score = df_forecasts['weighted_score'].sum()
 
-  print(f"Weighted Total Score: {weighted_total_score:.4f}")
+    # Calculate the sum of weights
+    total_weight = df_forecasts['question_weight'].sum()
 
-  return weighted_total_score
+    # Calculate the weighted total score
+    weighted_total_score = total_weighted_score / total_weight
+
+    print(f"Weighted Total Score: {weighted_total_score:.4f}")
+
+    return weighted_total_score
 
 # ====== CODE FROM LUKE, REFACTORED BY CHATGPT =======
 
-def string_location_to_scaled_location(string_location: str, question_row: pd.Series) -> float:
+def string_location_to_scaled_location(string_location, question_row):
+    """
+    Converts a string location to a scaled location based on question type.
+
+    Args:
+        string_location (str): String representation of the location.
+        question_row (pandas.Series): Row of the DataFrame containing question metadata.
+
+    Returns:
+        float: Scaled location.
+    """
     if string_location in ["ambiguous", "annulled"]:
         raise ValueError("Cannot convert ambiguous or annulled to any real locations")
 
@@ -523,7 +671,17 @@ def string_location_to_scaled_location(string_location: str, question_row: pd.Se
     # question.type == "numeric"
     return float(string_location)
 
-def scaled_location_to_unscaled_location(scaled_location: float, question_row: pd.Series) -> float:
+def scaled_location_to_unscaled_location(scaled_location, question_row):
+    """
+    Converts a scaled location to an unscaled location based on question type.
+
+    Args:
+        scaled_location (float): Scaled location.
+        question_row (pandas.Series): Row of the DataFrame containing question metadata.
+
+    Returns:
+        float: Unscaled location.
+    """
     question_type = question_row["type"]
 
     if question_type in ["binary", "multiple_choice"]:
@@ -542,13 +700,18 @@ def scaled_location_to_unscaled_location(scaled_location: float, question_row: p
 
     return (scaled_location - range_min) / (range_max - range_min)
 
-def nominal_location_to_cdf_location(
-    nominal_location: str | float,
-    question_data: dict,
-) -> float:
-    """Takes a location in nominal format (e.g. 123, "123",
-    or datetime in iso format) and scales it to metaculus's
-    "internal representation" range [0,1] incorporating question scaling"""
+def nominal_location_to_cdf_location(nominal_location, question_data):
+    """
+    Takes a location in nominal format (e.g. 123, "123", or datetime in iso format) and scales it to
+    metaculus's "internal representation" range [0, 1] incorporating question scaling
+
+    Args:
+        nominal_location (str or float): Nominal location.
+        question_data (dict): Dictionary containing question metadata.
+
+    Returns:
+        float: CDF location.
+    """
     if question_data["type"] == "date":
         scaled_location = datetime.fromisoformat(nominal_location).timestamp()
     else:
@@ -572,9 +735,17 @@ def nominal_location_to_cdf_location(
         unscaled_location = (scaled_location - range_min) / (range_max - range_min)
     return unscaled_location
 
-def get_cdf_at(cdf, unscaled_location) -> float:
-    """CDF is a list of values, unscaled_location is a float
-    with 0 meaning lower bound and 1 meaning upper bound"""
+def get_cdf_at(cdf, unscaled_location):
+    """
+    Retrieves the CDF value at a given unscaled location.
+
+    Args:
+        cdf (list[float]): List of CDF values.
+        unscaled_location (float): Unscaled location, with 0 meaning lower bound and 1 meaning upper bound.
+
+    Returns:
+        float: CDF value.
+    """
     if unscaled_location <= 0:
         return cdf[0]
     if unscaled_location >= 1:
@@ -594,22 +765,58 @@ def get_cdf_at(cdf, unscaled_location) -> float:
 # ======== END OF LUKE'S CODE ==========
 
 def cdf_between(row, cdf, lower_bound, upper_bound):
-  a = get_cdf_at(cdf, nominal_location_to_cdf_location(lower_bound, row))
-  b = get_cdf_at(cdf, nominal_location_to_cdf_location(upper_bound, row))
-  return (b - a)
+    """
+    Calculates the probability between two bounds using the CDF.
 
-# Any time the year does not match, remove the row. Find the year in question_title and title
+    Args:
+        row (pandas.Series): Row of the DataFrame containing question metadata.
+        cdf (list[float]): List of CDF values.
+        lower_bound (float): Lower bound.
+        upper_bound (float): Upper bound.
+
+    Returns:
+        float: Probability between the bounds.
+    """
+    a = get_cdf_at(cdf, nominal_location_to_cdf_location(lower_bound, row))
+    b = get_cdf_at(cdf, nominal_location_to_cdf_location(upper_bound, row))
+    return (b - a)
+
 def extract_year(title):
+    """
+    Extracts the year from a title string.
+
+    Args:
+        title (str): Title string.
+
+    Returns:
+        int or None: Extracted year or None if not found.
+    """
     match = re.search(r'\b(19|20)\d{2}\b', title)
     return int(match.group(0)) if match else None
 
-# If there is a month in question_title, make sure it is also in title
 def extract_month(title):
+    """
+    Extracts the month from a title string.
+
+    Args:
+        title (str): Title string.
+
+    Returns:
+        str or None: Extracted month or None if not found.
+    """
     match = re.search(r'\b(January|February|March|April|May|June|July|August|September|October|November|December)\b', title)
     return match.group(0) if match else None
 
-# Gracefully compute cp_baseline_score
 def compute_cp_baseline_score(value):
+    """
+    Gracefully computes the cp_baseline_score.
+
+    Args:
+        value (float): Input value.
+
+    Returns:
+        float: Computed cp_baseline_score or NaN if invalid.
+    """
     try:
         # Ensure the value is numeric and not NaN
         if pd.isna(value) or not isinstance(value, (int, float)):
@@ -622,11 +829,15 @@ def compute_cp_baseline_score(value):
 
 def process_forecast_values(df):
     """
-    Adds a new column 'bucket_forecast_value' to the DataFrame.
+    Adds a 'bucket_forecast_value' column to the DataFrame (for interpreting CP distribution as a
+    binary forecast, e.g. what probability mass did CP assign to "less than 7")
     Handles 'binary_version_tuple' and applies logic for 'less', 'greater', and 'complicated'.
 
-    :param df: DataFrame with 'binary_version_tuple', 'forecast_values', and other question-specific columns
-    :return: Updated DataFrame with 'bucket_forecast_value' column added
+    Args:
+        df (pandas.DataFrame): DataFrame with 'binary_version_tuple', 'forecast_values', and other question-specific columns.
+
+    Returns:
+        pandas.DataFrame: Updated DataFrame with 'bucket_forecast_value' column added.
     """
     def compute_bucket_forecast_value(row):
         # Handle binary_version_tuple gracefully
