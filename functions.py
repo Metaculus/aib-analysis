@@ -173,52 +173,6 @@ def make_wide(df_bot_peer, df_pro_bot_resolved_questions):
 
     return df_bot_peer_wide
 
-def t_critical_value(df):
-    """
-    Calculates the critical t-value for a given degrees of freedom (df) for a 95% confidence interval.
-
-    Args:
-        df (int or float): Degrees of freedom.
-
-    Returns:
-        float: Critical t-value.
-    
-    Example usage:
-        print(f"Critical t-value for df=3.5: {t_critical_value(3.5)}")
-        print(f"Critical t-value for df=35: {t_critical_value(35)}")
-        print(f"Critical t-value for df=200: {t_critical_value(200)}")
-    """
-    # Dictionary containing t-values for 95% confidence interval (2-tailed)
-    t_table = {
-        1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571,
-        6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228,
-        11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131,
-        16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086,
-        21: 2.080, 22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060,
-        26: 2.056, 27: 2.052, 28: 2.048, 29: 2.045, 30: 2.042,
-        40: 2.021, 50: 2.009, 60: 2.000, 70: 1.994, 80: 1.990,
-        90: 1.987, 100: 1.984, 1000: 1.962, float('inf'): 1.960
-    }
-
-    # Check if df is in the table
-    if df in t_table:
-        return t_table[df]
-
-    # If df is not in the table, find the closest lower df
-    lower_df = max(key for key in t_table.keys() if key <= df)
-
-    # If df is between two values, perform linear interpolation
-    if lower_df < df:
-        upper_df = min(key for key in t_table.keys() if key > df)
-        lower_t = t_table[lower_df]
-        upper_t = t_table[upper_df]
-
-        # Linear interpolation
-        t_value = lower_t + (upper_t - lower_t) * (df - lower_df) / (upper_df - lower_df)
-        return round(t_value, 3)
-
-    return t_table[lower_df]
-
 """
 Options from https://stats.stackexchange.com/questions/47325/bias-correction-in-weighted-variance
 I didn't think (B) beared trying, but could be wrong. - MGH
@@ -361,6 +315,113 @@ def calculate_weighted_scores(df_bot_team_forecasts, teams):
 
     # Convert the dictionary to a pandas Series for easier handling
     return pd.Series(team_scores)
+
+def calculate_t_test(df_input, bot_list, weight_col='question_weight'):
+    """
+    Calculates weighted statistics, including t-test and p-values, for multiple bots.
+
+    Args:
+        df_input (pandas.DataFrame): 
+            DataFrame with peer scores, such as `df_bot_vs_pro_peer`, comparing each bot to the pro median.
+        bot_list (list): 
+            List of column names corresponding to bot scores.
+        weight_col (str, optional): 
+            Name of the column containing weights. Defaults to 'question_weight'.
+
+    Returns:
+        pandas.DataFrame: 
+            Leaderboard DataFrame with calculated statistics for each bot, including:
+            - W_score: Weighted score.
+            - W_count: Weighted count.
+            - W_ave: Weighted average.
+            - W_stdev: Weighted standard deviation.
+            - std_err: Standard error.
+            - t_stat: T-statistic.
+            - t_crit: Critical t-value.
+            - upper_bound: Upper confidence bound.
+            - lower_bound: Lower confidence bound.
+            - cdf: Cumulative distribution function value.
+            - p_value: Two-tailed p-value.
+    """
+    # Initialize results dataframe
+    df_W_leaderboard = pd.DataFrame(index=bot_list)
+    
+    for bot in bot_list:
+        # Create working copy with just needed columns
+        df3 = df_input[[bot, weight_col]].copy()
+        df3 = df3.dropna()
+        df3 = df3.reset_index(drop=True)
+        
+        # Calculate weighted statistics
+        weighted_score = (df3[bot] * df3[weight_col]).sum()
+        weighted_count = df3[weight_col].sum()
+        
+        if weighted_count > 2:  # Only calculate if we have enough data
+            weighted_average = weighted_score / weighted_count
+            weighted_std_dev = calc_weighted_std_dev2(df3, bot, weighted_score, weighted_count, weight_col)
+            std_error = weighted_std_dev / np.sqrt(weighted_count)
+            t_statistic = (weighted_average - 0) / std_error
+            
+            # Get t-critical value and confidence bounds
+            effective_n = (df3[weight_col].sum() ** 2) / (df3[weight_col] ** 2).sum()
+            t_crit = stats.t.ppf(0.975, df=effective_n - 1)  # 95% confidence level
+            upper_bound = weighted_average + t_crit * std_error
+            lower_bound = weighted_average - t_crit * std_error
+            
+            # Calculate CDF and p-value
+            cdf = stats.t.cdf(t_statistic, df=weighted_count-1)
+            p_value = 2 * min(cdf, 1 - cdf)  # Two-tailed p-value
+            
+        else:  # Not enough data
+            weighted_average = weighted_score / weighted_count if weighted_count > 0 else np.nan
+            weighted_std_dev = np.nan
+            std_error = np.nan
+            t_statistic = np.nan
+            t_crit = np.nan
+            upper_bound = np.nan
+            lower_bound = np.nan
+            cdf = np.nan
+            p_value = np.nan
+        
+        # Store results
+        df_W_leaderboard.loc[bot, 'W_score'] = weighted_score
+        df_W_leaderboard.loc[bot, 'W_count'] = weighted_count
+        df_W_leaderboard.loc[bot, 'W_ave'] = weighted_average
+        df_W_leaderboard.loc[bot, 'W_stdev'] = weighted_std_dev
+        df_W_leaderboard.loc[bot, 'std_err'] = std_error
+        df_W_leaderboard.loc[bot, 't_stat'] = t_statistic
+        df_W_leaderboard.loc[bot, 't_crit'] = t_crit
+        df_W_leaderboard.loc[bot, 'upper_bound'] = upper_bound
+        df_W_leaderboard.loc[bot, 'lower_bound'] = lower_bound
+        df_W_leaderboard.loc[bot, 'cdf'] = cdf
+        df_W_leaderboard.loc[bot, 'p_value'] = p_value
+    
+    # Format and round the results
+    df_W_leaderboard['W_score'] = df_W_leaderboard['W_score'].round(1)
+
+    # Store numerical p-values temporarily for sorting
+    df_W_leaderboard['_p_value_sort'] = df_W_leaderboard['p_value']
+    
+    # Format p-values as percentages
+    df_W_leaderboard['p_value'] = df_W_leaderboard['p_value'].apply(
+        lambda x: f"{x:.6f}" if pd.notnull(x) else "NA"
+    )
+    
+    # Round other columns
+    df_W_leaderboard[['W_ave', 'W_count', 'lower_bound', 'upper_bound']] = \
+        df_W_leaderboard[['W_ave', 'W_count', 'lower_bound', 'upper_bound']].round(1)
+    
+    # Sort by the numerical p-values
+    df_W_leaderboard = df_W_leaderboard.sort_values(
+        by='W_score',
+        ascending=False,
+        na_position='last'
+    )
+    
+    # Drop the temporary sorting column
+    df_W_leaderboard = df_W_leaderboard.drop('_p_value_sort', axis=1)
+     
+    return df_W_leaderboard
 
 def calculate_head_to_head(row, a, b):
     """
