@@ -1,14 +1,11 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import norm
-from scipy import stats
+from scipy.stats import norm, t
 from scipy.optimize import minimize_scalar
 from scipy.stats import binom
 import re
 from datetime import datetime
-import random
-import math
 
 def convert_baseline_to_forecasts(df):
     """
@@ -364,12 +361,12 @@ def calculate_t_test(df_input, bot_list, weight_col='question_weight'):
             
             # Get t-critical value and confidence bounds
             effective_n = (df3[weight_col].sum() ** 2) / (df3[weight_col] ** 2).sum()
-            t_crit = stats.t.ppf(0.975, df=effective_n - 1)  # 95% confidence level
+            t_crit = t.ppf(0.975, df=effective_n - 1)  # 95% confidence level
             upper_bound = weighted_average + t_crit * std_error
             lower_bound = weighted_average - t_crit * std_error
             
             # Calculate CDF and p-value
-            cdf = stats.t.cdf(t_statistic, df=weighted_count-1)
+            cdf = t.cdf(t_statistic, df=weighted_count-1)
             p_value = 2 * min(cdf, 1 - cdf)  # Two-tailed p-value
             
         else:  # Not enough data
