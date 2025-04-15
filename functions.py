@@ -557,6 +557,8 @@ def plot_calibration_curve(df, column_name, label, color):
     Returns:
         None
     """
+    df = df[df['resolution'].isin(['yes', 'no'])]
+
     y_true = df['resolution']
     y_pred = df[column_name]
     weights = [1.0 for _ in y_true]
