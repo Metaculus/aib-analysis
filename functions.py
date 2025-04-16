@@ -10,6 +10,51 @@ from datetime import datetime
 import random
 import math
 
+def extract_forecast(df):
+    # Extract the forecast from whichever column it's in
+    df['forecast'] = df['probability_yes'].combine_first(
+        df['probability_yes_per_category'].combine_first(
+            df['continuous_cdf']
+        )
+    )
+    return df
+
+def process_forecasts(df):
+    """
+    Process a dataframe of forecasts by:
+    1. Extracting the non-null forecast value
+    2. Sorting by created_at to get chronological order
+    3. Taking the last forecast for each (forecaster, question_id) pair
+    4. Dropping unused columns
+    
+    Parameters:
+    -----------
+    df : pandas DataFrame
+        DataFrame containing forecast data
+        
+    Returns:
+    --------
+    pandas DataFrame
+        Processed DataFrame with last forecasts
+    """
+    # Extract the forecast value
+    df['forecast'] = df['probability_yes'].combine_first(
+        df['probability_yes_per_category'].combine_first(
+            df['continuous_cdf']
+        )
+    )
+    
+    # Sort by created_at to ensure chronological order
+    df = df.sort_values(by='created_at')
+    
+    # Take the last forecast for each (forecaster, question_id) pair
+    df = df.groupby(['question_id', 'forecaster']).last().reset_index()
+    
+    # Drop the original forecast columns as they're now redundant
+    df = df.drop(['probability_yes', 'probability_yes_per_category', 'continuous_cdf'], axis=1)
+    
+    return df
+
 def convert_baseline_to_forecasts(df):
     """
     Converts baseline scores to forecasts based on resolution.
