@@ -311,16 +311,125 @@ def weighted_bootstrap_analysis(df_bot_peer_wide, bots, NUM, ITER):
 
 def calculate_median_forecast(df, bots):
     """
-    Calculates the median forecast for a given set of bots.
-
+    Calculates the median forecast for a given set of bots, handling different question types properly.
+    
     Args:
-        df (pandas.DataFrame): DataFrame with bot forecast columns.
+        df (pandas.DataFrame): DataFrame with bot forecast columns and question metadata.
         bots (list): List of bot column names.
-
+        
     Returns:
         pandas.Series: Median forecast for each row.
     """
-    return df[bots].median(axis=1)
+    # Create a new Series to store the results
+    median_forecasts = pd.Series(index=df.index)
+    
+    # Process each row individually
+    for idx, row in df.iterrows():
+        question_type = row['type']
+        
+        if question_type == 'binary':
+            # For binary questions, just take the median of probabilities
+            valid_forecasts = [row[bot] for bot in bots if not pd.isna(row[bot])]
+            if valid_forecasts:
+                median_forecasts[idx] = np.median(valid_forecasts)
+            else:
+                median_forecasts[idx] = np.nan
+                
+        elif question_type == 'multiple_choice':
+            # For multiple choice, extract probabilities for the correct option
+            resolution_value = row['resolution']
+            options = row['options_parsed'] if 'options_parsed' in row else row['options']
+            
+            try:
+                # Find the index of the resolution in options
+                resolution_str = str(resolution_value)
+                resolution_index = options.index(resolution_str)
+                
+                # Extract the probability for the correct option from each bot's forecast
+                correct_probs = []
+                for bot in bots:
+                    bot_forecast = row[bot]
+                    if pd.isna(bot_forecast):
+                        continue
+                        
+                    # Parse the forecast if it's a string
+                    if isinstance(bot_forecast, str):
+                        try:
+                            bot_pmf = [float(x) for x in bot_forecast.strip('[]').split(',')]
+                            correct_probs.append(bot_pmf[resolution_index])
+                        except:
+                            pass
+                    # If it's already an array
+                    elif isinstance(bot_forecast, (list, np.ndarray)):
+                        try:
+                            correct_probs.append(bot_forecast[resolution_index])
+                        except:
+                            pass
+                
+                # Calculate median if we have valid forecasts
+                if correct_probs:
+                    median_forecasts[idx] = np.median(correct_probs)
+                else:
+                    median_forecasts[idx] = np.nan
+                    
+            except:
+                median_forecasts[idx] = np.nan
+                
+        elif question_type == 'numeric':
+            # For numeric questions, extract probability mass on the correct answer
+            resolution_value = row['resolution']
+            
+            # Handle different resolution types
+            try:
+                correct_probs = []
+                
+                for bot in bots:
+                    bot_cdf = row[bot]
+                    if pd.isna(bot_cdf):
+                        continue
+                    
+                    # Skip if not a valid CDF
+                    if not isinstance(bot_cdf, (list, np.ndarray)):
+                        continue
+                    
+                    # Convert CDF to PMF
+                    bot_pmf = np.diff(np.concatenate([[0], bot_cdf]))
+                    
+                    # Handle special cases for resolution
+                    if resolution_value == 'below_lower_bound':
+                        # First bucket probability
+                        correct_probs.append(bot_pmf[0])
+                    elif resolution_value == 'above_upper_bound':
+                        # Last bucket probability (1 - last CDF value)
+                        correct_probs.append(1 - bot_cdf[-1])
+                    else:
+                        # Try to get the appropriate bucket for a numeric resolution
+                        try:
+                            resolution_float = float(resolution_value)
+                            cdf_location = nominal_location_to_cdf_location(resolution_float, row)
+                            bucket_index = min(int(cdf_location * (len(bot_pmf) - 1)), len(bot_pmf) - 1)
+                            correct_probs.append(bot_pmf[bucket_index])
+                        except:
+                            pass
+                
+                # Calculate median if we have valid forecasts
+                if correct_probs:
+                    median_forecasts[idx] = np.median(correct_probs)
+                else:
+                    median_forecasts[idx] = np.nan
+                    
+            except:
+                median_forecasts[idx] = np.nan
+        
+        else:
+            # For unknown question types, use the original method
+            valid_forecasts = [row[bot] for bot in bots if not pd.isna(row[bot])]
+            if valid_forecasts:
+                median_forecasts[idx] = np.median(valid_forecasts)
+            else:
+                median_forecasts[idx] = np.nan
+    
+    return median_forecasts
 
 def calculate_weighted_scores(df_bot_team_forecasts, teams):
     """
