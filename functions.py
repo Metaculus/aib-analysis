@@ -974,3 +974,187 @@ def process_forecast_values(df):
     # Apply the function to each row and overwrite forecast_value (currently contains cdf, which we no longer need)
     df['forecast_values'] = df.apply(compute_bucket_forecast_value, axis=1)
     return df
+
+def calculate_peer_score_numeric(row, bot_col, pro_col='pro_median'):
+    """Calculate peer score for numeric questions"""
+    try:
+        # Check if bot didn't provide a forecast
+        if pd.isna(row[bot_col]):
+            return np.nan
+            
+        resolution_value = row['resolution']
+        
+        # Get the CDF values
+        bot_cdf = row[bot_col]
+        pro_median_cdf = row[pro_col]
+        
+        # Handle special cases
+        if resolution_value == 'below_lower_bound':
+            # Use first point in CDF
+            if isinstance(bot_cdf, (list, np.ndarray)) and len(bot_cdf) > 0:
+                bot_prob = bot_cdf[0]
+            else:
+                return np.nan
+                
+            if isinstance(pro_median_cdf, (list, np.ndarray)) and len(pro_median_cdf) > 0:
+                pro_median_prob = pro_median_cdf[0]
+            else:
+                return np.nan
+                
+        elif resolution_value == 'above_upper_bound':
+            # Use (1 - last point in CDF)
+            if isinstance(bot_cdf, (list, np.ndarray)) and len(bot_cdf) > 0:
+                bot_prob = 1 - bot_cdf[-1]
+            else:
+                return np.nan
+                
+            if isinstance(pro_median_cdf, (list, np.ndarray)) and len(pro_median_cdf) > 0:
+                pro_median_prob = 1 - pro_median_cdf[-1]
+            else:
+                return np.nan
+                
+        else:
+            # Convert to float if it's a numeric resolution
+            try:
+                resolution_float = float(resolution_value)
+                
+                # Convert CDF to PMF
+                if isinstance(bot_cdf, (list, np.ndarray)) and isinstance(pro_median_cdf, (list, np.ndarray)):
+                    # Convert CDFs to PMFs
+                    bot_pmf = np.diff(np.concatenate([[0], bot_cdf]))
+                    pro_pmf = np.diff(np.concatenate([[0], pro_median_cdf]))
+                    
+                    # Use nominal_location_to_cdf_location to find the appropriate bucket
+                    cdf_location = nominal_location_to_cdf_location(resolution_float, row)
+                    
+                    # Find the appropriate bucket index
+                    bucket_index = min(int(cdf_location * (len(bot_pmf) - 1)), len(bot_pmf) - 1)
+                    
+                    # Get probabilities
+                    bot_prob = bot_pmf[bucket_index]
+                    pro_median_prob = pro_pmf[bucket_index]
+                else:
+                    return np.nan
+            except:
+                return np.nan
+        
+        # Ensure non-zero probabilities
+        bot_prob = max(bot_prob, 1e-10)
+        pro_median_prob = max(pro_median_prob, 1e-10)
+        
+        # Calculate peer score and divide by 2 for continuous questions
+        return np.log(bot_prob / pro_median_prob) / 2
+        
+    except Exception as e:
+        # Print the specific error for debugging
+        return np.nan
+
+def calculate_peer_score_binary(row, bot_col, pro_col='pro_median'):
+    """Calculate peer score for binary questions"""
+    if row['resolution'] == 'yes':
+        return np.log(row[bot_col] / row[pro_col])
+    else:  # resolution is 'no'
+        return np.log((1 - row[bot_col]) / (1 - row[pro_col]))
+
+def parse_cdf_string(cdf_string):
+    """Parse CDF string into numpy array"""
+    return np.array([float(x) for x in cdf_string.strip('[]').split(',')])
+
+def calculate_peer_score_multiple_choice(row, bot_col, pro_col='pro_median'):
+    """Calculate peer score for multiple choice questions"""
+    # Check if bot didn't provide a forecast (NaN)
+    if pd.isna(row[bot_col]):
+        return np.nan
+    
+    # Get the resolution value and options
+    resolution_value = row['resolution']
+    options = row['options_parsed'] if 'options_parsed' in row else row['options']
+    
+    # Find the index of the resolution in options array
+    resolution_str = str(resolution_value)
+    
+    try:
+        resolution_index = options.index(resolution_str)
+        
+        # Get the forecasts
+        bot_pmf_raw = row[bot_col]
+        pro_pmf_raw = row[pro_col]
+        
+        # Parse string representations of arrays if needed
+        if isinstance(bot_pmf_raw, str):
+            bot_pmf = [float(x) for x in bot_pmf_raw.strip('[]').split(',')]
+        else:
+            bot_pmf = bot_pmf_raw
+        
+        if isinstance(pro_pmf_raw, str):
+            pro_pmf = [float(x) for x in pro_pmf_raw.strip('[]').split(',')]
+        else:
+            pro_pmf = pro_pmf_raw
+        
+        # Get the probabilities at the correct index
+        bot_prob = bot_pmf[resolution_index]
+        pro_prob = pro_pmf[resolution_index]
+        
+        # Calculate peer score
+        return np.log(bot_prob / pro_prob)
+    except Exception as e:
+        # If any error occurs, return NaN
+        return np.nan
+
+def calculate_peer_score(row, bot_col, pro_col='pro_median'):
+    """Calculate peer score based on question type"""
+    if row['type'] == 'binary':
+        return calculate_peer_score_binary(row, bot_col, pro_col)
+    elif row['type'] == 'multiple_choice':
+        return calculate_peer_score_multiple_choice(row, bot_col, pro_col)
+    elif row['type'] == 'numeric':
+        return calculate_peer_score_numeric(row, bot_col, pro_col)
+    else:
+        # Unknown question type; return NaN
+        return np.nan
+
+def calculate_all_peer_scores(df, all_bots, pro_col='pro_median'):
+    """Calculate peer scores for all bots"""
+    # Create a new DataFrame to store peer scores
+    df_peer = df.copy()
+    
+    # Calculate peer score for each bot
+    for bot in all_bots:
+        df_peer[bot] = 100 * df.apply(lambda row: calculate_peer_score(row, bot, pro_col), axis=1)
+    
+    # Calculate peer score for bot_team_median
+    df_peer["bot_team_median"] = 100 * df.apply(
+        lambda row: calculate_peer_score(row, 'bot_median', pro_col), axis=1)
+    
+    return df_peer
+
+def parse_options_array(options_str):
+    """
+    Parse options string that looks like an array into an actual array.
+    
+    Args:
+        options_str: String representation of options array (e.g. '["0","1","2-3","4-6",">6"]')
+        
+    Returns:
+        List of option strings
+    """
+    if not isinstance(options_str, str):
+        return options_str  # Already parsed or None
+        
+    try:
+        # First try using eval (safer than literal_eval for this specific case)
+        options_array = eval(options_str)
+        return options_array
+    except:
+        # If that fails, try custom parsing
+        # Strip brackets and split by comma
+        cleaned = options_str.strip('[]')
+        # Split by comma, but respect quotes
+        import re
+        # Match items in quotes with commas inside
+        parts = re.findall(r'"([^"]*)"', cleaned)
+        if parts:
+            return parts
+        
+        # Simple fallback: just split by comma and strip quotes
+        return [p.strip().strip('"\'') for p in cleaned.split(',')]
