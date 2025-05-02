@@ -1,6 +1,11 @@
+import numpy as np
 import pytest
 
-from refactored_notebook.scoring import calculate_spot_baseline_score
+from refactored_notebook.data_models import ForecastType
+from refactored_notebook.scoring import (
+    calculate_spot_baseline_score,
+    calculate_spot_peer_score,
+)
 
 # TODO:
 # For each of Multiple Choice, Binary, and Numeric questions
@@ -10,11 +15,9 @@ from refactored_notebook.scoring import calculate_spot_baseline_score
 #   - If everyone has the same forecast, the score is 0
 #   - The sum (average?) of everyone's scores is 0
 #   - The score for a weighted question is weighted by the question weight
-# - Test spot baseline score
-#   - 0 with 50% forecast, ? for a uniform distribution, and 0 for uniform multiple choice questions
-#   - better score when closer to resolution, and worse when further away (for forecasts on both sides of 50% forecast)
-#   - The score for a weighted question is weighted by the question weight
 # - Run a test of some forecasts from the site, and make sure the score generated matches the score the site gives
+
+################################### HELPER FUNCTIONS ###################################
 
 
 def generate_uniform_cdf(num_points: int) -> list[float]:
@@ -37,6 +40,198 @@ def generate_perfect_cdf(correct_index: int, inverse_cdf: bool = False) -> list[
     return cdf
 
 
+################################### PEER SCORES ###################################
+
+
+@pytest.mark.parametrize(
+    "forecasts,resolution,options,range_min,range_max",
+    [
+        # Binary: forecast closer to resolution gets better score
+        (
+            [[0.9], [0.7], [0.5], [0.3], [0.1]],
+            True,
+            None,
+            None,
+            None,
+        ),
+        # Multiple Choice: forecast closer to resolution gets better score
+        (
+            [
+                [0.9, 0.1, 0.0],
+                [0.7, 0.2, 0.1],
+                [0.5, 0.3, 0.2],
+                [0.3, 0.4, 0.3],
+                [0.1, 0.2, 0.7],
+            ],
+            "A",
+            ["A", "B", "C"],
+            None,
+            None,
+        ),
+        # Numeric: forecast CDFs with more mass near resolution get better score
+        (
+            [
+                [0.1] * 100 + [0.9] * 101,  # most mass above 0.5
+                [0.2] * 100 + [0.8] * 101,
+                [0.5] * 201,
+                [0.8] * 100 + [0.2] * 101,
+                [0.9] * 100 + [0.1] * 101,  # most mass below 0.5
+            ],
+            0.5,
+            None,
+            0.0,
+            1.0,
+        ),
+    ],
+)
+def test_better_forecast_means_better_peer_score(
+    forecasts: list[list[float]],
+    resolution: bool | str | float,
+    options: list[str] | None,
+    range_min: float | None,
+    range_max: float | None,
+    expected_order: list[int],
+):
+    scores = [
+        calculate_spot_peer_score(
+            forecast,
+            [f for i, f in enumerate(forecasts) if i != idx],
+            resolution,
+            options,
+            range_min,
+            range_max,
+            1.0,
+        )
+        for idx, forecast in enumerate(forecasts)
+    ]
+    # Scores should be ordered as expected (descending)
+    sorted_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
+    assert sorted_indices == expected_order
+
+
+@pytest.mark.parametrize(
+    "question_type,forecast,resolution,options,range_min,range_max",
+    [
+        ("binary", [0.5], True, None, None, None),
+        ("mc", [1 / 3, 1 / 3, 1 / 3], "A", ["A", "B", "C"], None, None),
+        ("numeric", [0.5] * 201, 0.5, None, 0.0, 1.0),
+    ],
+)
+def test_peer_score_zero_when_all_same(
+    question_type: str,
+    forecast: list[float],
+    resolution: bool | str | float,
+    options: list[str] | None,
+    range_min: float | None,
+    range_max: float | None,
+):
+    forecasts = [forecast for _ in range(5)]
+    scores = [
+        calculate_spot_peer_score(
+            f,
+            [f2 for i2, f2 in enumerate(forecasts) if i2 != i],
+            resolution,
+            options,
+            range_min,
+            range_max,
+            1.0,
+        )
+        for i, f in enumerate(forecasts)
+    ]
+    for score in scores:
+        assert score == pytest.approx(0)
+
+
+@pytest.mark.parametrize(
+    "forecasts,resolution,options,range_min,range_max",
+    [
+        # Binary
+        ([[0.7], [0.3], [0.5]], True, None, None, None),
+        # Multiple Choice
+        (
+            [[0.7, 0.2, 0.1], [0.1, 0.7, 0.2], [0.2, 0.1, 0.7]],
+            "A",
+            ["A", "B", "C"],
+            None,
+            None,
+        ),
+        # Numeric
+        (
+            [[0.1] * 100 + [0.9] * 101, [0.9] * 100 + [0.1] * 101, [0.5] * 201],
+            0.5,
+            None,
+            0.0,
+            1.0,
+        ),
+    ],
+)
+def test_peer_score_average_zero(
+    forecasts: list[list[float]],
+    resolution: bool | str | float,
+    options: list[str] | None,
+    range_min: float | None,
+    range_max: float | None,
+):
+    scores = [
+        calculate_spot_peer_score(
+            forecast,
+            [f for i, f in enumerate(forecasts) if i != idx],
+            resolution,
+            options,
+            range_min,
+            range_max,
+            1.0,
+        )
+        for idx, forecast in enumerate(forecasts)
+    ]
+    assert np.mean(scores) == pytest.approx(0)
+
+
+@pytest.mark.parametrize(
+    "forecasts,resolution,options,range_min,range_max,weight",
+    [
+        # Binary
+        ([[0.7], [0.3], [0.5]], True, None, None, None, 2.0),
+        # Multiple Choice
+        (
+            [[0.7, 0.2, 0.1], [0.1, 0.7, 0.2], [0.2, 0.1, 0.7]],
+            "A",
+            ["A", "B", "C"],
+            None,
+            None,
+            0.5,
+        ),
+        # Numeric
+        (
+            [[0.1] * 100 + [0.9] * 101, [0.9] * 100 + [0.1] * 101, [0.5] * 201],
+            0.5,
+            None,
+            0.0,
+            1.0,
+            3.0,
+        ),
+    ],
+)
+def test_peer_score_weighted(
+    forecasts: list[ForecastType],
+    resolution: bool | str | float,
+    options: list[str] | None,
+    range_min: float | None,
+    range_max: float | None,
+    weight: float,
+):
+    for idx, forecast in enumerate(forecasts):
+        other_forecasts = [f for i, f in enumerate(forecasts) if i != idx]
+        score_unweighted = calculate_spot_peer_score(
+            forecast, other_forecasts, resolution, options, range_min, range_max, 1.0
+        )
+        score_weighted = calculate_spot_peer_score(
+            forecast, other_forecasts, resolution, options, range_min, range_max, weight
+        )
+        assert score_weighted == pytest.approx(score_unweighted * weight)
+
+
+################################### BASELINE SCORES ###################################
 
 
 @pytest.mark.parametrize(
@@ -195,6 +390,3 @@ def test_baseline_score_weighted(
         forecast, resolution, options, range_min, range_max, question_weight
     )
     assert abs(score_weighted - score_unweighted * question_weight) < 1e-8
-
-
-
