@@ -385,6 +385,7 @@ def calculate_all_peer_scores(df_bot_team_forecasts: pd.DataFrame, teams: list[s
     Takes in a df that has a row for each question, a column for each team, and a forecast as that columns value
     Changes the df so that the forecast is now the score for that question
     """
+    raise NotImplementedError("I accidentally implemented baseline scoring here unfortunately")
     score_df = df_bot_team_forecasts.copy()
     team_scores = calculate_weighted_scores(df_bot_team_forecasts, teams)
     for team in teams:
