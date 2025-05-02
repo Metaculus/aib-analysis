@@ -4,8 +4,13 @@ from refactored_notebook.data_models import ForecastType, ResolutionType
 
 
 def calculate_spot_peer_score(
-    forecast_for_correct_answer: float,
-    other_users_forecasts_for_correct_answer: list[float],
+    forecast: ForecastType,
+    forecast_for_other_users: list[ForecastType],
+    resolution: ResolutionType,
+    options: list[str] | None = None,
+    range_min: float | None = None,
+    range_max: float | None = None,
+    question_weight: float = 1.0,
 ) -> float:
     raise NotImplementedError("Not implemented")
 
@@ -23,11 +28,40 @@ def calculate_spot_baseline_score(
     Scoring math: https://www.metaculus.com/help/scores-faq/#What:~:text=given%20score%20type.-,What%20is%20the%20Baseline%20score%3F,-The%20Baseline%20score
     """
 
+    prob_for_resolution, baseline_prob = (
+        _determine_probability_for_resolution_and_baseline(
+            forecast, resolution, options, range_min, range_max
+        )
+    )
+
+    if prob_for_resolution <= 0 or baseline_prob <= 0:
+        raise ValueError(
+            "Probability for resolution or baseline probability is less than or equal to 0 which could cause a log(0) issue"
+        )
+
+    baseline_score = (
+        np.log2(prob_for_resolution / baseline_prob) * 100
+    )  # @Check: check correctness (also shouldn't this be natural log?)
+
+    if isinstance(resolution, float):
+        baseline_score /= 2  # Numeric scores are halved
+
+    weighted_score = baseline_score * question_weight
+
+    return weighted_score
+
+
+def _determine_probability_for_resolution_and_baseline(
+    forecast: ForecastType,
+    resolution: ResolutionType,
+    options: list[str] | None = None,
+    range_min: float | None = None,
+    range_max: float | None = None,
+) -> tuple[float, float]:
 
     is_binary = isinstance(resolution, bool)
     is_multiple_choice = isinstance(resolution, str)
     is_numeric = isinstance(resolution, float) or isinstance(resolution, int)
-
 
     if forecast is None or resolution is None:
         raise NotImplementedError(
@@ -40,7 +74,6 @@ def calculate_spot_baseline_score(
     if not is_numeric and any(p <= 0 or p >= 1 for p in forecast):
         # @Check: Is it valid to have a numeric forecast with 0 probability for a number?
         raise ValueError("Forecast contains probabilities outside of 0 to 1 range")
-
 
     if is_binary:
         if len(forecast) != 1 and len(forecast) != 2:
@@ -94,23 +127,11 @@ def calculate_spot_baseline_score(
             raise ValueError("Resolution is out of bounds")
 
         prob_for_resolution = pmf[resolution_idx]
-        baseline_prob = 1 / len(pmf)  # bins = 201 because of extra appended bin # @Check: This comment seems off since its the cdf that has 201 bins
+        baseline_prob = 1 / len(
+            pmf
+        )  # bins = 201 because of extra appended bin # @Check: This comment seems off since its the cdf that has 201 bins
 
     else:
         raise ValueError("Unknown question type")
 
-    if prob_for_resolution <= 0 or baseline_prob <= 0:
-        raise ValueError(
-            "Probability for resolution or baseline probability is less than or equal to 0 which could cause a log(0) issue"
-        )
-
-    baseline_score = np.log2(
-        prob_for_resolution / baseline_prob
-    ) * 100    # @Check: check correctness (also shouldn't this be natural log?)
-
-    if isinstance(resolution, float):
-        baseline_score /= 2  # Numeric scores are halved
-
-    weighted_score = baseline_score * question_weight
-
-    return weighted_score
+    return prob_for_resolution, baseline_prob
