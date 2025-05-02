@@ -1,24 +1,26 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.stats import norm
-from scipy import stats
-from scipy.optimize import minimize_scalar
-from scipy.stats import binom
+import ast
+import math
+import random
 import re
 from datetime import datetime
-import random
-import math
-import ast
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from scipy import stats
+from scipy.optimize import minimize_scalar
+from scipy.stats import binom, norm
+
+from refactored_notebook.scoring import calculate_spot_baseline_score
+
 
 def extract_forecast(df):
     # Extract the forecast from whichever column it's in
-    df['forecast'] = df['probability_yes'].combine_first(
-        df['probability_yes_per_category'].combine_first(
-            df['continuous_cdf']
-        )
+    df["forecast"] = df["probability_yes"].combine_first(
+        df["probability_yes_per_category"].combine_first(df["continuous_cdf"])
     )
     return df
+
 
 def process_forecasts(df):
     """
@@ -27,39 +29,40 @@ def process_forecasts(df):
     2. Sorting by created_at to get chronological order
     3. Taking the last forecast for each (forecaster, question_id) pair
     4. Dropping unused columns
-    
+
     Parameters:
     -----------
     df : pandas DataFrame
         DataFrame containing forecast data
-        
+
     Returns:
     --------
     pandas DataFrame
         Processed DataFrame with last forecasts
     """
     # Extract the forecast value
-    df['forecast'] = df['probability_yes'].combine_first(
-        df['probability_yes_per_category'].combine_first(
-            df['continuous_cdf']
-        )
+    df["forecast"] = df["probability_yes"].combine_first(
+        df["probability_yes_per_category"].combine_first(df["continuous_cdf"])
     )
-    
+
     # Sort by created_at to ensure chronological order
-    df = df.sort_values(by='created_at')
-    
+    df = df.sort_values(by="created_at")
+
     # Take the last forecast for each (forecaster, question_id) pair
-    df = df.groupby(['question_id', 'forecaster']).last().reset_index()
-    
+    df = df.groupby(["question_id", "forecaster"]).last().reset_index()
+
     # Drop the original forecast columns as they're now redundant
-    df = df.drop(['probability_yes', 'probability_yes_per_category', 'continuous_cdf'], axis=1)
-    
+    df = df.drop(
+        ["probability_yes", "probability_yes_per_category", "continuous_cdf"], axis=1
+    )
+
     return df
+
 
 def add_is_median(df):
     """
     Marks exactly one row per question_id as the median.
-    Guarantees one median per question by taking the forecaster with 
+    Guarantees one median per question by taking the forecaster with
     the actual median value for that question.
 
     Args:
@@ -69,21 +72,22 @@ def add_is_median(df):
         pandas.DataFrame: DataFrame with an additional 'is_median' column.
     """
     # Initialize median column
-    df['is_median'] = False
-    
+    df["is_median"] = False
+
     # For each question_id
-    for qid in df['question_id'].unique():
+    for qid in df["question_id"].unique():
         # Get just the rows for this question
-        question_mask = df['question_id'] == qid
+        question_mask = df["question_id"] == qid
         question_df = df[question_mask]
-        
+
         # Get the median value index (middle position after sorting)
-        median_idx = question_df['forecast'].sort_values().index[len(question_df)//2]
-        
+        median_idx = question_df["forecast"].sort_values().index[len(question_df) // 2]
+
         # Mark that row
-        df.loc[median_idx, 'is_median'] = True
-        
+        df.loc[median_idx, "is_median"] = True
+
     return df
+
 
 def add_median_rows(df, prefix):
     """
@@ -97,15 +101,20 @@ def add_median_rows(df, prefix):
         pandas.DataFrame: Original DataFrame plus duplicate rows for medians.
     """
     # Get the median rows
-    median_rows = df[df['is_median']].copy()
-    
+    median_rows = df[df["is_median"]].copy()
+
     # Change forecaster to 'median'
-    median_rows['forecaster'] = f'{prefix}_median'
-    
+    median_rows["forecaster"] = f"{prefix}_median"
+
     # Combine original and new median rows
-    whole = pd.concat([df, median_rows], ignore_index=True).sort_values('question_id').drop_duplicates(['question_id', 'forecaster'])
+    whole = (
+        pd.concat([df, median_rows], ignore_index=True)
+        .sort_values("question_id")
+        .drop_duplicates(["question_id", "forecaster"])
+    )
 
     return whole
+
 
 def calculate_weighted_stats(df):
     """
@@ -120,12 +129,12 @@ def calculate_weighted_stats(df):
     results = []
 
     # For each forecaster
-    for forecaster in df['forecaster'].unique():
-        forecaster_data = df[df['forecaster'] == forecaster]
+    for forecaster in df["forecaster"].unique():
+        forecaster_data = df[df["forecaster"] == forecaster]
 
         # Get scores and weights
-        scores = forecaster_data['score']
-        weights = forecaster_data['question_weight']
+        scores = forecaster_data["score"]
+        weights = forecaster_data["question_weight"]
 
         # Calculate weighted mean
         weighted_mean = np.average(scores, weights=weights)
@@ -133,26 +142,28 @@ def calculate_weighted_stats(df):
 
         # Calculate weighted standard error
         # Using weighted variance formula
-        weighted_var = np.average((scores - weighted_mean)**2, weights=weights)
+        weighted_var = np.average((scores - weighted_mean) ** 2, weights=weights)
         n = len(scores)
         weighted_se = np.sqrt(weighted_var / n)
 
         # Calculate t-statistic for 95% confidence interval
-        t_value = stats.t.ppf(0.975, n-1)
+        t_value = stats.t.ppf(0.975, n - 1)
         ci_lower = weighted_mean - (t_value * weighted_se)
 
-        results.append({
-            'forecaster': forecaster,
-            'weighted_mean': weighted_mean,
-            'weighted_sum': weighted_sum,
-            'n_questions': n,
-            'ci_lower': ci_lower,
-            'weighted_se': weighted_se
-        })
+        results.append(
+            {
+                "forecaster": forecaster,
+                "weighted_mean": weighted_mean,
+                "weighted_sum": weighted_sum,
+                "n_questions": n,
+                "ci_lower": ci_lower,
+                "weighted_se": weighted_se,
+            }
+        )
 
     # Convert to dataframe and sort by lower bound
     results_df = pd.DataFrame(results)
-    return results_df.sort_values('weighted_sum', ascending=False)
+    return results_df.sort_values("weighted_sum", ascending=False)
 
 
 def make_wide(df_bot_peer, df_pro_bot_resolved_questions):
@@ -166,39 +177,45 @@ def make_wide(df_bot_peer, df_pro_bot_resolved_questions):
     Returns:
         pandas.DataFrame: Wide-format DataFrame with question weights merged.
     """
-    df_pivoted = df_bot_peer.pivot(index='bot_question_id', columns='forecaster', values='score')
+    df_pivoted = df_bot_peer.pivot(
+        index="bot_question_id", columns="forecaster", values="score"
+    )
     df_pivoted = df_pivoted.reset_index()
     df_pivoted = df_pivoted.reindex(sorted(df_pivoted.columns), axis=1)
 
     # Step 4: Move 'question_id' to be the first column
     cols = df_pivoted.columns.tolist()
-    cols = ['bot_question_id'] + [col for col in cols if col != 'bot_question_id']
+    cols = ["bot_question_id"] + [col for col in cols if col != "bot_question_id"]
     df_pivoted = df_pivoted[cols]
 
     all_columns = df_pivoted.columns.tolist()
     ## Remove 'question_id' and 'bot_median' from the list if they exist
-    all_columns = [col for col in all_columns if col not in ['bot_question_id']]
-    new_column_order = ['bot_question_id'] + all_columns
+    all_columns = [col for col in all_columns if col not in ["bot_question_id"]]
+    new_column_order = ["bot_question_id"] + all_columns
     df_pivoted = df_pivoted[new_column_order]
     df_bot_peer_wide = df_pivoted
-    df_bot_peer_wide['bot_question_id'] = pd.to_numeric(df_bot_peer_wide['bot_question_id'], errors='coerce')
+    df_bot_peer_wide["bot_question_id"] = pd.to_numeric(
+        df_bot_peer_wide["bot_question_id"], errors="coerce"
+    )
 
     # Join with df_pro_bot_resolved_questions to get question weights
     df_bot_peer_wide = pd.merge(
         df_bot_peer_wide,
-        df_pro_bot_resolved_questions[['bot_question_id', 'question_weight']],
-        on='bot_question_id',
-        how='left'
+        df_pro_bot_resolved_questions[["bot_question_id", "question_weight"]],
+        on="bot_question_id",
+        how="left",
     )
 
     return df_bot_peer_wide
 
+
 """
 Options from https://stats.stackexchange.com/questions/47325/bias-correction-in-weighted-variance
 I didn't think (B) beared trying, but could be wrong. - MGH
-It makes very little difference here but (C) does seem to be the correct formula - corrects for 
+It makes very little difference here but (C) does seem to be the correct formula - corrects for
 the bias in the sample variance.
 """
+
 
 def calc_weighted_std_dev(df3, bot, weighted_score, weighted_count, weight_col):
     """
@@ -215,8 +232,12 @@ def calc_weighted_std_dev(df3, bot, weighted_score, weighted_count, weight_col):
         float: Weighted standard deviation.
     """
     weighted_average = weighted_score / weighted_count
-    return np.sqrt(((df3[bot] - weighted_average) ** 2 * df3[weight_col]).sum() / (weighted_count - 1))
-  
+    return np.sqrt(
+        ((df3[bot] - weighted_average) ** 2 * df3[weight_col]).sum()
+        / (weighted_count - 1)
+    )
+
+
 def calc_weighted_std_dev2(df3, bot, weighted_score, weighted_count, weight_col):
     """
     Calculates the weighted standard deviation using Claude (via Nikos) method - (C) from stack exchange post.
@@ -233,9 +254,13 @@ def calc_weighted_std_dev2(df3, bot, weighted_score, weighted_count, weight_col)
     """
     weighted_average = weighted_score / weighted_count
     return np.sqrt(
-        (df3[weight_col] * (df3[bot] - weighted_average) ** 2).sum() / 
-        (df3[weight_col].sum() * (1 - (df3[weight_col] ** 2).sum() / (df3[weight_col].sum() ** 2)))
+        (df3[weight_col] * (df3[bot] - weighted_average) ** 2).sum()
+        / (
+            df3[weight_col].sum()
+            * (1 - (df3[weight_col] ** 2).sum() / (df3[weight_col].sum() ** 2))
+        )
     )
+
 
 def weighted_bootstrap_analysis(df_bot_peer_wide, bots, NUM, ITER):
     """
@@ -250,10 +275,11 @@ def weighted_bootstrap_analysis(df_bot_peer_wide, bots, NUM, ITER):
     Returns:
         pandas.DataFrame: DataFrame with confidence intervals and medians for each bot.
     """
+
     # Function to perform a single bootstrap iteration
     def single_bootstrap(df):
         # Weighted sampling of questions
-        sampled_df = df.sample(n=NUM, weights='question_weight', replace=True)
+        sampled_df = df.sample(n=NUM, weights="question_weight", replace=True)
         # Calculate total weighted score for each bot
         return sampled_df[bots].sum()
 
@@ -271,32 +297,35 @@ def weighted_bootstrap_analysis(df_bot_peer_wide, bots, NUM, ITER):
     median = results_df.median()
 
     # Create output DataFrame
-    output_df = pd.DataFrame({
-        '2.5% CI': ci_low,
-        '10% CI': ci_10,
-        'Median': median,
-        '90% CI': ci_90,
-        '97.5% CI': ci_high
-    })
+    output_df = pd.DataFrame(
+        {
+            "2.5% CI": ci_low,
+            "10% CI": ci_10,
+            "Median": median,
+            "90% CI": ci_90,
+            "97.5% CI": ci_high,
+        }
+    )
 
     # Sort by median descending
-    output_df = output_df.sort_values('Median', ascending=False)
+    output_df = output_df.sort_values("Median", ascending=False)
 
     return output_df
+
 
 def get_median_forecast_multiple_choice(row, forecasts):
     """
     Given a row (with 'options' and 'resolution') and a list of forecasts (each a list of floats),
     returns the median probability assigned to the resolution option.
     """
-    options = row['options']
-    resolution = row['resolution']
+    options = row["options"]
+    resolution = row["resolution"]
 
     try:
         resolution_idx = options.index(resolution)
-        #print(f"Resolution '{resolution}' found at index {resolution_idx} in options {options}")
+        # print(f"Resolution '{resolution}' found at index {resolution_idx} in options {options}")
     except ValueError:
-        #print(f"Resolution '{resolution}' not found in options {options} — returning np.nan")
+        # print(f"Resolution '{resolution}' not found in options {options} — returning np.nan")
         return np.nan  # Resolution not found in options
 
     probs = []
@@ -309,26 +338,27 @@ def get_median_forecast_multiple_choice(row, forecasts):
                 continue
 
     if not probs:
-        #print(f"NO PROBS collected for multiple-choice question {row.get('bot_question_id')} — returning np.nan")
+        # print(f"NO PROBS collected for multiple-choice question {row.get('bot_question_id')} — returning np.nan")
         return np.nan
 
     return np.nanmedian(probs)
 
+
 def get_median_forecast(row, bots):
     """
-    @BEN: Check
+    @Check:
 
     Calculates the median forecast for a given set of bots, handling different question types properly.
-    
+
     Args:
         df (pandas.DataFrame): DataFrame with bot forecast columns and question metadata.
         bots (list): List of bot column names.
-        
+
     Returns:
         pandas.Series: Median forecast for each row.
     """
-    q_type = row['type']
-   
+    q_type = row["type"]
+
     forecasts = []
     for bot in bots:
         f_raw = row.get(bot)
@@ -341,11 +371,11 @@ def get_median_forecast(row, bots):
                     continue
             else:
                 forecasts.append(f_raw)  # Already parsed float or list
- 
+
     if not forecasts:
         return np.nan
 
-    if q_type == 'numeric':
+    if q_type == "numeric":
         forecasts = [f for f in forecasts if isinstance(f, list)]
 
         if not forecasts:
@@ -356,33 +386,53 @@ def get_median_forecast(row, bots):
 
         return mean_cdf
 
-    elif q_type == 'binary':
+    elif q_type == "binary":
         probs = []
         for f in forecasts:
             try:
                 val = float(f)
                 probs.append(val)
             except (ValueError, TypeError):
-                print(f'   Invalid forecast: {f} — error {e}')
+                print(f"   Invalid forecast: {f} — error {e}")
                 continue
 
         if not probs:
-            print(f"   >>> NO PROBS collected for binary question {row.get('bot_question_id')} — returning np.nan")
+            print(
+                f"   >>> NO PROBS collected for binary question {row.get('bot_question_id')} — returning np.nan"
+            )
             return np.nan
 
         print(f"   >>> Collected {len(probs)} forecasts: {probs}")
         return np.nanmedian(probs)
 
-    elif q_type == 'multiple_choice':
+    elif q_type == "multiple_choice":
         return get_median_forecast_multiple_choice(row, forecasts)
 
     else:
         raise ValueError(f"Unknown question type: {q_type}")
 
 
+def calculate_all_peer_scores(
+    df_bot_team_forecasts: pd.DataFrame, teams: list[str]
+) -> pd.DataFrame:
+    """
+    Takes in a df that has a row for each question, a column for each team, and a forecast as that columns value
+    Changes the df so that the forecast is now the score for that question
+    """
+    raise NotImplementedError(
+        "I accidentally implemented baseline scoring here unfortunately"
+    )
+    score_df = df_bot_team_forecasts.copy()
+    team_scores = calculate_weighted_scores(df_bot_team_forecasts, teams)
+    for team in teams:
+        score_for_team = team_scores[team]
+        score_df[team] = score_for_team
+    return score_df
+
+
 def calculate_weighted_scores(df_bot_team_forecasts, teams):
     """
-    @BEN: check
+    @Check:
 
     Calculates weighted scores for each team based on their forecasts and question weights.
 
@@ -396,89 +446,43 @@ def calculate_weighted_scores(df_bot_team_forecasts, teams):
     team_scores = {team: 0.0 for team in teams}
 
     for _, row in df_bot_team_forecasts.iterrows():
-        q_type = row['type']
-        resolution = row['resolution']
-        options = row.get('options')
-        range_min = row.get('range_min')
-        range_max = row.get('range_max')
-        question_weight = row['question_weight']
+        q_type = row["type"]
+        resolution = row["resolution"]
+        options = row.get("options")
+        range_min = row.get("range_min")
+        range_max = row.get("range_max")
+        question_weight = row["question_weight"]
 
         for team in teams:
             forecast = row[team]
 
-            if forecast is None or (isinstance(forecast, float) and np.isnan(forecast)):
-                continue
-
-            baseline_score = None
-
             try:
-                if q_type == 'binary':
-                    forecast_val = float(forecast)
-                    baseline_prob = 0.5
-                    if resolution == 'yes':
-                        p_team = forecast_val
-                    elif resolution == 'no':
-                        p_team = 1 - forecast_val
-                    else:
-                        continue  # Skip if invalid resolution
-
-                elif q_type == 'multiple_choice':
-                    pmf = [float(p) for p in forecast]
-                    options = [str(opt) for opt in options]
-                    resolution_idx = options.index(str(resolution))
-                    p_team = pmf[resolution_idx]
-                    baseline_prob = 1 / len(pmf)
-
-                elif q_type == 'numeric':
-                    cdf = [float(p) for p in forecast]
-                    pmf = [cdf[0]] + [cdf[i] - cdf[i-1] for i in range(1, len(cdf))]
-                    pmf.append(1 - cdf[-1])
-
-                    resolution = float(resolution)
-                    if range_min is None or range_max is None:
-                        continue
-                    bin_edges = np.linspace(range_min, range_max, 200)
-                    resolution_idx = np.searchsorted(bin_edges, resolution, side='right')
-
-                    if resolution_idx >= len(pmf):
-                        continue  # Skip if out of bounds
-
-                    p_team = pmf[resolution_idx]
-                    baseline_prob = 1 / len(pmf)  # bins = 201 because of extra appended bin
-
-                else:
-                    continue  # Unknown question type
-
-                if p_team <= 0 or baseline_prob <= 0:
-                    continue  # Avoid log(0) issues
-
-                baseline_score = np.log2(p_team / baseline_prob)
-
-                if q_type == 'numeric':
-                    baseline_score /= 2  # Numeric scores are halved
-
-                weighted_score = baseline_score * question_weight
+                weighted_score = calculate_spot_baseline_score(
+                    forecast, resolution, options, range_min, range_max, question_weight
+                )
                 team_scores[team] += weighted_score
 
             except (ValueError, TypeError, IndexError):
+                # @Ben: Does skipping introduce any problems?
                 continue  # Be robust to bad/missing data
 
     return pd.Series(team_scores)
 
-def calculate_t_test(df_input, bot_list, weight_col='question_weight'):
+
+def calculate_t_test(df_input, bot_list, weight_col="question_weight"):
     """
     Calculates weighted statistics, including t-test and p-values, for multiple bots.
 
     Args:
-        df_input (pandas.DataFrame): 
+        df_input (pandas.DataFrame):
             DataFrame with peer scores, such as `df_bot_vs_pro_peer`, comparing each bot to the pro median.
-        bot_list (list): 
+        bot_list (list):
             List of column names corresponding to bot scores.
-        weight_col (str, optional): 
+        weight_col (str, optional):
             Name of the column containing weights. Defaults to 'question_weight'.
 
     Returns:
-        pandas.DataFrame: 
+        pandas.DataFrame:
             Leaderboard DataFrame with calculated statistics for each bot, including:
             - W_score: Weighted score.
             - W_count: Weighted count.
@@ -494,35 +498,39 @@ def calculate_t_test(df_input, bot_list, weight_col='question_weight'):
     """
     # Initialize results dataframe
     df_W_leaderboard = pd.DataFrame(index=bot_list)
-    
+
     for bot in bot_list:
         # Create working copy with just needed columns
         df3 = df_input[[bot, weight_col]].copy()
         df3 = df3.dropna()
         df3 = df3.reset_index(drop=True)
-        
+
         # Calculate weighted statistics
         weighted_score = (df3[bot] * df3[weight_col]).sum()
         weighted_count = df3[weight_col].sum()
-        
+
         if weighted_count > 2:  # Only calculate if we have enough data
             weighted_average = weighted_score / weighted_count
-            weighted_std_dev = calc_weighted_std_dev2(df3, bot, weighted_score, weighted_count, weight_col)
+            weighted_std_dev = calc_weighted_std_dev2(
+                df3, bot, weighted_score, weighted_count, weight_col
+            )
             std_error = weighted_std_dev / np.sqrt(weighted_count)
             t_statistic = (weighted_average - 0) / std_error
-            
+
             # Get t-critical value and confidence bounds
             effective_n = (df3[weight_col].sum() ** 2) / (df3[weight_col] ** 2).sum()
             t_crit = stats.t.ppf(0.975, df=effective_n - 1)  # 95% confidence level
             upper_bound = weighted_average + t_crit * std_error
             lower_bound = weighted_average - t_crit * std_error
-            
+
             # Calculate CDF and p-value
-            cdf = stats.t.cdf(t_statistic, df=weighted_count-1)
+            cdf = stats.t.cdf(t_statistic, df=weighted_count - 1)
             p_value = 2 * min(cdf, 1 - cdf)  # Two-tailed p-value
-            
+
         else:  # Not enough data
-            weighted_average = weighted_score / weighted_count if weighted_count > 0 else np.nan
+            weighted_average = (
+                weighted_score / weighted_count if weighted_count > 0 else np.nan
+            )
             weighted_std_dev = np.nan
             std_error = np.nan
             t_statistic = np.nan
@@ -531,50 +539,50 @@ def calculate_t_test(df_input, bot_list, weight_col='question_weight'):
             lower_bound = np.nan
             cdf = np.nan
             p_value = np.nan
-        
+
         # Store results
-        df_W_leaderboard.loc[bot, 'W_score'] = weighted_score
-        df_W_leaderboard.loc[bot, 'W_count'] = weighted_count
-        df_W_leaderboard.loc[bot, 'W_ave'] = weighted_average
-        df_W_leaderboard.loc[bot, 'W_stdev'] = weighted_std_dev
-        df_W_leaderboard.loc[bot, 'std_err'] = std_error
-        df_W_leaderboard.loc[bot, 't_stat'] = t_statistic
-        df_W_leaderboard.loc[bot, 't_crit'] = t_crit
-        df_W_leaderboard.loc[bot, 'upper_bound'] = upper_bound
-        df_W_leaderboard.loc[bot, 'lower_bound'] = lower_bound
-        df_W_leaderboard.loc[bot, 'cdf'] = cdf
-        df_W_leaderboard.loc[bot, 'p_value'] = p_value
-    
+        df_W_leaderboard.loc[bot, "W_score"] = weighted_score
+        df_W_leaderboard.loc[bot, "W_count"] = weighted_count
+        df_W_leaderboard.loc[bot, "W_ave"] = weighted_average
+        df_W_leaderboard.loc[bot, "W_stdev"] = weighted_std_dev
+        df_W_leaderboard.loc[bot, "std_err"] = std_error
+        df_W_leaderboard.loc[bot, "t_stat"] = t_statistic
+        df_W_leaderboard.loc[bot, "t_crit"] = t_crit
+        df_W_leaderboard.loc[bot, "upper_bound"] = upper_bound
+        df_W_leaderboard.loc[bot, "lower_bound"] = lower_bound
+        df_W_leaderboard.loc[bot, "cdf"] = cdf
+        df_W_leaderboard.loc[bot, "p_value"] = p_value
+
     # Format and round the results
-    df_W_leaderboard['W_score'] = df_W_leaderboard['W_score'].round(1)
+    df_W_leaderboard["W_score"] = df_W_leaderboard["W_score"].round(1)
 
     # Store numerical p-values temporarily for sorting
-    df_W_leaderboard['_p_value_sort'] = df_W_leaderboard['p_value']
-    
+    df_W_leaderboard["_p_value_sort"] = df_W_leaderboard["p_value"]
+
     # Format p-values as percentages
-    df_W_leaderboard['p_value'] = df_W_leaderboard['p_value'].apply(
+    df_W_leaderboard["p_value"] = df_W_leaderboard["p_value"].apply(
         lambda x: f"{x:.6f}" if pd.notnull(x) else "NA"
     )
-    
+
     # Round other columns
-    df_W_leaderboard[['W_ave', 'W_count', 'lower_bound', 'upper_bound']] = \
-        df_W_leaderboard[['W_ave', 'W_count', 'lower_bound', 'upper_bound']].round(1)
-    
+    df_W_leaderboard[["W_ave", "W_count", "lower_bound", "upper_bound"]] = (
+        df_W_leaderboard[["W_ave", "W_count", "lower_bound", "upper_bound"]].round(1)
+    )
+
     # Sort by the numerical p-values
     df_W_leaderboard = df_W_leaderboard.sort_values(
-        by='W_score',
-        ascending=False,
-        na_position='last'
+        by="W_score", ascending=False, na_position="last"
     )
-    
+
     # Drop the temporary sorting column
-    df_W_leaderboard = df_W_leaderboard.drop('_p_value_sort', axis=1)
-     
+    df_W_leaderboard = df_W_leaderboard.drop("_p_value_sort", axis=1)
+
     return df_W_leaderboard
+
 
 def calculate_head_to_head(row, a, b):
     """
-    @BEN: Check...
+    @Check:...
 
     Calculates the head-to-head score for two forecasters.
     Positive if 'a' did better than 'b', negative if 'b' did better than 'a'.
@@ -587,42 +595,50 @@ def calculate_head_to_head(row, a, b):
     Returns:
         float: Head-to-head score.
     """
-    q_type = row['type']
-    resolution = row['resolution']
-    options = row['options']
-    range_min = row.get('range_min')
-    range_max = row.get('range_max')
+    q_type = row["type"]
+    resolution = row["resolution"]
+    options = row["options"]
+    range_min = row.get("range_min")
+    range_max = row.get("range_max")
 
     forecast_a = row[a]
     forecast_b = row[b]
 
-    if q_type == 'binary':
-        if (resolution == 'yes') or (resolution == 1):
+    if q_type == "binary":
+        if (resolution == "yes") or (resolution == 1):
             return 100 * np.log(forecast_a / forecast_b)
-        elif (resolution == 'no') or (resolution == 0):
+        elif (resolution == "no") or (resolution == 0):
             return 100 * np.log((1 - forecast_a) / (1 - forecast_b))
         else:
             return np.nan
 
-    elif q_type == 'multiple_choice':
+    elif q_type == "multiple_choice":
         # Parse forecast_a if it's a string
         if isinstance(forecast_a, str):
             forecast_a = ast.literal_eval(forecast_a)
-            options = ast.literal_eval(row['options']) if isinstance(row['options'], str) else row['options']
-            resolution_idx = options.index(str(row['resolution']))
+            options = (
+                ast.literal_eval(row["options"])
+                if isinstance(row["options"], str)
+                else row["options"]
+            )
+            resolution_idx = options.index(str(row["resolution"]))
             forecast_a = forecast_a[resolution_idx]
 
         # Parse forecast_b if it's a string
         if isinstance(forecast_b, str):
             forecast_b = ast.literal_eval(forecast_b)
-            options = ast.literal_eval(row['options']) if isinstance(row['options'], str) else row['options']
-            resolution_idx = options.index(str(row['resolution']))
+            options = (
+                ast.literal_eval(row["options"])
+                if isinstance(row["options"], str)
+                else row["options"]
+            )
+            resolution_idx = options.index(str(row["resolution"]))
             forecast_b = forecast_b[resolution_idx]
 
         # Now both are floats with the prob assigned to the correct bin
         return 100 * np.log(forecast_a / forecast_b)
 
-    elif q_type == 'numeric':
+    elif q_type == "numeric":
         # Ensure both forecasts are Python lists
         if isinstance(forecast_a, str):
             forecast_a = ast.literal_eval(forecast_a)
@@ -640,10 +656,10 @@ def calculate_head_to_head(row, a, b):
         cdf_a = forecast_a
         cdf_b = forecast_b
 
-        pmf_a = [cdf_a[0]] + [cdf_a[i] - cdf_a[i-1] for i in range(1, len(cdf_a))]
+        pmf_a = [cdf_a[0]] + [cdf_a[i] - cdf_a[i - 1] for i in range(1, len(cdf_a))]
         pmf_a.append(1 - cdf_a[-1])
 
-        pmf_b = [cdf_b[0]] + [cdf_b[i] - cdf_b[i-1] for i in range(1, len(cdf_b))]
+        pmf_b = [cdf_b[0]] + [cdf_b[i] - cdf_b[i - 1] for i in range(1, len(cdf_b))]
         pmf_b.append(1 - cdf_b[-1])
 
         bin_edges = np.linspace(range_min, range_max, 200)
@@ -655,7 +671,9 @@ def calculate_head_to_head(row, a, b):
         else:
             try:
                 resolution_val = float(resolution)
-                resolution_idx = np.searchsorted(bin_edges, resolution_val, side='right')
+                resolution_idx = np.searchsorted(
+                    bin_edges, resolution_val, side="right"
+                )
             except ValueError:
                 print(f"Bad resolution value: {resolution}")
                 return np.nan
@@ -669,7 +687,10 @@ def calculate_head_to_head(row, a, b):
 
         return 100 * np.log(p_a / p_b)
 
-def plot_head_to_head_distribution(df_forecasts, col='head_to_head', vs=('Bot Team', 'Pros')):
+
+def plot_head_to_head_distribution(
+    df_forecasts, col="head_to_head", vs=("Bot Team", "Pros")
+):
     """
     Plots the distribution of head-to-head scores and fits a Gaussian curve.
 
@@ -690,29 +711,30 @@ def plot_head_to_head_distribution(df_forecasts, col='head_to_head', vs=('Bot Te
 
     # Create the histogram
     plt.figure(figsize=(10, 6))
-    n, bins, patches = plt.hist(data, bins=30, density=True, alpha=0.7, color='skyblue')
+    n, bins, patches = plt.hist(data, bins=30, density=True, alpha=0.7, color="skyblue")
 
     # Generate points for the fitted Gaussian curve
     x = np.linspace(min(data), max(data), 100)
     y = norm.pdf(x, mean, std)
 
     # Plot the fitted Gaussian curve
-    plt.plot(x, y, 'r-', linewidth=2, label='Fitted Gaussian')
+    plt.plot(x, y, "r-", linewidth=2, label="Fitted Gaussian")
 
     # Customize the plot
-    plt.title(f'{vs[0]} Head-to-Head Scores vs {vs[1]}')
-    plt.xlabel('Head-to-Head Score')
-    plt.ylabel('Density')
+    plt.title(f"{vs[0]} Head-to-Head Scores vs {vs[1]}")
+    plt.xlabel("Head-to-Head Score")
+    plt.ylabel("Density")
     plt.legend()
 
     # Add text annotation for the mean
-    #plt.text(0.95, 0.95, f'Mean: {mean:.2f}', transform=plt.gca().transAxes, verticalalignment='top', horizontalalignment='right')
+    # plt.text(0.95, 0.95, f'Mean: {mean:.2f}', transform=plt.gca().transAxes, verticalalignment='top', horizontalalignment='right')
 
     # Display the plot
     plt.show()
 
     # Print the average
     print(f"The average of 'head_to_head' is: {mean:.2f}")
+
 
 def calculate_calibration_curve(forecasts, resolutions, weights):
     """
@@ -771,6 +793,7 @@ def calculate_calibration_curve(forecasts, resolutions, weights):
         "calibration_curve": calibration_curve,
     }
 
+
 def plot_calibration_curve(df, column_name, label, color):
     """
     Plots a calibration curve with confidence intervals.
@@ -785,29 +808,36 @@ def plot_calibration_curve(df, column_name, label, color):
         None
     """
     # Filter to binary questions in case the DataFrame has other types (0 or 1 INT or 'yes'/'no' STR)
-    df = df[df['resolution'].isin(['yes', 'no', 1, 0])]
+    df = df[df["resolution"].isin(["yes", "no", 1, 0])]
 
-    y_true = df['resolution']
+    y_true = df["resolution"]
     y_pred = df[column_name]
     weights = [1.0 for _ in y_true]
-    calibration_curve = calculate_calibration_curve(y_pred, y_true, weights)['calibration_curve']
-    prob_true = [item['average_resolution'] for item in calibration_curve]
-    bin_center = [(item['bin_lower'] + item['bin_upper']) / 2 for item in calibration_curve]
-    ci_lower = [item['lower_confidence_interval'] for item in calibration_curve]
-    ci_upper = [item['upper_confidence_interval'] for item in calibration_curve]
+    calibration_curve = calculate_calibration_curve(y_pred, y_true, weights)[
+        "calibration_curve"
+    ]
+    prob_true = [item["average_resolution"] for item in calibration_curve]
+    bin_center = [
+        (item["bin_lower"] + item["bin_upper"]) / 2 for item in calibration_curve
+    ]
+    ci_lower = [item["lower_confidence_interval"] for item in calibration_curve]
+    ci_upper = [item["upper_confidence_interval"] for item in calibration_curve]
 
-    plt.plot(bin_center, prob_true, marker='o', linewidth=2, label=label, color=color)
+    plt.plot(bin_center, prob_true, marker="o", linewidth=2, label=label, color=color)
     plt.fill_between(bin_center, ci_lower, ci_upper, alpha=0.2, color=color)
     for x, y in zip(bin_center, prob_true):
         if x is None or y is None:
             continue
-        plt.annotate(f'({x:.2f}, {y:.2f})',
-                    (x, y),
-                    textcoords="offset points",
-                    xytext=(0,10),
-                    ha='center',
-                    color=color,
-                    fontsize=8)
+        plt.annotate(
+            f"({x:.2f}, {y:.2f})",
+            (x, y),
+            textcoords="offset points",
+            xytext=(0, 10),
+            ha="center",
+            color=color,
+            fontsize=8,
+        )
+
 
 def calculate_confidence(predictions, outcomes):
     """
@@ -824,15 +854,18 @@ def calculate_confidence(predictions, outcomes):
     bins = pd.cut(predictions, bins=10)
 
     # Calculate mean prediction and actual outcome for each bin
-    grouped = pd.DataFrame({'prediction': predictions, 'outcome': outcomes}).groupby(bins)
-    mean_prediction = grouped['prediction'].mean()
-    mean_outcome = grouped['outcome'].mean()
+    grouped = pd.DataFrame({"prediction": predictions, "outcome": outcomes}).groupby(
+        bins
+    )
+    mean_prediction = grouped["prediction"].mean()
+    mean_outcome = grouped["outcome"].mean()
 
     # Calculate the difference between mean prediction and mean outcome
     confidence_diff = mean_prediction - mean_outcome
 
     # Return the average difference (excluding NaN values)
     return np.nanmean(confidence_diff)
+
 
 def interpret_confidence(score):
     """
@@ -851,6 +884,7 @@ def interpret_confidence(score):
     else:
         return "Perfectly calibrated"
 
+
 def create_discrimination_histogram(df, bot_col, pro_col, resolution_col):
     """
     Creates histograms to compare discrimination between bot and pro teams.
@@ -866,39 +900,46 @@ def create_discrimination_histogram(df, bot_col, pro_col, resolution_col):
     """
     # Create figure and axes
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
-    
+
     # Define bin edges
     bins = np.linspace(0, 1, 6)
-    
+
     # Top plot: Questions that resolved 1
-    ax1.hist([df[df[resolution_col] == 1][bot_col],
-              df[df[resolution_col] == 1][pro_col]],
-             bins=bins, label=['Bot Team', 'Pro Team'], alpha=0.7)
-    ax1.set_title('Questions that Resolved \'Yes\'')
-    ax1.set_xlabel('Assigned Probability')
-    ax1.set_ylabel('Frequency')
+    ax1.hist(
+        [df[df[resolution_col] == 1][bot_col], df[df[resolution_col] == 1][pro_col]],
+        bins=bins,
+        label=["Bot Team", "Pro Team"],
+        alpha=0.7,
+    )
+    ax1.set_title("Questions that Resolved 'Yes'")
+    ax1.set_xlabel("Assigned Probability")
+    ax1.set_ylabel("Frequency")
     ax1.legend()
 
     # Set integer y-ticks for top plot
     ymax1 = int(np.ceil(ax1.get_ylim()[1]))
     ax1.set_yticks(range(0, ymax1 + 1, 2))
-    
+
     # Bottom plot: Questions that resolved 0
-    ax2.hist([df[df[resolution_col] == 0][bot_col],
-              df[df[resolution_col] == 0][pro_col]],
-             bins=bins, label=['Bot Team', 'Pro Team'], alpha=0.7)
-    ax2.set_title('Questions that Resolved \'No\'')
-    ax2.set_xlabel('Assigned Probability')
-    ax2.set_ylabel('Frequency')
+    ax2.hist(
+        [df[df[resolution_col] == 0][bot_col], df[df[resolution_col] == 0][pro_col]],
+        bins=bins,
+        label=["Bot Team", "Pro Team"],
+        alpha=0.7,
+    )
+    ax2.set_title("Questions that Resolved 'No'")
+    ax2.set_xlabel("Assigned Probability")
+    ax2.set_ylabel("Frequency")
     ax2.legend()
 
     # Set integer y-ticks for bottom plot
     ymax2 = int(np.ceil(ax2.get_ylim()[1]))
     ax2.set_yticks(range(0, ymax2 + 1, 10))
-    
+
     # Adjust layout and display
     plt.tight_layout()
     plt.show()
+
 
 def get_weighted_score(df_forecasts):
     """
@@ -911,13 +952,15 @@ def get_weighted_score(df_forecasts):
         float: Weighted total score.
     """
     # Calculate the weighted score for each row
-    df_forecasts['weighted_score'] = df_forecasts['head_to_head'] * df_forecasts['question_weight']
+    df_forecasts["weighted_score"] = (
+        df_forecasts["head_to_head"] * df_forecasts["question_weight"]
+    )
 
     # Calculate the total weighted score
-    total_weighted_score = df_forecasts['weighted_score'].sum()
+    total_weighted_score = df_forecasts["weighted_score"].sum()
 
     # Calculate the sum of weights
-    total_weight = df_forecasts['question_weight'].sum()
+    total_weight = df_forecasts["question_weight"].sum()
 
     # Calculate the weighted total score
     weighted_total_score = total_weighted_score / total_weight
@@ -926,7 +969,9 @@ def get_weighted_score(df_forecasts):
 
     return weighted_total_score
 
+
 # ====== CODE FROM LUKE, REFACTORED BY CHATGPT =======
+
 
 def string_location_to_scaled_location(string_location, question_row):
     """
@@ -962,6 +1007,7 @@ def string_location_to_scaled_location(string_location, question_row):
     # question.type == "numeric"
     return float(string_location)
 
+
 def scaled_location_to_unscaled_location(scaled_location, question_row):
     """
     Converts a scaled location to an unscaled location based on question type.
@@ -985,11 +1031,15 @@ def scaled_location_to_unscaled_location(scaled_location, question_row):
     if zero_point is not None:
         deriv_ratio = (range_max - zero_point) / max((range_min - zero_point), 1e-7)
         return (
-            np.log((scaled_location - range_min) * (deriv_ratio - 1) + (range_max - range_min))
+            np.log(
+                (scaled_location - range_min) * (deriv_ratio - 1)
+                + (range_max - range_min)
+            )
             - np.log(range_max - range_min)
         ) / np.log(deriv_ratio)
 
     return (scaled_location - range_min) / (range_max - range_min)
+
 
 def nominal_location_to_cdf_location(nominal_location, question_data):
     """
@@ -1026,6 +1076,7 @@ def nominal_location_to_cdf_location(nominal_location, question_data):
         unscaled_location = (scaled_location - range_min) / (range_max - range_min)
     return unscaled_location
 
+
 def get_cdf_at(cdf, unscaled_location):
     """
     Retrieves the CDF value at a given unscaled location.
@@ -1045,7 +1096,7 @@ def get_cdf_at(cdf, unscaled_location):
     if index_scaled_location.is_integer():
         return cdf[int(index_scaled_location)]
     # linear interpolation step
-    left_index = int(index_scaled_location) # This is the floor, which is what we want
+    left_index = int(index_scaled_location)  # This is the floor, which is what we want
     right_index = left_index + 1
     left_value = cdf[left_index]
     right_value = cdf[right_index]
@@ -1053,7 +1104,9 @@ def get_cdf_at(cdf, unscaled_location):
         index_scaled_location - left_index
     )
 
+
 # ======== END OF LUKE'S CODE ==========
+
 
 def cdf_between(row, cdf, lower_bound, upper_bound):
     """
@@ -1070,7 +1123,8 @@ def cdf_between(row, cdf, lower_bound, upper_bound):
     """
     a = get_cdf_at(cdf, nominal_location_to_cdf_location(lower_bound, row))
     b = get_cdf_at(cdf, nominal_location_to_cdf_location(upper_bound, row))
-    return (b - a)
+    return b - a
+
 
 def extract_year(title):
     """
@@ -1082,8 +1136,9 @@ def extract_year(title):
     Returns:
         int or None: Extracted year or None if not found.
     """
-    match = re.search(r'\b(19|20)\d{2}\b', title)
+    match = re.search(r"\b(19|20)\d{2}\b", title)
     return int(match.group(0)) if match else None
+
 
 def extract_month(title):
     """
@@ -1095,8 +1150,12 @@ def extract_month(title):
     Returns:
         str or None: Extracted month or None if not found.
     """
-    match = re.search(r'\b(January|February|March|April|May|June|July|August|September|October|November|December)\b', title)
+    match = re.search(
+        r"\b(January|February|March|April|May|June|July|August|September|October|November|December)\b",
+        title,
+    )
     return match.group(0) if match else None
+
 
 def compute_cp_baseline_score(value):
     """
@@ -1118,6 +1177,7 @@ def compute_cp_baseline_score(value):
         # Handle any unexpected errors
         return np.nan
 
+
 def process_forecast_values(df):
     """
     Adds a 'bucket_forecast_value' column to the DataFrame (for interpreting CP distribution as a
@@ -1130,47 +1190,53 @@ def process_forecast_values(df):
     Returns:
         pandas.DataFrame: Updated DataFrame with 'bucket_forecast_value' column added.
     """
+
     def compute_bucket_forecast_value(row):
         # Handle binary_version_tuple gracefully
-        if pd.isna(row['binary_version_tuple']) or not isinstance(row['binary_version_tuple'], (list, tuple)):
+        if pd.isna(row["binary_version_tuple"]) or not isinstance(
+            row["binary_version_tuple"], (list, tuple)
+        ):
             return None
-        
+
         # Extract the first and second elements of the tuple
-        comparison_type = row['binary_version_tuple'][0]
-        string_location = row['binary_version_tuple'][1]
-        
+        comparison_type = row["binary_version_tuple"][0]
+        string_location = row["binary_version_tuple"][1]
+
         # Skip if comparison_type is 'complicated'
-        if comparison_type == 'complicated':
+        if comparison_type == "complicated":
             return None
-        
+
         # Compute forecast_value using the extracted string_location
-        forecast_value = get_cdf_at(row['cdf'], nominal_location_to_cdf_location(string_location, row))
-        
+        forecast_value = get_cdf_at(
+            row["cdf"], nominal_location_to_cdf_location(string_location, row)
+        )
+
         # Apply logic based on comparison_type
-        if comparison_type == 'less':
+        if comparison_type == "less":
             return forecast_value
-        elif comparison_type == 'greater':
+        elif comparison_type == "greater":
             return 1 - forecast_value
-        
+
         return None
 
     # Apply the function to each row and overwrite forecast_value (currently contains cdf, which we no longer need)
-    df['forecast_values'] = df.apply(compute_bucket_forecast_value, axis=1)
+    df["forecast_values"] = df.apply(compute_bucket_forecast_value, axis=1)
     return df
+
 
 def parse_options_array(options_str):
     """
     Parse options string that looks like an array into an actual array.
-    
+
     Args:
         options_str: String representation of options array (e.g. '["0","1","2-3","4-6",">6"]')
-        
+
     Returns:
         List of option strings
     """
     if not isinstance(options_str, str):
         return options_str  # Already parsed or None
-        
+
     try:
         # First try using eval (safer than literal_eval for this specific case)
         options_array = eval(options_str)
@@ -1178,13 +1244,14 @@ def parse_options_array(options_str):
     except:
         # If that fails, try custom parsing
         # Strip brackets and split by comma
-        cleaned = options_str.strip('[]')
+        cleaned = options_str.strip("[]")
         # Split by comma, but respect quotes
         import re
+
         # Match items in quotes with commas inside
         parts = re.findall(r'"([^"]*)"', cleaned)
         if parts:
             return parts
-        
+
         # Simple fallback: just split by comma and strip quotes
-        return [p.strip().strip('"\'') for p in cleaned.split(',')]
+        return [p.strip().strip("\"'") for p in cleaned.split(",")]
