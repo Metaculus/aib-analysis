@@ -4,18 +4,14 @@ from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel
-from enum import Enum
 
-class ResolutionType(Enum):
-    YES = "yes"
-    NO = "no"
-    ANNULLED = "annulled"
-    AMBIGUOUS = "ambiguous"
+ResolutionType = bool | str | float | None # binary, MC, numeric, or 'annulled/ambiguous'
+ForecastType = list[float] | None # binary: [p_yes, p_no], multiple choice: [p_a, p_b, p_c], numeric: [p_0, p_1, p_2, ...]
 
 class Forecast(BaseModel):
     question: Question
     user: User
-    prediction: list[float] # binary, MC, or numeric
+    prediction: ForecastType
     predcition_for_correct_answer: float
     prediction_time: datetime
     comment: str | None = None
@@ -32,7 +28,7 @@ class Score(BaseModel):
     score: float
     type: Literal["spot_peer", "spot_baseline"]
     forecast: Forecast
-    users_used_in_scoring: list[User] | None# Empty if baseline
+    users_used_in_scoring: list[User] | None # Empty if baseline
 
 class Question(BaseModel):
     question_text: str
