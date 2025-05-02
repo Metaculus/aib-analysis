@@ -27,12 +27,13 @@ def generate_uniform_cdf(num_points: int) -> list[float]:
 def generate_perfect_cdf(correct_index: int, inverse_cdf: bool = False) -> list[float]:
     assert correct_index >= 0 and correct_index <= 201
     length_of_cdf = 201
+    perfect_forecast = 0.99999
     cdf = []
     for i in range(length_of_cdf):
         if i < correct_index:
-            cdf.append(float(i / length_of_cdf))
+            cdf.append(1 - perfect_forecast)
         else:
-            cdf.append(0.99)
+            cdf.append(perfect_forecast)
 
     if inverse_cdf:
         cdf = [1 - c for c in cdf]
@@ -90,7 +91,6 @@ def test_better_forecast_means_better_peer_score(
     options: list[str] | None,
     range_min: float | None,
     range_max: float | None,
-    expected_order: list[int],
 ):
     scores = [
         calculate_spot_peer_score(
@@ -104,9 +104,8 @@ def test_better_forecast_means_better_peer_score(
         )
         for idx, forecast in enumerate(forecasts)
     ]
-    # Scores should be ordered as expected (descending)
     sorted_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
-    assert sorted_indices == expected_order
+    assert sorted_indices == list(range(len(scores))), "Scores should be ordered as expected (descending)"
 
 
 @pytest.mark.parametrize(
@@ -230,6 +229,12 @@ def test_peer_score_weighted(
         )
         assert score_weighted == pytest.approx(score_unweighted * weight)
 
+# TODO: Test the below
+# Best score for MC and binary is 996
+# Worst score for MC and binary is -996
+# Best score for numeric is 408
+# Worst score for numeric is -408
+# @Check: Can we even validate this (won't we need infinite other forecasters to get max score?)
 
 ################################### BASELINE SCORES ###################################
 
