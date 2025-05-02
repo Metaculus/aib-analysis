@@ -130,7 +130,8 @@ def display_everything(score_sets: dict[str, SimulatedTournament]) -> None:
         # Add these stats as a property of the simulated tournament scores
             # Caculate average spot peer score
             # Caculate sum of spot peer scores
-            # Find confidence interval
+            # Find confidence interval w/ t test
+            # find confidence interval with bootstrapping
             # Weighted question count (sum of weights)
         # Show in table with a row for each user
         # Filter by users_to_display if provided
