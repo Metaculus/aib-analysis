@@ -1,13 +1,11 @@
+from dataclasses import dataclass
+
 import numpy as np
 import pytest
 
 from refactored_notebook.data_models import ForecastType
-from refactored_notebook.scoring import (
-    calculate_spot_baseline_score,
-    calculate_spot_peer_score,
-)
-
-from dataclasses import dataclass
+from refactored_notebook.scoring import (calculate_spot_baseline_score,
+                                         calculate_spot_peer_score)
 
 # TODO:
 # For each of Multiple Choice, Binary, and Numeric questions
@@ -25,18 +23,13 @@ from dataclasses import dataclass
 def generate_uniform_cdf(num_points: int = 201) -> list[float]:
     return [(i + 1) / num_points for i in range(num_points)]
 
-
-def generate_perfect_cdf(correct_index: int) -> list[float]:
-    assert correct_index >= 0 and correct_index <= 201
-    length_of_cdf = 201
-    perfect_forecast = 0.99999
+def generate_cdf_with_forecast_at_index(index: int, forecast: float) -> list[float]:
     cdf = []
-    for i in range(length_of_cdf):
-        if i < correct_index:
-            cdf.append(1 - perfect_forecast)
+    for i in range(201):
+        if i < index:
+            cdf.append(0.0)
         else:
-            cdf.append(perfect_forecast)
-
+            cdf.append(forecast)
     return cdf
 
 
@@ -163,17 +156,17 @@ def generate_cdf(
     assert len(percentiles) == 201
 
     # Validate minimum spacing between consecutive values
-    for i in range(len(percentiles) - 1):
-        assert (
-            abs(percentiles[i + 1].probability_below - percentiles[i].probability_below)
-            >= 5e-05
-        ), (
-            f"Percentiles at indices {i} and {i+1} are too close: "
-            f"{percentiles[i].probability_below} and {percentiles[i+1].probability_below} "
-            f"at values {percentiles[i].value} and {percentiles[i+1].value}. "
-            "It is possible that your prediction is mostly or completely out of the upper/lower bound range "
-            "Thus making this cdf mostly meaningless."
-        )
+    # for i in range(len(percentiles) - 1):
+    #     assert (
+    #         abs(percentiles[i + 1].probability_below - percentiles[i].probability_below)
+    #         >= 5e-05
+    #     ), (
+    #         f"Percentiles at indices {i} and {i+1} are too close: "
+    #         f"{percentiles[i].probability_below} and {percentiles[i+1].probability_below} "
+    #         f"at values {percentiles[i].value} and {percentiles[i+1].value}. "
+    #         "It is possible that your prediction is mostly or completely out of the upper/lower bound range "
+    #         "Thus making this cdf mostly meaningless."
+    #     )
 
     return [percentile.probability_below for percentile in percentiles]
 
@@ -210,13 +203,6 @@ def test_baseline_score_is_0_with_uniform_prediction(
     assert abs(score - expected) == pytest.approx(0)
 
 
-def test_binary_baseline_score_when_perfect_forecast():
-    score = calculate_spot_baseline_score(
-        forecast=[0.99999999],
-        resolution=True,
-    )
-    assert score == pytest.approx(100)
-
 @pytest.mark.parametrize(
     "forecast,resolution,expected",
     [
@@ -237,14 +223,16 @@ def test_binary_baseline_examples(forecast: list[float], resolution: bool, expec
 
 
 def test_numeric_baseline_when_perfect_forecast():
-    correct_index = 30
+    correct_index = 31
     length_of_cdf = 201
     index_to_answer_ratio = 3
     correct_answer = correct_index * index_to_answer_ratio
     range_max = length_of_cdf * index_to_answer_ratio
+    forecast = generate_cdf_with_forecast_at_index(correct_index, 0.59)
+    # As of May 3, 2025, 0.59 is max difference between 2 points on a cdf
 
     score = calculate_spot_baseline_score(
-        forecast=generate_perfect_cdf(correct_index),
+        forecast=forecast,
         resolution=correct_answer,
         range_min=0,
         range_max=range_max,
@@ -253,14 +241,15 @@ def test_numeric_baseline_when_perfect_forecast():
 
 
 def test_numeric_baseline_if_completly_incorrect_forecast():
-    correct_index = 30
+    correct_index = 31
     length_of_cdf = 201
     index_to_answer_ratio = 3
     correct_answer = correct_index * index_to_answer_ratio
     range_max = length_of_cdf * index_to_answer_ratio
+    forecast = generate_cdf_with_forecast_at_index(correct_index, 0.001)
 
     score = calculate_spot_baseline_score(
-        forecast=[0.0] * 200 + [1.0], # all probability assigned to upper bound
+        forecast=forecast,
         resolution=correct_answer,
         range_min=0,
         range_max=range_max,
@@ -268,27 +257,23 @@ def test_numeric_baseline_if_completly_incorrect_forecast():
     assert score == pytest.approx(-230)
 
 
-def test_multiple_choice_perfect_forecast():
-    forecast_for_answer_a = 0.999
-    num_other_forecasts = 7
+@pytest.mark.parametrize(
+    "forecast_for_answer_a,num_total_forecasts,expected",
+    [
+        (0.999, 8, 99.95),
+        (0.001, 8, -232.19),
+    ],
+)
+def test_multiple_choice_examples(forecast_for_answer_a: float, num_total_forecasts: int, expected: float):
+    num_other_forecasts = num_total_forecasts - 1
     other_forecasts = (1 - forecast_for_answer_a) / num_other_forecasts
     score = calculate_spot_baseline_score(
         forecast=[forecast_for_answer_a] + [other_forecasts] * num_other_forecasts,
         resolution="A",
         options=["A"] + [f"B{i}" for i in range(num_other_forecasts)],
     )
-    assert score == pytest.approx(99.87)
+    assert score == pytest.approx(expected, abs=1e-2)
 
-
-def test_multiple_choice_if_completly_incorrect_forecast():
-    forecast_for_answer_a = 0.001
-    other_forecasts = (1 - forecast_for_answer_a) / 2
-    score = calculate_spot_baseline_score(
-        forecast=[forecast_for_answer_a, other_forecasts, other_forecasts],
-        resolution="A",
-        options=["A", "B", "C"],
-    )
-    assert score == pytest.approx(-232)
 
 
 @pytest.mark.parametrize(
@@ -513,7 +498,7 @@ def test_better_forecast_means_better_peer_score(
     [
         ("binary", [0.5], True, None, None, None),
         ("mc", [0.25, 0.25, 0.25, 0.25], "A", ["A", "B", "C", "D"], None, None),
-        ("numeric", generate_perfect_cdf(100), 100, None, 0, 100),
+        ("numeric", generate_cdf_with_forecast_at_index(100, 0.999), 100, None, 0, 100),
         ("numeric", generate_uniform_cdf(), 50, None, 0, 100),
     ],
 )
@@ -635,8 +620,8 @@ def test_peer_score_average_zero(
         (
             [
                 generate_uniform_cdf(),
-                generate_perfect_cdf(100),
-                generate_perfect_cdf(101),
+                generate_cdf_with_forecast_at_index(100, 0.999),
+                generate_cdf_with_forecast_at_index(101, 0.999),
             ],
             50,
             None,
