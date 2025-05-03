@@ -17,14 +17,16 @@ def calculate_spot_peer_score(
     forecast_for_resolution, _ = _determine_probability_for_resolution_and_baseline(
         forecast, resolution, options, range_min, range_max
     )
-    other_user_forecasts, _ = zip(
-        [
-            _determine_probability_for_resolution_and_baseline(
-                forecast, resolution, options, range_min, range_max
-            )
-            for forecast in forecast_for_other_users
-        ]
-    )
+    other_user_forecasts_and_baseline_prob = [
+        _determine_probability_for_resolution_and_baseline(
+            forecast, resolution, options, range_min, range_max
+        )
+        for forecast in forecast_for_other_users
+    ]
+    other_user_forecasts = [
+        forecast for forecast, _ in other_user_forecasts_and_baseline_prob
+    ]
+
     geometric_mean = gmean(other_user_forecasts)
     peer_score = np.log(forecast_for_resolution / geometric_mean)
     if isinstance(
@@ -43,6 +45,8 @@ def nominal_location_to_cdf_location(
     """
     Takes a location in nominal format (e.g. 123, "123", or datetime in iso format) and scales it to
     metaculus's "internal representation" range [0, 1] incorporating question scaling
+    0.8 would incidate the nomial locatoin is at cdf index 201 * 0.8
+    Values higher/lower than 0 and 1 are resolutions that are above/below the upper/lower bound
     """
     assert isinstance(zero_point, float | None)
 
@@ -63,7 +67,6 @@ def nominal_location_to_cdf_location(
     else:
         # linearly scaled question
         unscaled_location = (scaled_location - range_min) / (range_max - range_min)
-    assert 0 <= unscaled_location <= 1
     return unscaled_location
 
 
@@ -115,11 +118,12 @@ def _determine_probability_for_resolution_and_baseline(
     Also returns the baseline probability used in baseline scoring
     """
 
+    if resolution == "above_upper_bound" or resolution == "below_lower_bound":
+        raise ValueError("'above_upper_bound' or 'below_lower_bound' format not supported")
+
     is_numeric = (
         isinstance(resolution, float)
         or isinstance(resolution, int)
-        or resolution == "above_upper_bound"
-        or resolution == "below_lower_bound"
     )
     is_binary = isinstance(resolution, bool)
     is_multiple_choice = isinstance(resolution, str)
@@ -133,17 +137,16 @@ def _determine_probability_for_resolution_and_baseline(
         raise ValueError("Forecast is empty")
 
     if not is_numeric and any(p <= 0 or p >= 1 for p in forecast):
-        # @Check: Is it valid to have a numeric forecast with 0 probability for a number?
         raise ValueError("Forecast contains probabilities outside of 0 to 1 range")
 
     if is_binary:
-        prob_for_resolution, baseline_prob = _binary_resolution_baseline_prob(
+        prob_for_resolution, baseline_prob = _binary_resolution_and_baseline_prob(
             forecast, resolution
         )
     elif is_multiple_choice:
         if options is None:
             raise ValueError("Options are required for multiple choice questions")
-        prob_for_resolution, baseline_prob = _multiple_choice_resolution_baseline_prob(
+        prob_for_resolution, baseline_prob = _multiple_choice_resolution_and_baseline_prob(
             forecast, resolution, options
         )
     elif is_numeric:
@@ -151,18 +154,18 @@ def _determine_probability_for_resolution_and_baseline(
             raise ValueError(
                 "Range min and range max are required for numeric questions"
             )
-        prob_for_resolution, baseline_prob = _numeric_resolution_baseline_prob(
+        prob_for_resolution, baseline_prob = _numeric_resolution_and_baseline_prob(
             forecast, resolution, range_min, range_max
         )
     else:
         raise ValueError("Unknown question type")
 
-    assert 0 < prob_for_resolution <= 1
-    assert 0 < baseline_prob <= 1
+    assert 0 <= prob_for_resolution <= 1, f"Probability for resolution is {prob_for_resolution} which is not between 0 and 1"
+    assert 0 <= baseline_prob <= 1, f"Baseline probability is {baseline_prob} which is not between 0 and 1"
     return prob_for_resolution, baseline_prob
 
 
-def _binary_resolution_baseline_prob(forecast: list[float], resolution: bool):
+def _binary_resolution_and_baseline_prob(forecast: list[float], resolution: bool):
     if len(forecast) != 1 and len(forecast) != 2:
         raise ValueError(
             "Binary questions must have exactly one or two forecasts (for yes or 'yes and no')"
@@ -177,7 +180,7 @@ def _binary_resolution_baseline_prob(forecast: list[float], resolution: bool):
     return prob_for_resolution, baseline_prob
 
 
-def _multiple_choice_resolution_baseline_prob(
+def _multiple_choice_resolution_and_baseline_prob(
     forecast: list[float], resolution: str, options: list[str]
 ):
     if options is None:
@@ -194,7 +197,7 @@ def _multiple_choice_resolution_baseline_prob(
     return prob_for_resolution, baseline_prob
 
 
-def _numeric_resolution_baseline_prob(
+def _numeric_resolution_and_baseline_prob(
     forecast: list[float], resolution: float | str, range_min: float, range_max: float
 ):
     if len(forecast) != 201:
@@ -207,31 +210,28 @@ def _numeric_resolution_baseline_prob(
         previous_prob = current_prob
 
     cdf = [float(p) for p in forecast]
-    assert len(cdf) == 201
-    pmf = [cdf[0]] + [
+    assert len(cdf) == 201, f"There should be 201 bins, but there are {len(cdf)}"
+    lower_bound_prob = cdf[0]
+    upper_bound_prob = 1 - cdf[-1]
+    pmf = [lower_bound_prob] + [
         cdf[i] - cdf[i - 1] for i in range(1, len(cdf))
-    ]  # @Check: is this a correct conversion?
-    pmf.append(1 - cdf[-1])
+    ] + [upper_bound_prob] # @Check: is this a correct conversion?
     # pmf = np.diff(np.concatenate([[0], cdf]))
-    assert len(pmf) == 200
+    assert len(pmf) == 202, f"There should be 202 bins, but there are {len(pmf)}"
 
-    if resolution == "below_lower_bound":
-        prob_for_resolution = cdf[0]
-    elif resolution == "above_upper_bound":
-        prob_for_resolution = 1 - cdf[-1]  # Grab probability of 201st bin
-    else:
-        resolution = float(resolution)
-        # bin_edges = np.linspace(range_min, range_max, 200)
-        # resolution_bin_idx = np.searchsorted(bin_edges, resolution, side="right")
 
-        cdf_location = nominal_location_to_cdf_location(
-            resolution, range_min, range_max
-        )
-        resolution_bin_idx = min(int(cdf_location * (len(pmf) - 1)), len(pmf) - 1)
-        if resolution_bin_idx >= len(pmf):
-            raise ValueError("Resolution is out of bounds")
+    resolution = float(resolution)
+    # bin_edges = np.linspace(range_min, range_max, 200)
+    # resolution_bin_idx = np.searchsorted(bin_edges, resolution, side="right")
+    cdf_location = nominal_location_to_cdf_location(
+        resolution, range_min, range_max
+    )
+    resolution_bin_idx = min(int(cdf_location * (len(pmf) - 1)), len(pmf) - 1)
 
-        prob_for_resolution = pmf[resolution_bin_idx]
+    if resolution_bin_idx >= len(pmf):
+        raise ValueError("Resolution is out of bounds")
+
+    prob_for_resolution = pmf[resolution_bin_idx]
 
     baseline_prob = 1 / len(
         pmf
