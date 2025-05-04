@@ -9,32 +9,52 @@ import re
 from datetime import datetime
 import random
 import math
+import ast
 
-def convert_baseline_to_forecasts(df):
+def extract_forecast(df):
+    # Extract the forecast from whichever column it's in
+    df['forecast'] = df['probability_yes'].combine_first(
+        df['probability_yes_per_category'].combine_first(
+            df['continuous_cdf']
+        )
+    )
+    return df
+
+def process_forecasts(df):
     """
-    Converts baseline scores to forecasts based on resolution.
-
-    Args:
-        df (pandas.DataFrame): DataFrame with columns 'bot_question_id', 'resolution', and 'score'.
-
+    Process a dataframe of forecasts by:
+    1. Extracting the non-null forecast value
+    2. Sorting by created_at to get chronological order
+    3. Taking the last forecast for each (forecaster, question_id) pair
+    4. Dropping unused columns
+    
+    Parameters:
+    -----------
+    df : pandas DataFrame
+        DataFrame containing forecast data
+        
     Returns:
-        pandas.DataFrame: DataFrame with an additional 'forecast' column.
+    --------
+    pandas DataFrame
+        Processed DataFrame with last forecasts
     """
-    result_df = df.copy()
-
-    def score_to_forecast(score, resolution):
-        if resolution == 'yes':
-            return 2 ** (score/100 - 1)
-        else:
-            return 1 - 2 ** (score/100 - 1)
-
-    score_columns = ['score']
-    #score_columns = [col for col in score_columns if col not in ['bot_question_id', 'resolution', 'pro_question_id']]
-
-    for col in score_columns:
-        result_df['forecast'] = result_df.apply(lambda row: score_to_forecast(row[col], row['resolution']), axis=1)
-
-    return result_df
+    # Extract the forecast value
+    df['forecast'] = df['probability_yes'].combine_first(
+        df['probability_yes_per_category'].combine_first(
+            df['continuous_cdf']
+        )
+    )
+    
+    # Sort by created_at to ensure chronological order
+    df = df.sort_values(by='created_at')
+    
+    # Take the last forecast for each (forecaster, question_id) pair
+    df = df.groupby(['question_id', 'forecaster']).last().reset_index()
+    
+    # Drop the original forecast columns as they're now redundant
+    df = df.drop(['probability_yes', 'probability_yes_per_category', 'continuous_cdf'], axis=1)
+    
+    return df
 
 def add_is_median(df):
     """
@@ -264,21 +284,106 @@ def weighted_bootstrap_analysis(df_bot_peer_wide, bots, NUM, ITER):
 
     return output_df
 
-def calculate_median_forecast(df, bots):
+def get_median_forecast_multiple_choice(row, forecasts):
     """
-    Calculates the median forecast for a given set of bots.
+    Given a row (with 'options' and 'resolution') and a list of forecasts (each a list of floats),
+    returns the median probability assigned to the resolution option.
+    """
+    options = row['options']
+    resolution = row['resolution']
 
+    try:
+        resolution_idx = options.index(resolution)
+        #print(f"Resolution '{resolution}' found at index {resolution_idx} in options {options}")
+    except ValueError:
+        #print(f"Resolution '{resolution}' not found in options {options} — returning np.nan")
+        return np.nan  # Resolution not found in options
+
+    probs = []
+    for f in forecasts:
+        if isinstance(f, list) and len(f) > resolution_idx:
+            try:
+                val = float(f[resolution_idx])
+                probs.append(val)
+            except (ValueError, TypeError):
+                continue
+
+    if not probs:
+        #print(f"NO PROBS collected for multiple-choice question {row.get('bot_question_id')} — returning np.nan")
+        return np.nan
+
+    return np.nanmedian(probs)
+
+def get_median_forecast(row, bots):
+    """
+    @BEN: Check
+
+    Calculates the median forecast for a given set of bots, handling different question types properly.
+    
     Args:
-        df (pandas.DataFrame): DataFrame with bot forecast columns.
+        df (pandas.DataFrame): DataFrame with bot forecast columns and question metadata.
         bots (list): List of bot column names.
-
+        
     Returns:
         pandas.Series: Median forecast for each row.
     """
-    return df[bots].median(axis=1)
+    q_type = row['type']
+   
+    forecasts = []
+    for bot in bots:
+        f_raw = row.get(bot)
+        if f_raw is not None:
+            if isinstance(f_raw, str):
+                try:
+                    f = ast.literal_eval(f_raw)
+                    forecasts.append(f)
+                except (ValueError, SyntaxError):
+                    continue
+            else:
+                forecasts.append(f_raw)  # Already parsed float or list
+ 
+    if not forecasts:
+        return np.nan
+
+    if q_type == 'numeric':
+        forecasts = [f for f in forecasts if isinstance(f, list)]
+
+        if not forecasts:
+            return np.nan
+
+        cdfs_array = np.array(forecasts, dtype=float)
+        mean_cdf = np.mean(cdfs_array, axis=0)
+
+        return mean_cdf
+
+    elif q_type == 'binary':
+        probs = []
+        for f in forecasts:
+            try:
+                val = float(f)
+                probs.append(val)
+            except (ValueError, TypeError):
+                print(f'   Invalid forecast: {f} — error {e}')
+                continue
+
+        if not probs:
+            print(f"   >>> NO PROBS collected for binary question {row.get('bot_question_id')} — returning np.nan")
+            return np.nan
+
+        print(f"   >>> Collected {len(probs)} forecasts: {probs}")
+        return np.nanmedian(probs)
+
+    elif q_type == 'multiple_choice':
+        return get_median_forecast_multiple_choice(row, forecasts)
+
+    else:
+        raise ValueError(f"Unknown question type: {q_type}")
+
 
 def calculate_weighted_scores(df_bot_team_forecasts, teams):
     """
+    @BEN: check
+
     Calculates weighted scores for each team based on their forecasts and question weights.
 
     Args:
@@ -288,32 +393,76 @@ def calculate_weighted_scores(df_bot_team_forecasts, teams):
     Returns:
         pandas.Series: Weighted scores for each team.
     """
-    # Initialize a dictionary to store the weighted scores for each team
-    team_scores = {team: 0 for team in teams}
+    team_scores = {team: 0.0 for team in teams}
 
-    # Iterate through each row (question) in the dataframe
     for _, row in df_bot_team_forecasts.iterrows():
+        q_type = row['type']
         resolution = row['resolution']
+        options = row.get('options')
+        range_min = row.get('range_min')
+        range_max = row.get('range_max')
         question_weight = row['question_weight']
 
-        # Calculate the baseline score for each team
         for team in teams:
             forecast = row[team]
 
-            # Calculate the baseline score based on the resolution
-            if resolution == 'yes':
-                baseline_score = np.log2(forecast / 0.5)
-            elif resolution == 'no':
-                baseline_score = np.log2((1 - forecast) / 0.5)
-            else:
-                # Skip if resolution is neither 0 nor 1
+            if forecast is None or (isinstance(forecast, float) and np.isnan(forecast)):
                 continue
 
-            # Calculate the weighted score and add it to the team's total
-            weighted_score = baseline_score * question_weight
-            team_scores[team] += weighted_score
+            baseline_score = None
 
-    # Convert the dictionary to a pandas Series for easier handling
+            try:
+                if q_type == 'binary':
+                    forecast_val = float(forecast)
+                    baseline_prob = 0.5
+                    if resolution == 'yes':
+                        p_team = forecast_val
+                    elif resolution == 'no':
+                        p_team = 1 - forecast_val
+                    else:
+                        continue  # Skip if invalid resolution
+
+                elif q_type == 'multiple_choice':
+                    pmf = [float(p) for p in forecast]
+                    options = [str(opt) for opt in options]
+                    resolution_idx = options.index(str(resolution))
+                    p_team = pmf[resolution_idx]
+                    baseline_prob = 1 / len(pmf)
+
+                elif q_type == 'numeric':
+                    cdf = [float(p) for p in forecast]
+                    pmf = [cdf[0]] + [cdf[i] - cdf[i-1] for i in range(1, len(cdf))]
+                    pmf.append(1 - cdf[-1])
+
+                    resolution = float(resolution)
+                    if range_min is None or range_max is None:
+                        continue
+                    bin_edges = np.linspace(range_min, range_max, 200)
+                    resolution_idx = np.searchsorted(bin_edges, resolution, side='right')
+
+                    if resolution_idx >= len(pmf):
+                        continue  # Skip if out of bounds
+
+                    p_team = pmf[resolution_idx]
+                    baseline_prob = 1 / len(pmf)  # bins = 201 because of extra appended bin
+
+                else:
+                    continue  # Unknown question type
+
+                if p_team <= 0 or baseline_prob <= 0:
+                    continue  # Avoid log(0) issues
+
+                baseline_score = np.log2(p_team / baseline_prob)
+
+                if q_type == 'numeric':
+                    baseline_score /= 2  # Numeric scores are halved
+
+                weighted_score = baseline_score * question_weight
+                team_scores[team] += weighted_score
+
+            except (ValueError, TypeError, IndexError):
+                continue  # Be robust to bad/missing data
+
     return pd.Series(team_scores)
 
 def calculate_t_test(df_input, bot_list, weight_col='question_weight'):
@@ -425,22 +574,100 @@ def calculate_t_test(df_input, bot_list, weight_col='question_weight'):
 
 def calculate_head_to_head(row, a, b):
     """
-    Calculates the head-to-head score for two forecasters. If positive, a did better than b; if negative, a did worse than b.
+    @BEN: Check...
+
+    Calculates the head-to-head score for two forecasters.
+    Positive if 'a' did better than 'b', negative if 'b' did better than 'a'.
 
     Args:
-        row (pandas.Series): Row of the DataFrame containing 'resolution' and forecaster columns.
-        a (str): Column name for the first forecaster.
-        b (str): Column name for the second forecaster.
+        row (pandas.Series): Row containing 'resolution', 'type', and forecast columns.
+        a (str): Column name for first forecaster.
+        b (str): Column name for second forecaster.
 
     Returns:
         float: Head-to-head score.
     """
-    if (row['resolution'] == 'yes') | (row['resolution'] == 1):
-        return 100* np.log(row[a] / row[b])
-    elif (row['resolution'] == 'no') | (row['resolution'] == 0):
-        return 100* np.log((1 - row[a]) / (1 - row[b]))
-    else:
-        return np.nan
+    q_type = row['type']
+    resolution = row['resolution']
+    options = row['options']
+    range_min = row.get('range_min')
+    range_max = row.get('range_max')
+
+    forecast_a = row[a]
+    forecast_b = row[b]
+
+    if q_type == 'binary':
+        if (resolution == 'yes') or (resolution == 1):
+            return 100 * np.log(forecast_a / forecast_b)
+        elif (resolution == 'no') or (resolution == 0):
+            return 100 * np.log((1 - forecast_a) / (1 - forecast_b))
+        else:
+            return np.nan
+
+    elif q_type == 'multiple_choice':
+        # Parse forecast_a if it's a string
+        if isinstance(forecast_a, str):
+            forecast_a = ast.literal_eval(forecast_a)
+            options = ast.literal_eval(row['options']) if isinstance(row['options'], str) else row['options']
+            resolution_idx = options.index(str(row['resolution']))
+            forecast_a = forecast_a[resolution_idx]
+
+        # Parse forecast_b if it's a string
+        if isinstance(forecast_b, str):
+            forecast_b = ast.literal_eval(forecast_b)
+            options = ast.literal_eval(row['options']) if isinstance(row['options'], str) else row['options']
+            resolution_idx = options.index(str(row['resolution']))
+            forecast_b = forecast_b[resolution_idx]
+
+        # Now both are floats with the prob assigned to the correct bin
+        return 100 * np.log(forecast_a / forecast_b)
+
+    elif q_type == 'numeric':
+        # Ensure both forecasts are Python lists
+        if isinstance(forecast_a, str):
+            forecast_a = ast.literal_eval(forecast_a)
+        elif isinstance(forecast_a, np.ndarray):
+            forecast_a = forecast_a.tolist()
+
+        if isinstance(forecast_b, str):
+            forecast_b = ast.literal_eval(forecast_b)
+        elif isinstance(forecast_b, np.ndarray):
+            forecast_b = forecast_b.tolist()
+
+        if not forecast_a or not forecast_b:
+            return np.nan
+
+        cdf_a = forecast_a
+        cdf_b = forecast_b
+
+        pmf_a = [cdf_a[0]] + [cdf_a[i] - cdf_a[i-1] for i in range(1, len(cdf_a))]
+        pmf_a.append(1 - cdf_a[-1])
+
+        pmf_b = [cdf_b[0]] + [cdf_b[i] - cdf_b[i-1] for i in range(1, len(cdf_b))]
+        pmf_b.append(1 - cdf_b[-1])
+
+        bin_edges = np.linspace(range_min, range_max, 200)
+
+        if resolution == "below_lower_bound":
+            resolution_idx = 0
+        elif resolution == "above_upper_bound":
+            resolution_idx = len(pmf_a) - 1  # i.e., 200
+        else:
+            try:
+                resolution_val = float(resolution)
+                resolution_idx = np.searchsorted(bin_edges, resolution_val, side='right')
+            except ValueError:
+                print(f"Bad resolution value: {resolution}")
+                return np.nan
+
+        p_a = pmf_a[resolution_idx]
+        p_b = pmf_b[resolution_idx]
+
+        if p_a <= 0 or p_b <= 0:
+            print(f"Invalid PMF values: p_a={p_a}, p_b={p_b}")
+            return np.nan
+
+        return 100 * np.log(p_a / p_b)
 
 def plot_head_to_head_distribution(df_forecasts, col='head_to_head', vs=('Bot Team', 'Pros')):
     """
@@ -557,6 +784,9 @@ def plot_calibration_curve(df, column_name, label, color):
     Returns:
         None
     """
+    # Filter to binary questions in case the DataFrame has other types (0 or 1 INT or 'yes'/'no' STR)
+    df = df[df['resolution'].isin(['yes', 'no', 1, 0])]
+
     y_true = df['resolution']
     y_pred = df[column_name]
     weights = [1.0 for _ in y_true]
@@ -927,3 +1157,187 @@ def process_forecast_values(df):
     # Apply the function to each row and overwrite forecast_value (currently contains cdf, which we no longer need)
     df['forecast_values'] = df.apply(compute_bucket_forecast_value, axis=1)
     return df
+
+def parse_options_array(options_str):
+    """
+    Parse options string that looks like an array into an actual array.
+    
+    Args:
+        options_str: String representation of options array (e.g. '["0","1","2-3","4-6",">6"]')
+        
+    Returns:
+        List of option strings
+    """
+    if not isinstance(options_str, str):
+        return options_str  # Already parsed or None
+        
+    try:
+        # First try using eval (safer than literal_eval for this specific case)
+        options_array = eval(options_str)
+        return options_array
+    except:
+        # If that fails, try custom parsing
+        # Strip brackets and split by comma
+        cleaned = options_str.strip('[]')
+        # Split by comma, but respect quotes
+        import re
+        # Match items in quotes with commas inside
+        parts = re.findall(r'"([^"]*)"', cleaned)
+        if parts:
+            return parts
+        
+        # Simple fallback: just split by comma and strip quotes
+        return [p.strip().strip('"\'') for p in cleaned.split(',')]
+
+def calculate_peer_score_numeric(row, bot_col, pro_col='pro_median'):
+    """Calculate peer score for numeric questions"""
+    try:
+        # Check if bot didn't provide a forecast
+        if pd.isna(row[bot_col]):
+            return np.nan
+
+        resolution_value = row['resolution']
+
+        # Get the CDF values
+        bot_cdf = row[bot_col]
+        pro_median_cdf = row[pro_col]
+
+        # Handle special cases
+        if resolution_value == 'below_lower_bound':
+            # Use first point in CDF
+            if isinstance(bot_cdf, (list, np.ndarray)) and len(bot_cdf) > 0:
+                bot_prob = bot_cdf[0]
+            else:
+                return np.nan
+
+            if isinstance(pro_median_cdf, (list, np.ndarray)) and len(pro_median_cdf) > 0:
+                pro_median_prob = pro_median_cdf[0]
+            else:
+                return np.nan
+
+        elif resolution_value == 'above_upper_bound':
+            # Use (1 - last point in CDF)
+            if isinstance(bot_cdf, (list, np.ndarray)) and len(bot_cdf) > 0:
+                bot_prob = 1 - bot_cdf[-1]
+            else:
+                return np.nan
+
+            if isinstance(pro_median_cdf, (list, np.ndarray)) and len(pro_median_cdf) > 0:
+                pro_median_prob = 1 - pro_median_cdf[-1]
+            else:
+                return np.nan
+
+        else:
+            # Convert to float if it's a numeric resolution
+            try:
+                resolution_float = float(resolution_value)
+
+                # Convert CDF to PMF
+                if isinstance(bot_cdf, (list, np.ndarray)) and isinstance(pro_median_cdf, (list, np.ndarray)):
+                    # Convert CDFs to PMFs
+                    bot_pmf = np.diff(np.concatenate([[0], bot_cdf]))
+                    pro_pmf = np.diff(np.concatenate([[0], pro_median_cdf]))
+
+                    # Use nominal_location_to_cdf_location to find the appropriate bucket
+                    cdf_location = nominal_location_to_cdf_location(resolution_float, row)
+
+                    # Find the appropriate bucket index
+                    bucket_index = min(int(cdf_location * (len(bot_pmf) - 1)), len(bot_pmf) - 1)
+
+                    # Get probabilities
+                    bot_prob = bot_pmf[bucket_index]
+                    pro_median_prob = pro_pmf[bucket_index]
+                else:
+                    return np.nan
+            except:
+                return np.nan
+
+        # Ensure non-zero probabilities
+        bot_prob = max(bot_prob, 1e-10)
+        pro_median_prob = max(pro_median_prob, 1e-10)
+
+        # Calculate peer score and divide by 2 for continuous questions
+        return np.log(bot_prob / pro_median_prob) / 2
+
+    except Exception as e:
+        # Print the specific error for debugging
+        return np.nan
+
+def calculate_peer_score_binary(row, bot_col, pro_col='pro_median'):
+    """Calculate peer score for binary questions"""
+    if row['resolution'] == 'yes':
+        return np.log(row[bot_col] / row[pro_col])
+    else:  # resolution is 'no'
+        return np.log((1 - row[bot_col]) / (1 - row[pro_col]))
+
+def parse_cdf_string(cdf_string):
+    """Parse CDF string into numpy array"""
+    return np.array([float(x) for x in cdf_string.strip('[]').split(',')])
+
+def calculate_peer_score_multiple_choice(row, bot_col, pro_col='pro_median'):
+    """Calculate peer score for multiple choice questions"""
+    # Check if bot didn't provide a forecast (NaN)
+    if pd.isna(row[bot_col]):
+        return np.nan
+
+    # Get the resolution value and options
+    resolution_value = row['resolution']
+    options = row['options_parsed'] if 'options_parsed' in row else row['options']
+
+    # Find the index of the resolution in options array
+    resolution_str = str(resolution_value)
+
+    try:
+        resolution_index = options.index(resolution_str)
+
+        # Get the forecasts
+        bot_pmf_raw = row[bot_col]
+        pro_pmf_raw = row[pro_col]
+
+        # Parse string representations of arrays if needed
+        if isinstance(bot_pmf_raw, str):
+            bot_pmf = [float(x) for x in bot_pmf_raw.strip('[]').split(',')]
+        else:
+            bot_pmf = bot_pmf_raw
+
+        if isinstance(pro_pmf_raw, str):
+            pro_pmf = [float(x) for x in pro_pmf_raw.strip('[]').split(',')]
+        else:
+            pro_pmf = pro_pmf_raw
+
+        # Get the probabilities at the correct index
+        bot_prob = bot_pmf[resolution_index]
+        pro_prob = pro_pmf[resolution_index]
+
+        # Calculate peer score
+        return np.log(bot_prob / pro_prob)
+    except Exception as e:
+        # If any error occurs, return NaN
+        return np.nan
+
+def calculate_peer_score(row, bot_col, pro_col='pro_median'):
+    """Calculate peer score based on question type"""
+    if row['type'] == 'binary':
+        return calculate_peer_score_binary(row, bot_col, pro_col)
+    elif row['type'] == 'multiple_choice':
+        return calculate_peer_score_multiple_choice(row, bot_col, pro_col)
+    elif row['type'] == 'numeric':
+        return calculate_peer_score_numeric(row, bot_col, pro_col)
+    else:
+        # Unknown question type; return NaN
+        return np.nan
+
+def calculate_all_peer_scores(df, all_bots, pro_col='pro_median'):
+    """Calculate peer scores for all bots"""
+    # Create a new DataFrame to store peer scores
+    df_peer = df.copy()
+
+    # Calculate peer score for each bot
+    for bot in all_bots:
+        df_peer[bot] = 100 * df.apply(lambda row: calculate_peer_score(row, bot, pro_col), axis=1)
+
+    # Calculate peer score for bot_team_median
+    df_peer["bot_team_median"] = 100 * df.apply(
+        lambda row: calculate_peer_score(row, 'bot_median', pro_col), axis=1)
+
+    return df_peer
