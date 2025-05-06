@@ -4,8 +4,7 @@ import numpy as np
 import pytest
 
 from refactored_notebook.data_models import ForecastType
-from refactored_notebook.scoring import (calculate_spot_baseline_score,
-                                         calculate_spot_peer_score)
+from refactored_notebook.scoring import calculate_baseline_score, calculate_peer_score
 
 # TODO:
 # For each of Multiple Choice, Binary, and Numeric questions
@@ -20,8 +19,10 @@ from refactored_notebook.scoring import (calculate_spot_baseline_score,
 ################################### HELPER FUNCTIONS ###################################
 
 
-def generate_uniform_cdf(num_points: int = 201) -> list[float]:
-    return [(i + 1) / num_points for i in range(num_points)]
+def generate_uniform_cdf() -> list[float]:
+    num_points = 200 # cdf has 201 points, but first point is 0% if we assume closed bounds
+    return [0] + [(i + 1) / num_points for i in range(num_points)]
+
 
 def generate_cdf_with_forecast_at_index(index: int, forecast: float) -> list[float]:
     cdf = []
@@ -197,7 +198,7 @@ def test_baseline_score_is_0_with_uniform_prediction(
     question_weight: float,
     expected: float,
 ):
-    score = calculate_spot_baseline_score(
+    score = calculate_baseline_score(
         forecast, resolution, options, range_min, range_max, question_weight
     )
     assert abs(score - expected) == pytest.approx(0)
@@ -206,16 +207,22 @@ def test_baseline_score_is_0_with_uniform_prediction(
 @pytest.mark.parametrize(
     "forecast,resolution,expected",
     [
-        ([0.001], True, -896.57), # Completely incorrect
-        ([0.999], True, 99.86), # Completely correct
-        ([0.001], False, 99.86), # Completely correct
-        ([0.4], True, -32.19), # Examples found here: https://www.metaculus.com/help/scores-faq/#:~:text=details%20for%20nerds-,Do%20all%20my%20predictions%20on%20a%20question%20count%20toward%20my%20score%3F,-Yes.%20Metaculus%20uses
+        ([0.001], True, -896.57),  # Completely incorrect
+        ([0.999], True, 99.86),  # Completely correct
+        ([0.001], False, 99.86),  # Completely correct
+        (
+            [0.4],
+            True,
+            -32.19,
+        ),  # Examples found here: https://www.metaculus.com/help/scores-faq/#:~:text=details%20for%20nerds-,Do%20all%20my%20predictions%20on%20a%20question%20count%20toward%20my%20score%3F,-Yes.%20Metaculus%20uses
         ([0.7], True, 48.542),
         ([0.4, 0.6], True, -32.19),
     ],
 )
-def test_binary_baseline_examples(forecast: list[float], resolution: bool, expected: float):
-    score = calculate_spot_baseline_score(
+def test_binary_baseline_examples(
+    forecast: list[float], resolution: bool, expected: float
+):
+    score = calculate_baseline_score(
         forecast=forecast,
         resolution=resolution,
     )
@@ -228,14 +235,16 @@ def test_numeric_baseline_when_perfect_forecast():
     index_to_answer_ratio = 3
     correct_answer = correct_index * index_to_answer_ratio
     range_max = length_of_cdf * index_to_answer_ratio
-    forecast = generate_cdf_with_forecast_at_index(correct_index, 0.59)
+    forecast = generate_cdf_with_forecast_at_index(correct_index, 0.999)
     # As of May 3, 2025, 0.59 is max difference between 2 points on a cdf
 
-    score = calculate_spot_baseline_score(
+    score = calculate_baseline_score(
         forecast=forecast,
         resolution=correct_answer,
         range_min=0,
         range_max=range_max,
+        open_upper_bound=False,
+        open_lower_bound=False,
     )
     assert score == pytest.approx(183)
 
@@ -248,7 +257,7 @@ def test_numeric_baseline_if_completly_incorrect_forecast():
     range_max = length_of_cdf * index_to_answer_ratio
     forecast = generate_cdf_with_forecast_at_index(correct_index, 0.001)
 
-    score = calculate_spot_baseline_score(
+    score = calculate_baseline_score(
         forecast=forecast,
         resolution=correct_answer,
         range_min=0,
@@ -264,16 +273,17 @@ def test_numeric_baseline_if_completly_incorrect_forecast():
         (0.001, 8, -232.19),
     ],
 )
-def test_multiple_choice_examples(forecast_for_answer_a: float, num_total_forecasts: int, expected: float):
+def test_multiple_choice_examples(
+    forecast_for_answer_a: float, num_total_forecasts: int, expected: float
+):
     num_other_forecasts = num_total_forecasts - 1
     other_forecasts = (1 - forecast_for_answer_a) / num_other_forecasts
-    score = calculate_spot_baseline_score(
+    score = calculate_baseline_score(
         forecast=[forecast_for_answer_a] + [other_forecasts] * num_other_forecasts,
         resolution="A",
         options=["A"] + [f"B{i}" for i in range(num_other_forecasts)],
     )
     assert score == pytest.approx(expected, abs=1e-2)
-
 
 
 @pytest.mark.parametrize(
@@ -322,10 +332,10 @@ def test_baseline_score_better_when_closer(
     range_min: float | None,
     range_max: float | None,
 ):
-    score_closer = calculate_spot_baseline_score(
+    score_closer = calculate_baseline_score(
         forecast_closer, resolution, options, range_min, range_max, 1.0
     )
-    score_further = calculate_spot_baseline_score(
+    score_further = calculate_baseline_score(
         forecast_further, resolution, options, range_min, range_max, 1.0
     )
     assert score_closer > score_further
@@ -339,7 +349,23 @@ def test_baseline_score_better_when_closer(
         # Multiple Choice
         ([0.7, 0.2, 0.1], "A", ["A", "B", "C"], None, None, 0.5),
         # Numeric
-        ([0.1] * 50 + [0.9] * 149, 0.5, None, 0.0, 1.0, 3.0),
+        (
+            generate_cdf(
+                [
+                    Percentile(value=0.1, probability_below=0.1),
+                    Percentile(value=0.9, probability_below=0.9),
+                ],
+                lower_bound=0.0,
+                upper_bound=1.0,
+                open_lower_bound=False,
+                open_upper_bound=False,
+            ),
+            0.5,
+            None,
+            0.0,
+            1.0,
+            3.0,
+        ),
     ],
 )
 def test_baseline_score_weighted(
@@ -350,10 +376,10 @@ def test_baseline_score_weighted(
     range_max: float | None,
     question_weight: float,
 ):
-    score_unweighted = calculate_spot_baseline_score(
+    score_unweighted = calculate_baseline_score(
         forecast, resolution, options, range_min, range_max, 1.0
     )
-    score_weighted = calculate_spot_baseline_score(
+    score_weighted = calculate_baseline_score(
         forecast, resolution, options, range_min, range_max, question_weight
     )
     assert abs(score_weighted - score_unweighted * question_weight) < 1e-8
@@ -431,8 +457,8 @@ def test_baseline_score_weighted(
             [
                 generate_cdf(  # Best CDF
                     [
-                        Percentile(value=100, probability_below=0.1),
-                        Percentile(value=120, probability_below=0.9),
+                        Percentile(value=110, probability_below=0.1),
+                        Percentile(value=130, probability_below=0.9),
                     ],
                     lower_bound=0,
                     upper_bound=100,
@@ -441,8 +467,8 @@ def test_baseline_score_weighted(
                 ),
                 generate_cdf(
                     [
-                        Percentile(value=100, probability_below=0.1),
-                        Percentile(value=120, probability_below=0.9),
+                        Percentile(value=90, probability_below=0.1),
+                        Percentile(value=140, probability_below=0.9),
                     ],
                     lower_bound=0,
                     upper_bound=100,
@@ -451,13 +477,13 @@ def test_baseline_score_weighted(
                 ),
                 generate_cdf(  # worst CDF
                     [
-                        Percentile(value=100, probability_below=0.1),
-                        Percentile(value=120, probability_below=0.9),
+                        Percentile(value=30, probability_below=0.1),
+                        Percentile(value=110, probability_below=0.9),
                     ],
                     lower_bound=0,
                     upper_bound=100,
                     open_lower_bound=False,
-                    open_upper_bound=False,  # No upper bound = no probability mass at upper bound
+                    open_upper_bound=True,  # No upper bound = no probability mass at upper bound
                 ),
             ],
             120,
@@ -475,7 +501,7 @@ def test_better_forecast_means_better_peer_score(
     range_max: float | None,
 ):
     scores = [
-        calculate_spot_peer_score(
+        calculate_peer_score(
             forecast,
             [f for i, f in enumerate(forecasts) if i != idx],
             resolution,
@@ -512,7 +538,7 @@ def test_peer_score_zero_when_all_same(
 ):
     forecasts = [forecast for _ in range(5)]
     scores = [
-        calculate_spot_peer_score(
+        calculate_peer_score(
             f,
             [f2 for i2, f2 in enumerate(forecasts) if i2 != i],
             resolution,
@@ -589,7 +615,7 @@ def test_peer_score_average_zero(
     range_max: float | None,
 ):
     scores = [
-        calculate_spot_peer_score(
+        calculate_peer_score(
             forecast,
             [f for i, f in enumerate(forecasts) if i != idx],
             resolution,
@@ -641,10 +667,10 @@ def test_peer_score_weighted(
 ):
     for idx, forecast in enumerate(forecasts):
         other_forecasts = [f for i, f in enumerate(forecasts) if i != idx]
-        score_unweighted = calculate_spot_peer_score(
+        score_unweighted = calculate_peer_score(
             forecast, other_forecasts, resolution, options, range_min, range_max, 1.0
         )
-        score_weighted = calculate_spot_peer_score(
+        score_weighted = calculate_peer_score(
             forecast, other_forecasts, resolution, options, range_min, range_max, weight
         )
         assert score_weighted == pytest.approx(score_unweighted * weight)
