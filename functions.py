@@ -11,7 +11,11 @@ from scipy import stats
 from scipy.optimize import minimize_scalar
 from scipy.stats import binom, norm
 
-from refactored_notebook.scoring import calculate_spot_baseline_score, nominal_location_to_cdf_location, calculate_spot_peer_score
+from refactored_notebook.scoring import (
+    calculate_baseline_score,
+    calculate_peer_score,
+    nominal_location_to_cdf_location,
+)
 
 
 def extract_forecast(df):
@@ -428,19 +432,27 @@ def calculate_weighted_scores(df_bot_team_forecasts, teams):
     team_scores = {team: 0.0 for team in teams}
 
     for _, row in df_bot_team_forecasts.iterrows():
-        q_type = row["type"]
-        resolution = row["resolution"]
-        options = row.get("options")
-        range_min = row.get("range_min")
-        range_max = row.get("range_max")
-        question_weight = row["question_weight"]
+        resolution = row["Resolution"]
+        options = row["Options"]
+        range_min = row["Range_min"]
+        range_max = row["Range_max"]
+        question_weight = row["Question_weight"]
+        open_upper_bound = row["Open_upper_bound"]
+        open_lower_bound = row["Open_lower_bound"]
 
         for team in teams:
             forecast = row[team]
 
             try:
-                weighted_score = calculate_spot_baseline_score(
-                    forecast, resolution, options, range_min, range_max, question_weight
+                weighted_score = calculate_baseline_score(
+                    forecast,
+                    resolution,
+                    options,
+                    range_min,
+                    range_max,
+                    question_weight,
+                    open_upper_bound=open_upper_bound,
+                    open_lower_bound=open_lower_bound,
                 )
                 team_scores[team] += weighted_score
 
@@ -1041,7 +1053,9 @@ def nominal_location_to_cdf_location_via_question_dict(nominal_location, questio
     range_max = question_data["range_max"]
     zero_point = question_data["zero_point"]
 
-    return nominal_location_to_cdf_location(nominal_location, range_min, range_max, zero_point)
+    return nominal_location_to_cdf_location(
+        nominal_location, range_min, range_max, zero_point
+    )
 
 
 def get_cdf_at(cdf, unscaled_location):
@@ -1088,8 +1102,12 @@ def cdf_between(row, cdf, lower_bound, upper_bound):
     Returns:
         float: Probability between the bounds.
     """
-    a = get_cdf_at(cdf, nominal_location_to_cdf_location_via_question_dict(lower_bound, row))
-    b = get_cdf_at(cdf, nominal_location_to_cdf_location_via_question_dict(upper_bound, row))
+    a = get_cdf_at(
+        cdf, nominal_location_to_cdf_location_via_question_dict(lower_bound, row)
+    )
+    b = get_cdf_at(
+        cdf, nominal_location_to_cdf_location_via_question_dict(upper_bound, row)
+    )
     return b - a
 
 
@@ -1175,7 +1193,8 @@ def process_forecast_values(df):
 
         # Compute forecast_value using the extracted string_location
         forecast_value = get_cdf_at(
-            row["cdf"], nominal_location_to_cdf_location_via_question_dict(string_location, row)
+            row["cdf"],
+            nominal_location_to_cdf_location_via_question_dict(string_location, row),
         )
 
         # Apply logic based on comparison_type
@@ -1224,37 +1243,48 @@ def parse_options_array(options_str):
         return [p.strip().strip("\"'") for p in cleaned.split(",")]
 
 
-
 def calculate_weighted_h2h_score_between_two_forecast_columns(row, col_a, col_b):
-    forecast_a = row[col_a] # If string, I may need to do: [float(x) for x in bot_pmf_raw.strip('[]').split(',')]
+    forecast_a = row[
+        col_a
+    ]  # If string, I may need to do: [float(x) for x in bot_pmf_raw.strip('[]').split(',')]
     forecast_b = row[col_b]
-    resolution = row['resolution']
-    options = row['options_parsed'] if 'options_parsed' in row else row['options']
-    range_min = row['range_min']
-    range_max = row['range_max']
-    question_weight = row['question_weight']
-    score = calculate_spot_peer_score(
+    resolution = row["resolution"]
+    options = row["options_parsed"] if "options_parsed" in row else row["options"]
+    range_min = row["range_min"]
+    range_max = row["range_max"]
+    question_weight = row["question_weight"]
+    score = calculate_peer_score(
         forecast=forecast_a,
         forecast_for_other_users=[forecast_b],
         resolution=resolution,
         options=options,
         range_min=range_min,
         range_max=range_max,
-        question_weight=question_weight
+        question_weight=question_weight,
     )
     return score
 
-def calculate_all_peer_scores(df, all_bots, pro_col='pro_median'):
+
+def calculate_all_peer_scores(df, all_bots, pro_col="pro_median"):
     """Calculate peer scores for all bots"""
     # Create a new DataFrame to store peer scores
     df_peer = df.copy()
 
     # Calculate peer score for each bot
     for bot in all_bots:
-        df_peer[bot] = 100 * df.apply(lambda row: calculate_weighted_h2h_score_between_two_forecast_columns(row, bot, pro_col), axis=1)
+        df_peer[bot] = 100 * df.apply(
+            lambda row: calculate_weighted_h2h_score_between_two_forecast_columns(
+                row, bot, pro_col
+            ),
+            axis=1,
+        )
 
     # Calculate peer score for bot_team_median
     df_peer["bot_team_median"] = 100 * df.apply(
-        lambda row: calculate_weighted_h2h_score_between_two_forecast_columns(row, 'bot_median', pro_col), axis=1)
+        lambda row: calculate_weighted_h2h_score_between_two_forecast_columns(
+            row, "bot_median", pro_col
+        ),
+        axis=1,
+    )
 
     return df_peer

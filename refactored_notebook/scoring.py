@@ -1,11 +1,12 @@
 from datetime import datetime
+
 import numpy as np
 from scipy.stats.mstats import gmean
 
 from refactored_notebook.data_models import ForecastType, ResolutionType
 
 
-def calculate_spot_peer_score(
+def calculate_peer_score(
     forecast: ForecastType,
     forecast_for_other_users: list[ForecastType],
     resolution: ResolutionType,
@@ -65,37 +66,31 @@ def nominal_location_to_cdf_location(
     return unscaled_location
 
 
-def calculate_spot_baseline_score(
+def calculate_baseline_score(
     forecast: ForecastType,
     resolution: ResolutionType,
     options: list[str] | None = None,
     range_min: float | None = None,
     range_max: float | None = None,
     question_weight: float = 1.0,
+    open_upper_bound: bool = False,
+    open_lower_bound: bool = False,
 ) -> float:
     """
     Question type can be infered from resolution type
     Scoring math: https://www.metaculus.com/help/scores-faq/#What:~:text=given%20score%20type.-,What%20is%20the%20Baseline%20score%3F,-The%20Baseline%20score
     """
-
     prob_for_resolution = _determine_probability_for_resolution(
         forecast, resolution, options, range_min, range_max
     )
-    baseline_prob = _determine_baseline(resolution, options)
+    baseline_prob = _determine_baseline(
+        resolution, options, range_min, range_max, open_upper_bound, open_lower_bound
+    )
     divisor = _determine_divisor_for_baseline_score(resolution, options)
     if prob_for_resolution <= 0 or baseline_prob <= 0:
         raise ValueError(
             "Probability for resolution or baseline probability is less than or equal to 0 which could cause a log(0) issue"
         )
-
-    # if resolution_bucket in [0, len(pmf) - 1]:
-    #     baseline = 0.05
-    # else:
-    #     open_bound_count = bool(question.open_upper_bound) + bool(
-    #     question.open_lower_bound
-    # )
-    #     baseline = (1 - 0.05 * open_bounds_count) / (len(pmf) - 2)
-    # forecast_score = 100 * np.log(pmf[resolution_bucket] / baseline) / 2
 
     baseline_score = np.log(prob_for_resolution / baseline_prob) / divisor * 100
 
@@ -105,7 +100,12 @@ def calculate_spot_baseline_score(
 
 
 def _determine_baseline(
-    resolution: ResolutionType, options: list[str] | None = None
+    resolution: ResolutionType,
+    options: list[str] | None = None,
+    range_min: float | None = None,
+    range_max: float | None = None,
+    open_upper_bound: bool | None = None,
+    open_lower_bound: bool | None = None,
 ) -> float:
     is_binary = isinstance(resolution, bool)
     is_multiple_choice = isinstance(resolution, str)
@@ -118,9 +118,34 @@ def _determine_baseline(
             raise ValueError("Options are required for multiple choice questions")
         baseline_prob = 1 / len(options)
     elif is_numeric:
-        baseline_prob = (
-            1 / 202
-        )  # len(pmf) # ??? -> bins = 201 because of extra appended bin # @Check: This comment seems off since its the cdf that has 201 bins
+        if open_upper_bound is None or open_lower_bound is None:
+            raise ValueError("Open upper bound and lower bound are required for numeric questions")
+        # @Check: Which version is correct?
+
+        # Version 1:
+        resolved_outside_bounds = False
+        assert range_min is not None and range_max is not None and resolution is not None
+        if resolution > range_max or resolution < range_min:
+            resolved_outside_bounds = True
+        if resolved_outside_bounds:
+            baseline_prob = 0.05
+        else:
+            open_bound_count = bool(open_upper_bound) + bool(open_lower_bound)
+            baseline_prob = (1 - 0.05 * open_bound_count) / 200 # PMF has 202 bins, 2 of which represent the bounds. So 200 is the internal bins
+
+        # Version 2:
+        # open_bound_count = bool(open_upper_bound) + bool(open_lower_bound)
+        # if open_bound_count == 0:
+        #     baseline_prob = 1
+        # elif open_bound_count == 1:
+        #     baseline_prob = 0.95
+        # else:
+        #     baseline_prob = 0.9
+
+        # Version 3:
+        # baseline_prob = (
+        #     1 / 202
+        # )  # len(pmf) # ??? -> bins = 201 because of extra appended bin # @Check: This comment seems off since its the cdf that has 201 bins
         # @Check: Should this be either 1, 0.9, or 0.95 based on whether open or closed bounds
     else:
         raise ValueError("Unknown question type")
@@ -145,7 +170,7 @@ def _determine_probability_for_resolution(
     if resolution == "above_upper_bound" or resolution == "below_lower_bound":
         raise ValueError(
             "'above_upper_bound' or 'below_lower_bound' format not supported"
-        )
+        ) # This is an old resolution type in Q4 2024
 
     is_numeric = isinstance(resolution, float) or isinstance(resolution, int)
     is_binary = isinstance(resolution, bool)
