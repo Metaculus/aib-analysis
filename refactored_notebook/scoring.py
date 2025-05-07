@@ -125,8 +125,7 @@ def _determine_baseline(
         # Version 3:
         # baseline_prob = (
         #     1 / 202
-        # )  # len(pmf) # ??? -> bins = 201 because of extra appended bin # @Check: This comment seems off since its the cdf that has 201 bins
-        # @Check: Should this be either 1, 0.9, or 0.95 based on whether open or closed bounds
+        # )  # len(pmf) # bins = 201 because of extra appended bin
     else:
         raise ValueError("Unknown question type")
     assert (
@@ -234,8 +233,7 @@ def _numeric_resolution_prob(
         [lower_bound_prob]
         + [cdf[i] - cdf[i - 1] for i in range(1, len(cdf))]
         + [upper_bound_prob]
-    )  # @Check: is this a correct conversion?
-    # pmf = np.diff(np.concatenate([[0], cdf]))
+    )
     assert len(pmf) == 202, f"There should be 202 bins, but there are {len(pmf)}"
 
     resolution = float(resolution)
