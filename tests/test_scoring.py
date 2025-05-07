@@ -240,7 +240,7 @@ def test_numeric_baseline_when_perfect_forecast():
 
     score = calculate_baseline_score(
         forecast=forecast,
-        resolution=correct_answer,
+        resolution=float(correct_answer),
         range_min=0,
         range_max=range_max,
         open_upper_bound=False,
@@ -259,7 +259,7 @@ def test_numeric_baseline_if_completly_incorrect_forecast():
 
     score = calculate_baseline_score(
         forecast=forecast,
-        resolution=correct_answer,
+        resolution=float(correct_answer),
         range_min=0,
         range_max=range_max,
     )
@@ -317,7 +317,7 @@ def test_multiple_choice_examples(
                 open_lower_bound=False,
                 open_upper_bound=False,
             ),
-            50,
+            50.0,
             None,
             -1,
             96,
@@ -327,7 +327,7 @@ def test_multiple_choice_examples(
 def test_baseline_score_better_when_closer(
     forecast_closer: list[float],
     forecast_further: list[float],
-    resolution: bool | str | None,
+    resolution: bool | str | float | None,
     options: list[str] | None,
     range_min: float | None,
     range_max: float | None,
