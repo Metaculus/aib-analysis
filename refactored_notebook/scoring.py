@@ -124,7 +124,7 @@ def _determine_baseline(
 
         # Version 1:
         resolved_outside_bounds = False
-        assert range_min is not None and range_max is not None and resolution is not None
+        assert range_min is not None and range_max is not None and resolution is not None, f"These need to be not None: Range min: {range_min}, range max: {range_max}, resolution: {resolution}"
         if resolution > range_max or resolution < range_min:
             resolved_outside_bounds = True
         if resolved_outside_bounds:

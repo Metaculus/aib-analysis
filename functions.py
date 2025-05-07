@@ -1243,16 +1243,51 @@ def parse_options_array(options_str):
         return [p.strip().strip("\"'") for p in cleaned.split(",")]
 
 
-def calculate_weighted_h2h_score_between_two_forecast_columns(row, col_a, col_b):
+def calculate_weighted_h2h_score_between_two_forecast_columns(row: pd.Series, col_a: str, col_b: str):
     forecast_a = row[
         col_a
-    ]  # If string, I may need to do: [float(x) for x in bot_pmf_raw.strip('[]').split(',')]
+    ]
+    if isinstance(forecast_a, str):
+        forecast_a = [float(x) for x in forecast_a.strip('[]').split(',')]
+
     forecast_b = row[col_b]
-    resolution = row["resolution"]
+    if isinstance(forecast_b, str):
+        forecast_b = [float(x) for x in forecast_b.strip('[]').split(',')]
+
     options = row["options_parsed"] if "options_parsed" in row else row["options"]
-    range_min = row["range_min"]
-    range_max = row["range_max"]
+    resolution = row["resolution"]
+    question_type = row["type"]
+    if question_type == "binary":
+        if resolution == "yes":
+            resolution = True
+        elif resolution == "no":
+            resolution = False
+
+        assert isinstance(forecast_a, float)
+        assert isinstance(forecast_b, float)
+        forecast_a = [forecast_a]
+        forecast_b = [forecast_b]
+    elif question_type == "multiple_choice":
+        resolution = resolution
+    elif question_type == "numeric":
+        if not isinstance(resolution, float):
+            resolution = float(resolution)
+    else:
+        raise ValueError(f"Unknown question type: {question_type}")
+
+
+    range_min = row.get("range_min")
+    if range_min:
+        range_min = float(range_min)
+
+    range_max = row.get("range_max")
+    if range_max:
+        range_max = float(range_max)
+
     question_weight = row["question_weight"]
+    if question_weight:
+        question_weight = float(question_weight)
+
     score = calculate_peer_score(
         forecast=forecast_a,
         forecast_for_other_users=[forecast_b],
@@ -1272,7 +1307,7 @@ def calculate_all_peer_scores(df, all_bots, pro_col="pro_median"):
 
     # Calculate peer score for each bot
     for bot in all_bots:
-        df_peer[bot] = 100 * df.apply(
+        df_peer[bot] = df.apply(
             lambda row: calculate_weighted_h2h_score_between_two_forecast_columns(
                 row, bot, pro_col
             ),
@@ -1280,7 +1315,7 @@ def calculate_all_peer_scores(df, all_bots, pro_col="pro_median"):
         )
 
     # Calculate peer score for bot_team_median
-    df_peer["bot_team_median"] = 100 * df.apply(
+    df_peer["bot_team_median"] = df.apply(
         lambda row: calculate_weighted_h2h_score_between_two_forecast_columns(
             row, "bot_median", pro_col
         ),

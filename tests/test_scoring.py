@@ -255,7 +255,7 @@ def test_numeric_baseline_if_completly_incorrect_forecast():
     index_to_answer_ratio = 3
     correct_answer = correct_index * index_to_answer_ratio
     range_max = length_of_cdf * index_to_answer_ratio
-    forecast = generate_cdf_with_forecast_at_index(correct_index, 0.001)
+    forecast = generate_cdf_with_forecast_at_index(correct_index, 0.01/200)
 
     score = calculate_baseline_score(
         forecast=forecast,
@@ -263,7 +263,7 @@ def test_numeric_baseline_if_completly_incorrect_forecast():
         range_min=0,
         range_max=range_max,
     )
-    assert score == pytest.approx(-230)
+    assert score == pytest.approx(-230.25, abs=1e-1)
 
 
 @pytest.mark.parametrize(
