@@ -458,7 +458,8 @@ def calculate_weighted_scores(df_bot_team_forecasts, teams):
                 )
                 team_scores[team] += weighted_score
 
-            except (ValueError, TypeError, IndexError):
+            except (ValueError, TypeError, IndexError) as e:
+                print(f"   >>> Error calculating baseline score for question {row.get('bot_question_id')} — skipping: {e}")
                 # @Check: Does skipping introduce any problems?
                 continue  # Be robust to bad/missing data
 
