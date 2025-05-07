@@ -432,32 +432,34 @@ def calculate_weighted_scores(df_bot_team_forecasts, teams):
     team_scores = {team: 0.0 for team in teams}
 
     for _, row in df_bot_team_forecasts.iterrows():
-        resolution = row["Resolution"]
-        options = row["Options"]
-        range_min = row["Range_min"]
-        range_max = row["Range_max"]
-        question_weight = row["Question_weight"]
-        open_upper_bound = row["Open_upper_bound"]
-        open_lower_bound = row["Open_lower_bound"]
+        resolution = row["resolution"]
+        options = row["options"]
+        range_min = row["range_min"]
+        range_max = row["range_max"]
+        question_weight = row["question_weight"]
+        open_upper_bound = row["open_upper_bound"]
+        open_lower_bound = row["open_lower_bound"]
+        question_type = row["type"]
 
         for team in teams:
             forecast = row[team]
 
             try:
                 weighted_score = calculate_baseline_score(
-                    forecast,
-                    resolution,
-                    options,
-                    range_min,
-                    range_max,
-                    question_weight,
+                    forecast=forecast,
+                    resolution=resolution,
+                    q_type=question_type,
+                    options=options,
+                    range_min=range_min,
+                    range_max=range_max,
+                    question_weight=question_weight,
                     open_upper_bound=open_upper_bound,
                     open_lower_bound=open_lower_bound,
                 )
                 team_scores[team] += weighted_score
 
             except (ValueError, TypeError, IndexError):
-                # @Ben: Does skipping introduce any problems?
+                # @Check: Does skipping introduce any problems?
                 continue  # Be robust to bad/missing data
 
     return pd.Series(team_scores)
@@ -1243,19 +1245,28 @@ def parse_options_array(options_str):
         return [p.strip().strip("\"'") for p in cleaned.split(",")]
 
 
-def calculate_weighted_h2h_score_between_two_forecast_columns(row: pd.Series, col_a: str, col_b: str):
+def calculate_weighted_h2h_score_between_two_forecast_columns(row: pd.Series, col_a: str, col_b: str) -> float:
+    question_type = row["type"]
+
     forecast_a = row[
         col_a
     ]
     if isinstance(forecast_a, str):
         forecast_a = [float(x) for x in forecast_a.strip('[]').split(',')]
+    elif isinstance(forecast_a, float) and math.isnan(forecast_a):
+        return np.nan
 
     forecast_b = row[col_b]
     if isinstance(forecast_b, str):
         forecast_b = [float(x) for x in forecast_b.strip('[]').split(',')]
+    elif isinstance(forecast_b, float) and math.isnan(forecast_b):
+        return np.nan
 
     options = row["options_parsed"] if "options_parsed" in row else row["options"]
     resolution = row["resolution"]
+    if resolution == "annulled" or resolution == "ambiguous":
+        return np.nan
+
     question_type = row["type"]
     if question_type == "binary":
         if resolution == "yes":
@@ -1270,8 +1281,12 @@ def calculate_weighted_h2h_score_between_two_forecast_columns(row: pd.Series, co
     elif question_type == "multiple_choice":
         resolution = resolution
     elif question_type == "numeric":
-        if not isinstance(resolution, float):
+        if resolution == "above_upper_bound" or resolution == "below_lower_bound":
+            resolution = resolution
+        elif not isinstance(resolution, float):
             resolution = float(resolution)
+        else:
+            raise ValueError(f"Unknown resolution type: {resolution}")
     else:
         raise ValueError(f"Unknown question type: {question_type}")
 
@@ -1289,6 +1304,7 @@ def calculate_weighted_h2h_score_between_two_forecast_columns(row: pd.Series, co
         question_weight = float(question_weight)
 
     score = calculate_peer_score(
+        q_type=question_type,
         forecast=forecast_a,
         forecast_for_other_users=[forecast_b],
         resolution=resolution,
