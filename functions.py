@@ -11,9 +11,11 @@ from scipy import stats
 from scipy.optimize import minimize_scalar
 from scipy.stats import binom, norm
 
-from refactored_notebook.scoring import (calculate_baseline_score,
-                                         calculate_peer_score,
-                                         nominal_location_to_cdf_location)
+from refactored_notebook.scoring import (
+    calculate_baseline_score,
+    calculate_peer_score,
+    nominal_location_to_cdf_location,
+)
 
 
 def extract_forecast(df):
@@ -348,8 +350,6 @@ def get_median_forecast_multiple_choice(row, forecasts):
 
 def get_median_forecast(row, bots):
     """
-    @Check:
-
     Calculates the median forecast for a given set of bots, handling different question types properly.
 
     Args:
@@ -378,18 +378,18 @@ def get_median_forecast(row, bots):
         return np.nan
 
     if q_type == "numeric":
-        forecasts = [f for f in forecasts if isinstance(f, list)]
+        numeric_forecasts: list[list[float]] = [f for f in forecasts if isinstance(f, list)]
 
-        if not forecasts:
+        if not numeric_forecasts:
             return np.nan
 
-        cdfs_array = np.array(forecasts, dtype=float)
-        mean_cdf = np.mean(cdfs_array, axis=0)
+        cdfs_array = np.array(numeric_forecasts, dtype=float)
+        median_cdf = np.median(cdfs_array, axis=0)
 
-        return mean_cdf
+        return median_cdf
 
     elif q_type == "binary":
-        probs = []
+        probs: list[float] = []
         for f in forecasts:
             try:
                 val = float(f)
@@ -416,8 +416,6 @@ def get_median_forecast(row, bots):
 
 def calculate_weighted_scores(df_bot_team_forecasts, teams):
     """
-    @Check:
-
     Calculates weighted scores for each team based on their forecasts and question weights.
 
     Args:
@@ -431,7 +429,7 @@ def calculate_weighted_scores(df_bot_team_forecasts, teams):
 
     for _, row in df_bot_team_forecasts.iterrows():
         for team in teams:
-            # @Check: that the conversion is corret
+            # @Check: that the row conversion is corret
             cleaned_row = _prepare_new_row_for_scoring(row, [team])
             if _is_unscorable(cleaned_row, [team]):
                 continue

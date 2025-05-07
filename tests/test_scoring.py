@@ -685,9 +685,8 @@ def test_peer_score_weighted(
         assert score_weighted == pytest.approx(score_unweighted * weight)
 
 
-# TODO: Test the below
+# TODO: Test the below for peer scores
 # Best score for MC and binary is 996
 # Worst score for MC and binary is -996
 # Best score for numeric is 408
 # Worst score for numeric is -408
-# @Check: Can we even validate this (won't we need infinite other forecasters to get max score?)
