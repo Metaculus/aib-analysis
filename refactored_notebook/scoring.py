@@ -16,11 +16,11 @@ def calculate_peer_score(
     forecast: ForecastType,
     forecast_for_other_users: list[ForecastType],
     resolution: ResolutionType,
-    q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
     options: list[str] | None = None,
     range_min: float | None = None,
     range_max: float | None = None,
     question_weight: float = 1.0,
+    q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
 ) -> float:
     question_type = _determine_question_type(q_type, resolution)
     resolution = _normalize_resolution(question_type, resolution, range_min, range_max)
@@ -44,13 +44,13 @@ def calculate_peer_score(
 def calculate_baseline_score(
     forecast: ForecastType,
     resolution: ResolutionType,
-    q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
     options: list[str] | None = None,
     range_min: float | None = None,
     range_max: float | None = None,
     question_weight: float = 1.0,
     open_upper_bound: bool = False,
     open_lower_bound: bool = False,
+    q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
 ) -> float:
     """
     Question type can be infered from resolution type
