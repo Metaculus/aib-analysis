@@ -235,7 +235,7 @@ def test_numeric_baseline_when_perfect_forecast():
     index_to_answer_ratio = 3
     correct_answer = correct_index * index_to_answer_ratio
     range_max = length_of_cdf * index_to_answer_ratio
-    forecast = generate_cdf_with_forecast_at_index(correct_index, 0.999)
+    forecast = generate_cdf_with_forecast_at_index(correct_index, 0.59)
     # As of May 3, 2025, 0.59 is max difference between 2 points on a cdf
 
     score = calculate_baseline_score(
@@ -333,10 +333,18 @@ def test_baseline_score_better_when_closer(
     range_max: float | None,
 ):
     score_closer = calculate_baseline_score(
-        forecast_closer, resolution, options, range_min, range_max, 1.0
+        forecast=forecast_closer,
+        resolution=resolution,
+        options=options,
+        range_min=range_min,
+        range_max=range_max,
     )
     score_further = calculate_baseline_score(
-        forecast_further, resolution, options, range_min, range_max, 1.0
+        forecast=forecast_further,
+        resolution=resolution,
+        options=options,
+        range_min=range_min,
+        range_max=range_max,
     )
     assert score_closer > score_further
 
@@ -512,6 +520,7 @@ def test_better_forecast_means_better_peer_score(
         )
         for idx, forecast in enumerate(forecasts)
     ]
+    assert scores[1] > 0, "The first score should be positive"
     sorted_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
     assert len(scores) == len(set(scores)), "Scores should all be different"
     assert sorted_indices == list(

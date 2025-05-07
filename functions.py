@@ -11,11 +11,9 @@ from scipy import stats
 from scipy.optimize import minimize_scalar
 from scipy.stats import binom, norm
 
-from refactored_notebook.scoring import (
-    calculate_baseline_score,
-    calculate_peer_score,
-    nominal_location_to_cdf_location,
-)
+from refactored_notebook.scoring import (calculate_baseline_score,
+                                         calculate_peer_score,
+                                         nominal_location_to_cdf_location)
 
 
 def extract_forecast(df):
@@ -193,7 +191,7 @@ def make_wide(df_bot_peer, df_pro_bot_resolved_questions):
     df_pivoted = df_pivoted[cols]
 
     all_columns = df_pivoted.columns.tolist()
-    ## Remove 'question_id' and 'bot_median' from the list if they exist
+    # Remove 'question_id' and 'bot_median' from the list if they exist
     all_columns = [col for col in all_columns if col not in ["bot_question_id"]]
     new_column_order = ["bot_question_id"] + all_columns
     df_pivoted = df_pivoted[new_column_order]
@@ -432,17 +430,21 @@ def calculate_weighted_scores(df_bot_team_forecasts, teams):
     team_scores = {team: 0.0 for team in teams}
 
     for _, row in df_bot_team_forecasts.iterrows():
-        resolution = row["resolution"]
-        options = row["options"]
-        range_min = row["range_min"]
-        range_max = row["range_max"]
-        question_weight = row["question_weight"]
-        open_upper_bound = row["open_upper_bound"]
-        open_lower_bound = row["open_lower_bound"]
-        question_type = row["type"]
-
         for team in teams:
-            forecast = row[team]
+            # @Check: that the conversion is corret
+            cleaned_row = _prepare_new_row_for_scoring(row, [team])
+            if _is_unscorable(cleaned_row, [team]):
+                continue
+
+            forecast = cleaned_row[team]
+            resolution = cleaned_row["resolution"]
+            options = cleaned_row["options"]
+            range_min = cleaned_row["range_min"]
+            range_max = cleaned_row["range_max"]
+            question_weight = cleaned_row["question_weight"]
+            open_upper_bound = cleaned_row["open_upper_bound"]
+            open_lower_bound = cleaned_row["open_lower_bound"]
+            question_type = cleaned_row["type"]
 
             try:
                 weighted_score = calculate_baseline_score(
@@ -574,114 +576,6 @@ def calculate_t_test(df_input, bot_list, weight_col="question_weight"):
     df_W_leaderboard = df_W_leaderboard.drop("_p_value_sort", axis=1)
 
     return df_W_leaderboard
-
-
-def calculate_head_to_head(row, a, b):
-    """
-    @Check:...
-
-    Calculates the head-to-head score for two forecasters.
-    Positive if 'a' did better than 'b', negative if 'b' did better than 'a'.
-
-    Args:
-        row (pandas.Series): Row containing 'resolution', 'type', and forecast columns.
-        a (str): Column name for first forecaster.
-        b (str): Column name for second forecaster.
-
-    Returns:
-        float: Head-to-head score.
-    """
-    q_type = row["type"]
-    resolution = row["resolution"]
-    options = row["options"]
-    range_min = row.get("range_min")
-    range_max = row.get("range_max")
-
-    forecast_a = row[a]
-    forecast_b = row[b]
-
-    if q_type == "binary":
-        if (resolution == "yes") or (resolution == 1):
-            return 100 * np.log(forecast_a / forecast_b)
-        elif (resolution == "no") or (resolution == 0):
-            return 100 * np.log((1 - forecast_a) / (1 - forecast_b))
-        else:
-            return np.nan
-
-    elif q_type == "multiple_choice":
-        # Parse forecast_a if it's a string
-        if isinstance(forecast_a, str):
-            forecast_a = ast.literal_eval(forecast_a)
-            options = (
-                ast.literal_eval(row["options"])
-                if isinstance(row["options"], str)
-                else row["options"]
-            )
-            resolution_idx = options.index(str(row["resolution"]))
-            forecast_a = forecast_a[resolution_idx]
-
-        # Parse forecast_b if it's a string
-        if isinstance(forecast_b, str):
-            forecast_b = ast.literal_eval(forecast_b)
-            options = (
-                ast.literal_eval(row["options"])
-                if isinstance(row["options"], str)
-                else row["options"]
-            )
-            resolution_idx = options.index(str(row["resolution"]))
-            forecast_b = forecast_b[resolution_idx]
-
-        # Now both are floats with the prob assigned to the correct bin
-        return 100 * np.log(forecast_a / forecast_b)
-
-    elif q_type == "numeric":
-        # Ensure both forecasts are Python lists
-        if isinstance(forecast_a, str):
-            forecast_a = ast.literal_eval(forecast_a)
-        elif isinstance(forecast_a, np.ndarray):
-            forecast_a = forecast_a.tolist()
-
-        if isinstance(forecast_b, str):
-            forecast_b = ast.literal_eval(forecast_b)
-        elif isinstance(forecast_b, np.ndarray):
-            forecast_b = forecast_b.tolist()
-
-        if not forecast_a or not forecast_b:
-            return np.nan
-
-        cdf_a = forecast_a
-        cdf_b = forecast_b
-
-        pmf_a = [cdf_a[0]] + [cdf_a[i] - cdf_a[i - 1] for i in range(1, len(cdf_a))]
-        pmf_a.append(1 - cdf_a[-1])
-
-        pmf_b = [cdf_b[0]] + [cdf_b[i] - cdf_b[i - 1] for i in range(1, len(cdf_b))]
-        pmf_b.append(1 - cdf_b[-1])
-
-        bin_edges = np.linspace(range_min, range_max, 200)
-
-        if resolution == "below_lower_bound":
-            resolution_idx = 0
-        elif resolution == "above_upper_bound":
-            resolution_idx = len(pmf_a) - 1  # i.e., 200
-        else:
-            try:
-                resolution_val = float(resolution)
-                resolution_idx = np.searchsorted(
-                    bin_edges, resolution_val, side="right"
-                )
-            except ValueError:
-                print(f"Bad resolution value: {resolution}")
-                return np.nan
-
-        p_a = pmf_a[resolution_idx]
-        p_b = pmf_b[resolution_idx]
-
-        if p_a <= 0 or p_b <= 0:
-            print(f"Invalid PMF values: p_a={p_a}, p_b={p_b}")
-            return np.nan
-
-        return 100 * np.log(p_a / p_b)
 
 
 def plot_head_to_head_distribution(
@@ -1079,7 +973,8 @@ def get_cdf_at(cdf, unscaled_location):
     if index_scaled_location.is_integer():
         return cdf[int(index_scaled_location)]
     # linear interpolation step
-    left_index = int(index_scaled_location)  # This is the floor, which is what we want
+    # This is the floor, which is what we want
+    left_index = int(index_scaled_location)
     right_index = left_index + 1
     left_value = cdf[left_index]
     right_value = cdf[right_index]
@@ -1245,63 +1140,35 @@ def parse_options_array(options_str):
         return [p.strip().strip("\"'") for p in cleaned.split(",")]
 
 
-def calculate_weighted_h2h_score_between_two_forecast_columns(row: pd.Series, col_a: str, col_b: str) -> float:
-    question_type = row["type"]
+def calculate_weighted_h2h_score_between_two_forecast_columns(
+    row: pd.Series, col_a: str, col_b: str
+) -> float:
+    """
+    Calculates the head-to-head score for two forecasters.
+    Positive if 'a' did better than 'b', negative if 'b' did better than 'a'.
 
-    forecast_a = row[
-        col_a
-    ]
-    if isinstance(forecast_a, str):
-        forecast_a = [float(x) for x in forecast_a.strip('[]').split(',')]
-    elif isinstance(forecast_a, float) and math.isnan(forecast_a):
+    Args:
+        row (pandas.Series): Row containing 'resolution', 'type', and forecast columns.
+        a (str): Column name for first forecaster.
+        b (str): Column name for second forecaster.
+
+    Returns:
+        float: Head-to-head score.
+    """
+    # @Check: that the row conversion is corret
+
+    cleaned_row = _prepare_new_row_for_scoring(row, [col_a, col_b])
+    if _is_unscorable(cleaned_row, [col_a, col_b]):
         return np.nan
 
-    forecast_b = row[col_b]
-    if isinstance(forecast_b, str):
-        forecast_b = [float(x) for x in forecast_b.strip('[]').split(',')]
-    elif isinstance(forecast_b, float) and math.isnan(forecast_b):
-        return np.nan
-
-    options = row["options_parsed"] if "options_parsed" in row else row["options"]
-    resolution = row["resolution"]
-    if resolution == "annulled" or resolution == "ambiguous":
-        return np.nan
-
-    question_type = row["type"]
-    if question_type == "binary":
-        if resolution == "yes":
-            resolution = True
-        elif resolution == "no":
-            resolution = False
-
-        assert isinstance(forecast_a, float)
-        assert isinstance(forecast_b, float)
-        forecast_a = [forecast_a]
-        forecast_b = [forecast_b]
-    elif question_type == "multiple_choice":
-        resolution = resolution
-    elif question_type == "numeric":
-        if resolution == "above_upper_bound" or resolution == "below_lower_bound":
-            resolution = resolution
-        elif not isinstance(resolution, float):
-            resolution = float(resolution)
-        else:
-            raise ValueError(f"Unknown resolution type: {resolution}")
-    else:
-        raise ValueError(f"Unknown question type: {question_type}")
-
-
-    range_min = row.get("range_min")
-    if range_min:
-        range_min = float(range_min)
-
-    range_max = row.get("range_max")
-    if range_max:
-        range_max = float(range_max)
-
-    question_weight = row["question_weight"]
-    if question_weight:
-        question_weight = float(question_weight)
+    question_type = cleaned_row["type"]
+    forecast_a = cleaned_row[col_a]
+    forecast_b = cleaned_row[col_b]
+    resolution = cleaned_row["resolution"]
+    options = cleaned_row["options"]
+    range_min = cleaned_row["range_min"]
+    range_max = cleaned_row["range_max"]
+    question_weight = cleaned_row["question_weight"]
 
     score = calculate_peer_score(
         q_type=question_type,
@@ -1314,6 +1181,87 @@ def calculate_weighted_h2h_score_between_two_forecast_columns(row: pd.Series, co
         question_weight=question_weight,
     )
     return score
+
+
+def _is_unscorable(row: pd.Series, forecast_columns_to_check_null: list[str]):
+    is_unscorable = False
+    for col in forecast_columns_to_check_null:
+        forecast = row[col]
+        if forecast is None:
+            is_unscorable = True
+        elif isinstance(forecast, float) and math.isnan(forecast):
+            is_unscorable = True
+    resolution = row["resolution"]
+    if resolution == "annulled" or resolution == "ambiguous":
+        is_unscorable = True
+    return is_unscorable
+
+
+def _prepare_new_row_for_scoring(
+    original_row: pd.Series, forecast_columns: list[str]
+) -> pd.Series:
+    new_row = original_row.copy()
+    question_type = original_row["type"]
+
+    options = (
+        original_row["options_parsed"]
+        if "options_parsed" in new_row
+        else new_row["options"]
+    )
+    if isinstance(options, str):
+        options = options.strip("[]").split(",")
+    new_row["options"] = options
+
+    resolution = original_row["resolution"]
+    question_type = original_row["type"]
+    if question_type == "binary":
+        if resolution == "yes":
+            resolution = True
+        elif resolution == "no":
+            resolution = False
+
+    elif question_type == "multiple_choice":
+        resolution = resolution
+    elif question_type == "numeric":
+        if resolution == "above_upper_bound" or resolution == "below_lower_bound":
+            resolution = resolution
+        elif not isinstance(resolution, float):
+            resolution = float(resolution)
+        else:
+            raise ValueError(f"Unknown resolution type: {resolution}")
+    else:
+        raise ValueError(f"Unknown question type: {question_type}")
+    new_row["resolution"] = resolution
+
+    range_min = original_row.get("range_min")
+    if range_min:
+        range_min = float(range_min)
+    new_row["range_min"] = range_min
+
+    range_max = original_row.get("range_max")
+    if range_max:
+        range_max = float(range_max)
+    new_row["range_max"] = range_max
+
+    question_weight = original_row["question_weight"]
+    if question_weight:
+        question_weight = float(question_weight)
+    new_row["question_weight"] = question_weight
+
+    for col in forecast_columns:
+        forecast = original_row[col]
+        if isinstance(forecast, float) and math.isnan(forecast):
+            forecast = forecast
+        elif question_type == "binary":
+            if isinstance(forecast, str):
+                forecast = [float(forecast)]
+            forecast = [forecast]
+        elif isinstance(forecast, str):
+            forecast = [float(x) for x in forecast.strip("[]").split(",")]
+
+        new_row[col] = forecast
+
+    return new_row
 
 
 def calculate_all_peer_scores(df, all_bots, pro_col="pro_median"):
