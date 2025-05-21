@@ -153,8 +153,11 @@ def _determine_probability_for_resolution(
             "Havent decided how to handle null forecasts or anulled resolutions"
         )
 
-    if len(forecast) == 0:
-        raise ValueError("Forecast is empty")
+    try:
+        if len(forecast) == 0:
+            raise ValueError("Forecast is empty")
+    except Exception as e:
+        raise ValueError(f"Error encountered for question of type {q_type} with resolution {resolution} and forecast {forecast}: {e}")
 
     if not q_type == QuestionType.NUMERIC and any(p <= 0 or p >= 1 for p in forecast):
         raise ValueError("Forecast contains probabilities outside of 0 to 1 range")
@@ -207,7 +210,7 @@ def _multiple_choice_resolution_prob(
         raise ValueError("Forecast and options have different lengths")
 
     pmf = [float(p) for p in forecast]
-    options = [str(opt) for opt in options]
+    options = [str(opt) for opt in options] # @Check: TODO: For whatever reason, options had " and ' surrounding them, and were not parsed at this point. This is the easier way to handle it, but should be dealt with earlier in the pipeline.
     resolution_idx = options.index(str(resolution))
     prob_for_resolution = pmf[resolution_idx]
     return prob_for_resolution

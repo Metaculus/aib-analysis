@@ -10,7 +10,7 @@ import pandas as pd
 from scipy import stats
 from scipy.optimize import minimize_scalar
 from scipy.stats import binom, norm
-
+import re
 from refactored_notebook.scoring import (
     calculate_baseline_score,
     calculate_peer_score,
@@ -345,7 +345,14 @@ def get_median_forecast_multiple_choice(row, forecasts):
         # print(f"NO PROBS collected for multiple-choice question {row.get('bot_question_id')} — returning np.nan")
         return np.nan
 
-    return np.nanmedian(probs)
+    median_forecast = [] # NOTE: This forecast will not add to 1, but we only need the median for the resolution
+    for i, _ in enumerate(options):
+        if i == resolution_idx:
+            median_forecast.append(np.nanmedian(probs))
+        else:
+            median_forecast.append(0.0001) # this is filler @Check: This won't screw anything up right? Perviously we were just returning the probability of resolution
+
+    return median_forecast
 
 
 def get_median_forecast(row, bots):
@@ -1106,7 +1113,7 @@ def process_forecast_values(df):
     return df
 
 
-def parse_options_array(options_str):
+def parse_options_array(options_str: str) -> list[str]:
     """
     Parse options string that looks like an array into an actual array.
 
@@ -1119,24 +1126,30 @@ def parse_options_array(options_str):
     if not isinstance(options_str, str):
         return options_str  # Already parsed or None
 
+    if options_str == "[]":
+        return [] # This can happen for numeric/binary questions with no options
+
+    options = []
     try:
         # First try using eval (safer than literal_eval for this specific case)
-        options_array = eval(options_str)
-        return options_array
+        options = eval(options_str)
     except:
         # If that fails, try custom parsing
         # Strip brackets and split by comma
         cleaned = options_str.strip("[]")
         # Split by comma, but respect quotes
-        import re
 
         # Match items in quotes with commas inside
         parts = re.findall(r'"([^"]*)"', cleaned)
         if parts:
-            return parts
-
-        # Simple fallback: just split by comma and strip quotes
-        return [p.strip().strip("\"'") for p in cleaned.split(",")]
+            options = parts
+        else:
+            # Simple fallback: just split by comma and strip quotes
+            options = [p for p in cleaned.split(",")]
+    stripped_options = [p.strip("\"' ") for p in options]
+    if len(stripped_options) == 0:
+        raise ValueError(f"No options found in {options_str}")
+    return stripped_options
 
 
 def calculate_weighted_h2h_score_between_two_forecast_columns(
