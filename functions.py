@@ -421,7 +421,7 @@ def get_median_forecast(row, bots):
         raise ValueError(f"Unknown question type: {q_type}")
 
 
-def calculate_weighted_scores(df_bot_team_forecasts, teams):
+def calculate_weighted_scores(df_bot_team_forecasts: pd.DataFrame, teams: list[str]) -> pd.Series:
     """
     Calculates weighted scores for each team based on their forecasts and question weights.
 
