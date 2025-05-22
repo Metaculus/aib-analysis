@@ -647,7 +647,10 @@ def plot_calibration_curve(df: pd.DataFrame, column_name: str, label: str, color
     """
     _assert_calibration_dataframe_matches_assumptions(df)
     # Filter to binary questions in case the DataFrame has other types (0 or 1 INT or 'yes'/'no' STR)
-    df = df[df["resolution"].isin(["yes", "no", 1, 0])]
+    df = df[df["resolution"].isin(["yes", "no", 1.0, 0.0])]
+
+    # If any of df[column_name] are None, drop those rows
+    df = df[df[column_name].notnull()]
 
     y_true = df["resolution"]
     y_pred = df[column_name]
@@ -655,6 +658,7 @@ def plot_calibration_curve(df: pd.DataFrame, column_name: str, label: str, color
     calibration_curve = _calculate_calibration_curve(y_pred, y_true, weights)[
         "calibration_curve"
     ]
+    
     prob_true = [item["average_resolution"] for item in calibration_curve]
     bin_center = [
         (item["bin_lower"] + item["bin_upper"]) / 2 for item in calibration_curve
