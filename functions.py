@@ -10,7 +10,7 @@ import pandas as pd
 from scipy import stats
 from scipy.optimize import minimize_scalar
 from scipy.stats import binom, norm
-import re
+
 from refactored_notebook.scoring import (
     calculate_baseline_score,
     calculate_peer_score,
@@ -266,7 +266,7 @@ def calc_weighted_std_dev2(df3, bot, weighted_score, weighted_count, weight_col)
     )
 
 
-def weighted_bootstrap_analysis(df_bot_peer_wide, bots, NUM, ITER):
+def weighted_bootstrap_analysis(df_bot_peer_wide: pd.DataFrame, bots: list[str], NUM: int, ITER: int):
     """
     Performs weighted bootstrap analysis to calculate confidence intervals and medians.
 
@@ -281,7 +281,7 @@ def weighted_bootstrap_analysis(df_bot_peer_wide, bots, NUM, ITER):
     """
 
     # Function to perform a single bootstrap iteration
-    def single_bootstrap(df):
+    def single_bootstrap(df: pd.DataFrame):
         # Weighted sampling of questions
         sampled_df = df.sample(n=NUM, weights="question_weight", replace=True)
         # Calculate total weighted score for each bot
@@ -632,7 +632,80 @@ def plot_head_to_head_distribution(
     print(f"The average of 'head_to_head' is: {mean:.2f}")
 
 
-def calculate_calibration_curve(forecasts, resolutions, weights):
+def plot_calibration_curve(df: pd.DataFrame, column_name: str, label: str, color: str):
+    """
+    Plots a calibration curve with confidence intervals.
+
+    Args:
+        df (pandas.DataFrame): DataFrame with forecast and resolution data.
+        column_name (str): Column name for forecast probabilities.
+        label (str): Label for the plot.
+        color (str): Color for the plot.
+
+    Returns:
+        None
+    """
+    _assert_calibration_dataframe_matches_assumptions(df)
+    # Filter to binary questions in case the DataFrame has other types (0 or 1 INT or 'yes'/'no' STR)
+    df = df[df["resolution"].isin(["yes", "no", 1, 0])]
+
+    y_true = df["resolution"]
+    y_pred = df[column_name]
+    weights = [1.0 for _ in y_true]
+    calibration_curve = _calculate_calibration_curve(y_pred, y_true, weights)[
+        "calibration_curve"
+    ]
+    prob_true = [item["average_resolution"] for item in calibration_curve]
+    bin_center = [
+        (item["bin_lower"] + item["bin_upper"]) / 2 for item in calibration_curve
+    ]
+    ci_lower = [item["lower_confidence_interval"] for item in calibration_curve]
+    ci_upper = [item["upper_confidence_interval"] for item in calibration_curve]
+
+    plt.plot(bin_center, prob_true, marker="o", linewidth=2, label=label, color=color)
+    plt.fill_between(bin_center, ci_lower, ci_upper, alpha=0.2, color=color)
+    for x, y in zip(bin_center, prob_true):
+        if x is None or y is None:
+            continue
+        plt.annotate(
+            f"({x:.2f}, {y:.2f})",
+            (x, y),
+            textcoords="offset points",
+            xytext=(0, 10),
+            ha="center",
+            color=color,
+            fontsize=8,
+        )
+
+def _assert_calibration_dataframe_matches_assumptions(df: pd.DataFrame):
+    # 1. Only binary questions
+    assert (df['type'] == 'binary').all(), "DataFrame contains non-binary questions."
+
+    # 2. Only valid resolutions (0, 1, 'yes', 'no')
+    valid_resolutions = {0, 1}
+    assert set(df['resolution'].unique()).issubset(valid_resolutions), (
+        f"DataFrame contains invalid resolutions: {set(df['resolution'].unique()) - valid_resolutions}"
+    )
+
+    # 3. Each question_id appears only once (if grouped by question)
+    if 'question_id' in df.columns:
+        assert df['question_id'].is_unique, "Each question_id should appear only once."
+
+    # 4. No missing values in key columns
+    for col in ['resolution', 'type']:
+        assert df[col].notnull().all(), f"Missing values found in column: {col}"
+
+    # 5. Probabilities are between 0 and 1 for forecast columns
+    prob_cols = [col for col in df.columns if 'prob' in col or 'median' in col or 'forecast' in col]
+    for col in prob_cols:
+        if df[col].dtype.kind in {'f', 'i'}:
+            assert ((df[col] >= 0) & (df[col] <= 1)).all(), f"Column {col} contains values outside [0, 1]"
+
+    # 6. DataFrame is not empty
+    assert not df.empty, "DataFrame is empty after filtering."
+
+
+def _calculate_calibration_curve(forecasts: list[float], resolutions: list[int], weights: list[float]) -> dict:
     """
     Calculates a calibration curve for forecasts.
 
@@ -688,51 +761,6 @@ def calculate_calibration_curve(forecasts, resolutions, weights):
     return {
         "calibration_curve": calibration_curve,
     }
-
-
-def plot_calibration_curve(df, column_name, label, color):
-    """
-    Plots a calibration curve with confidence intervals.
-
-    Args:
-        df (pandas.DataFrame): DataFrame with forecast and resolution data.
-        column_name (str): Column name for forecast probabilities.
-        label (str): Label for the plot.
-        color (str): Color for the plot.
-
-    Returns:
-        None
-    """
-    # Filter to binary questions in case the DataFrame has other types (0 or 1 INT or 'yes'/'no' STR)
-    df = df[df["resolution"].isin(["yes", "no", 1, 0])]
-
-    y_true = df["resolution"]
-    y_pred = df[column_name]
-    weights = [1.0 for _ in y_true]
-    calibration_curve = calculate_calibration_curve(y_pred, y_true, weights)[
-        "calibration_curve"
-    ]
-    prob_true = [item["average_resolution"] for item in calibration_curve]
-    bin_center = [
-        (item["bin_lower"] + item["bin_upper"]) / 2 for item in calibration_curve
-    ]
-    ci_lower = [item["lower_confidence_interval"] for item in calibration_curve]
-    ci_upper = [item["upper_confidence_interval"] for item in calibration_curve]
-
-    plt.plot(bin_center, prob_true, marker="o", linewidth=2, label=label, color=color)
-    plt.fill_between(bin_center, ci_lower, ci_upper, alpha=0.2, color=color)
-    for x, y in zip(bin_center, prob_true):
-        if x is None or y is None:
-            continue
-        plt.annotate(
-            f"({x:.2f}, {y:.2f})",
-            (x, y),
-            textcoords="offset points",
-            xytext=(0, 10),
-            ha="center",
-            color=color,
-            fontsize=8,
-        )
 
 
 def calculate_confidence(predictions, outcomes):
