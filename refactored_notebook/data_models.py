@@ -214,10 +214,27 @@ class Leaderboard(BaseModel):
                 raise ValueError(f"Leaderboard type {self.type} does not match score type {list(score_types)[0]}")
         return self
 
+    @model_validator(mode="after")
+    def sort_entries(self: Self) -> Self:
+        self.entries.sort(key=lambda x: x.sum_of_scores, reverse=True)
+        return self
+
 
 class LeaderboardEntry(BaseModel):
-    user: User
     scores: list[Score]
+
+    @model_validator(mode="after")
+    def check_single_user(self: Self) -> Self:
+        user_names = {score.forecast.user.name for score in self.scores}
+        if len(user_names) != 1:
+            raise ValueError(f"Leaderboard entry should have exactly one user, found: {user_names}")
+        return self
+
+    @property
+    def user(self) -> User:
+        users = [score.forecast.user for score in self.scores]
+        first_user = users[0]
+        return first_user
 
     @property
     def sum_of_scores(self) -> float:
@@ -226,3 +243,7 @@ class LeaderboardEntry(BaseModel):
     @property
     def average_score(self) -> float:
         return self.sum_of_scores / len(self.scores)
+
+    @property
+    def question_count(self) -> int:
+        return len(set([score.forecast.question.question_id for score in self.scores]))

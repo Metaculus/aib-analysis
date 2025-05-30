@@ -27,3 +27,8 @@ class QuestionType(Enum):
 class ScoreType(Enum):
     SPOT_PEER = "spot_peer"
     SPOT_BASELINE = "spot_baseline"
+
+    def is_spot_score(self) -> bool:
+        return self in {ScoreType.SPOT_PEER, ScoreType.SPOT_BASELINE}
+
+

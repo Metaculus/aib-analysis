@@ -1,14 +1,16 @@
 import pytest
 
 from refactored_notebook.custom_types import ScoreType, UserType
+from refactored_notebook.load_tournament_data import load_tournament
 from refactored_notebook.simulated_tournament import SimulatedTournament
 from tests.mock_data_maker import (
     make_forecast,
     make_question_binary,
     make_user,
 )
-from refactored_notebook.load_tournament_data import load_tournament
+import logging
 
+logger = logging.getLogger(__name__)
 
 @pytest.mark.parametrize("score_type", [ScoreType.SPOT_BASELINE, ScoreType.SPOT_PEER])
 def test_simulated_tournament_leaderboard_ranking_good_forecast_higher(score_type: ScoreType):
@@ -27,12 +29,30 @@ def test_simulated_tournament_leaderboard_ranking_good_forecast_higher(score_typ
     assert leaderboard.entries[2].user.name == "bad"
 
 
-@pytest.mark.parametrize("file_path, user_type, num_users", [
-    ("tests/test_data/pro_forecasts_q1.csv", UserType.PRO, 10),
-    # ("tests/test_data/bot_forecasts_q1.csv", UserType.BOT, None),
-])
-def test_simulated_tournament_leaderboard_ranking_bot_forecasts(file_path: str, user_type: UserType, num_users: int):
-    tournament = load_tournament(file_path, user_type)
+def test_simulated_tournament_leaderboard_ranking_runs(pro_tournament: SimulatedTournament):
+    tournament = pro_tournament
     leaderboard = tournament.get_leaderboard(ScoreType.SPOT_PEER)
-    if num_users:
-        assert len(leaderboard.entries) == num_users
+    assert len(leaderboard.entries) == 10
+
+def test_scores_from_pro_tournament(pro_tournament: SimulatedTournament):
+    validate_scores_from_simulated_tournament(pro_tournament)
+
+@pytest.mark.skip(reason="Bot tournament takes a while to run")
+def test_scores_from_bot_tournament(bot_tournament: SimulatedTournament):
+    validate_scores_from_simulated_tournament(bot_tournament)
+
+def validate_scores_from_simulated_tournament(tournament: SimulatedTournament):
+    # This test is mostly just running data validation.
+    logger.info(f"Tournament has {len(tournament.questions)} questions")
+    for question in tournament.questions:
+        if question.question_id in [34247, 34730]:
+            logger.info(f"Question {question.question_id} has resolution {question.resolution}.\n {question}")
+        forecasters_on_question = tournament.get_forecasters_on_question(question.question_id)
+        for user in forecasters_on_question:
+            for score_type in ScoreType:
+                if question.resolution is None:
+                    continue
+
+                score = tournament.get_spot_score_for_question(question.question_id, user.name, score_type)
+                assert score.type == score_type
+

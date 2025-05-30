@@ -85,7 +85,8 @@ def parse_forecast_row(
 
 def parse_forecast(forecast_row: dict) -> ForecastType:
     row = forecast_row
-    if row["type"] == "binary":
+    question_type = row["type"]
+    if question_type == "binary":
         if pd.notnull(row["probability_yes"]):
             prediction = [
                 float(row["probability_yes"]),
@@ -93,41 +94,47 @@ def parse_forecast(forecast_row: dict) -> ForecastType:
             ]
         else:
             prediction = None
-    elif row["type"] == "multiple_choice":
+    elif question_type == "multiple_choice":
         if pd.notnull(row["probability_yes_per_category"]):
             prediction = eval(row["probability_yes_per_category"])
         else:
             prediction = None
-    elif row["type"] == "numeric":
+    elif question_type == "numeric":
         if pd.notnull(row["continuous_cdf"]):
             prediction = eval(row["continuous_cdf"])
         else:
             prediction = None
     else:
         prediction = None
+
+    if prediction is None:
+        raise ValueError(f"Invalid prediction: {prediction} for row {forecast_row}")
     return prediction
 
 
 def parse_resolution(forecast_row: dict) -> ResolutionType:
     q_type = forecast_row["type"]
     raw_resolution = forecast_row["resolution"]
-    if pd.isnull(raw_resolution):
+    if pd.isnull(raw_resolution) or str(raw_resolution).lower() in [
+        "annulled",
+        "ambiguous",
+    ]:
         return None
     if q_type == "binary":
         if str(raw_resolution).lower() in ["1", "true", "yes"]:
             return True
         if str(raw_resolution).lower() in ["0", "false", "no"]:
             return False
-        return None
+        raise ValueError(f"Invalid resolution: {raw_resolution}")
     elif q_type == "multiple_choice":
         return str(raw_resolution)
     elif q_type == "numeric":
-        try:
-            return float(raw_resolution)
-        except Exception:
-            return None
-    if str(raw_resolution).lower() in ["annulled", "ambiguous"]:
-        return None
+        if raw_resolution == "above_upper_bound":
+            return 1000000000000000000000000000000000.0
+        if raw_resolution == "below_lower_bound":
+            return -100000000000000000000000000000000.0
+        return float(raw_resolution)
+
     return raw_resolution
 
 
@@ -136,7 +143,7 @@ def parse_options(forecast_row: dict) -> list[str] | None:
         options = forecast_row.get("options")
         if options is not None and pd.notnull(options) and options != "":
             return eval(options)
-        return None
+        raise ValueError(f"Invalid options: {options}")
     return None
 
 
@@ -145,7 +152,7 @@ def parse_upper_bound(forecast_row: dict) -> float | None:
         upper = forecast_row.get("range_max")
         if upper is not None and pd.notnull(upper) and upper != "":
             return float(upper)
-        return None
+        raise ValueError(f"Invalid upper bound: {upper}")
     return None
 
 
@@ -154,7 +161,7 @@ def parse_lower_bound(forecast_row: dict) -> float | None:
         lower = forecast_row.get("range_min")
         if lower is not None and pd.notnull(lower) and lower != "":
             return float(lower)
-        return None
+        raise ValueError(f"Invalid lower bound: {lower}")
     return None
 
 
@@ -163,7 +170,7 @@ def parse_open_upper_bound(forecast_row: dict) -> bool | None:
         open_upper = forecast_row.get("open_upper_bound")
         if open_upper is not None and pd.notnull(open_upper) and open_upper != "":
             return parse_truth_value(open_upper)
-        return None
+        raise ValueError(f"Invalid open upper bound: {open_upper}")
     return None
 
 
@@ -172,7 +179,7 @@ def parse_open_lower_bound(forecast_row: dict) -> bool | None:
         open_lower = forecast_row.get("open_lower_bound")
         if open_lower is not None and pd.notnull(open_lower) and open_lower != "":
             return parse_truth_value(open_lower)
-        return None
+        raise ValueError(f"Invalid open lower bound: {open_lower}")
     return None
 
 

@@ -20,7 +20,7 @@ def make_question_binary() -> Question:
         open_upper_bound=None,
         open_lower_bound=None,
         weight=1.0,
-        spot_scoring_time=datetime(2025, 5, 30, 0, 46, 31),
+        spot_scoring_time=datetime(2030, 5, 30, 0, 46, 31),
     )
 
 def make_question_mc() -> Question:

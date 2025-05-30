@@ -270,6 +270,8 @@ def _numeric_resolution_prob(
     )
 
     prob_for_resolution = pmf[resolution_bin_idx]
+    if prob_for_resolution <= 0 or prob_for_resolution >= 1:
+        raise ValueError(f"Numeric forecast probability for resolution is {prob_for_resolution} which is not between 0 and 1")
 
     return prob_for_resolution
 
@@ -295,7 +297,7 @@ def _resolution_value_to_pmf_index(
     if len(pmf) != 202:
         raise ValueError(f"PMF should have 202 bins, but has {len(pmf)}")
     if resolution > range_max:
-        resolution_bin_idx = 202
+        resolution_bin_idx = 201 # 202nd index
     elif resolution < range_min:
         resolution_bin_idx = 0
     else:
@@ -307,11 +309,12 @@ def _resolution_value_to_pmf_index(
         raise ValueError(
             f"Invalid resolution bin index: {resolution_bin_idx}. Resolution: {resolution}, Range min: {range_min}, Range max: {range_max}"
         )
-    _test_resolution_bin_idx_edge_cases(resolution_bin_idx, resolution, range_min, range_max)
+    _test_resolution_bin_idx_edge_cases(pmf, resolution_bin_idx, resolution, range_min, range_max)
     return resolution_bin_idx
 
 
 def _test_resolution_bin_idx_edge_cases(
+    pmf: list[float],
     resolution_bin_idx: int,
     resolution: float,
     range_min: float,
@@ -323,10 +326,10 @@ def _test_resolution_bin_idx_edge_cases(
     An index of 1 means the resolution is AT (or very near) the lower bound
     etc
     """
-    assert 0 <= resolution_bin_idx <= 202, f"Resolution bin index is {resolution_bin_idx} which is not between 0 and 202"
+    assert 0 <= resolution_bin_idx < 202, f"Resolution bin index is {resolution_bin_idx} which is not between 0 and 201 (i.e. 202 options)"
     if resolution > range_max:
         assert (
-            resolution_bin_idx == 202
+            resolution_bin_idx == len(pmf) - 1
         ), f"Resolution bin index is {resolution_bin_idx} which is not the last index"
     if resolution < range_min:
         assert (
@@ -334,7 +337,7 @@ def _test_resolution_bin_idx_edge_cases(
         ), f"Resolution bin index is {resolution_bin_idx} which is not the first index"
     if resolution == range_max:
         assert (
-            resolution_bin_idx == 201
+            resolution_bin_idx == len(pmf) - 2
         ), f"Resolution bin index is {resolution_bin_idx} which is not the second to last index"
     if resolution == range_min:
         assert (
@@ -393,13 +396,16 @@ def _normalize_resolution(
                 "Range min and range max are required for numeric questions"
             )
         if resolution == "above_upper_bound":
-            return (
-                range_max + 1.1
-            )  # Adding arbitrary buffer to put the resolution beyond the bounds
+            updated_resolution = range_max + 1.1
+            # Adding arbitrary buffer to put the resolution beyond the bounds
         elif resolution == "below_lower_bound":
-            return range_min - 1.1
+            updated_resolution = range_min - 1.1
         else:
-            return resolution
+            try:
+                updated_resolution = float(resolution) # type: ignore
+            except Exception:
+                updated_resolution = resolution
+        return updated_resolution
     else:
         return resolution
 
