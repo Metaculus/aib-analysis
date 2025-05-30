@@ -264,36 +264,13 @@ def _numeric_resolution_prob(
     )
 
     prob_for_resolution = pmf[resolution_bin_idx]
-    if prob_for_resolution <= 0 or prob_for_resolution >= 1:
+    if not 0 < prob_for_resolution < 1:
         raise ValueError(
             f"Numeric forecast probability for resolution is {prob_for_resolution} which is not between 0 and 1"
         )
 
     return prob_for_resolution
 
-
-def cdf_to_pmf(cdf: list[float]) -> list[float]:
-    assert len(cdf) == 201, f"There should be 201 bins, but there are {len(cdf)}"
-    lower_bound_prob = cdf[0]
-    upper_bound_prob = 1 - cdf[-1]
-    pmf = (
-        [lower_bound_prob]
-        + [cdf[i] - cdf[i - 1] for i in range(1, len(cdf))]
-        + [upper_bound_prob]
-    )
-    assert len(pmf) == 202, f"There should be 202 bins, but there are {len(pmf)}"
-    return pmf
-
-
-def pmf_to_cdf(pmf: list[float]) -> list[float]:
-    assert len(pmf) == 202, f"There should be 202 bins, but there are {len(pmf)}"
-    cdf = []
-    total = 0.0
-    for p in pmf:
-        total += p
-        cdf.append(total)
-    assert len(cdf) == 201, f"There should be 201 bins, but there are {len(cdf)}"
-    return cdf
 
 
 def _determine_divisor_for_baseline_score(
@@ -324,7 +301,7 @@ def _resolution_value_to_pmf_index(
         position_in_range = _resolution_value_to_position_in_numeric_range(
             resolution, range_min, range_max
         )
-        resolution_bin_idx = int(position_in_range * 200) + 1
+        resolution_bin_idx =int(position_in_range * 200 + 0.5)
     if resolution_bin_idx >= len(pmf) or resolution_bin_idx < 0:
         raise ValueError(
             f"Invalid resolution bin index: {resolution_bin_idx}. Resolution: {resolution}, Range min: {range_min}, Range max: {range_max}"
@@ -355,15 +332,15 @@ def _test_resolution_bin_idx_edge_cases(
         assert (
             resolution_bin_idx == len(pmf) - 1
         ), f"Resolution bin index is {resolution_bin_idx} which is not the last index"
-    if resolution < range_min:
+    elif resolution < range_min:
         assert (
             resolution_bin_idx == 0
         ), f"Resolution bin index is {resolution_bin_idx} which is not the first index"
-    if resolution == range_max:
+    elif resolution == range_max:
         assert (
             resolution_bin_idx == len(pmf) - 2
         ), f"Resolution bin index is {resolution_bin_idx} which is not the second to last index"
-    if resolution == range_min:
+    elif resolution == range_min:
         assert (
             resolution_bin_idx == 1
         ), f"Resolution bin index is {resolution_bin_idx} which is not the second index"
@@ -460,6 +437,31 @@ def _determine_question_type(
             )
     else:
         return QuestionType(question_type)
+
+
+def cdf_to_pmf(cdf: list[float]) -> list[float]:
+    assert len(cdf) == 201, f"There should be 201 bins, but there are {len(cdf)}"
+    lower_bound_prob = cdf[0]
+    upper_bound_prob = 1 - cdf[-1]
+    pmf = (
+        [lower_bound_prob]
+        + [cdf[i] - cdf[i - 1] for i in range(1, len(cdf))]
+        + [upper_bound_prob]
+    )
+    assert len(pmf) == 202, f"There should be 202 bins, but there are {len(pmf)}"
+    return pmf
+
+
+def pmf_to_cdf(pmf: list[float]) -> list[float]:
+    assert len(pmf) == 202, f"There should be 202 bins, but there are {len(pmf)}"
+    cdf = []
+    total = 0.0
+    for p in pmf:
+        total += p
+        cdf.append(total)
+    assert len(cdf) == 201, f"There should be 201 bins, but there are {len(cdf)}"
+    return cdf
+
 
 
 # HOW TO CALCULATE PEER SCORE W/ GEOMETRIC MEAN AVERAGES
