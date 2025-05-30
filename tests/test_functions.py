@@ -1,5 +1,5 @@
 import pytest
-from functions import *
+from archived.functions import *
 
 def test_get_median_forecast_multiple_choice():
   test_row = {'options': ['0-4', '5-9', '>9'], 'resolution': '0-4'}
