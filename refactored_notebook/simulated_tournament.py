@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from pydantic import BaseModel
-from refactored_notebook.data_models import User, Question, Forecast, Score
+
+from refactored_notebook.data_models import Forecast, Question, Score, User
 
 
 class SimulatedTournament(BaseModel):

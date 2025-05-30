@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from typing import Literal
 
 from pydantic import BaseModel
@@ -8,11 +9,22 @@ from pydantic import BaseModel
 ResolutionType = bool | str | float | None # binary, MC, numeric, or 'annulled/ambiguous'
 ForecastType = list[float] | None # binary: [p_yes, p_no], multiple choice: [p_a, p_b, p_c], numeric: [p_0, p_1, p_2, ...]
 
+class UserType(Enum):
+    PRO = "pro"
+    BOT = "bot"
+    CP = "cp"
+
+
+class QuestionType(Enum):
+    BINARY = "binary"
+    MULTIPLE_CHOICE = "multiple_choice"
+    NUMERIC = "numeric"
+
+
 class Forecast(BaseModel):
     question: Question
     user: User
     prediction: ForecastType
-    predcition_for_correct_answer: float
     prediction_time: datetime
     comment: str | None = None
 
@@ -32,13 +44,20 @@ class Score(BaseModel):
 
 class Question(BaseModel):
     question_text: str
+    type: QuestionType
     resolution: ResolutionType
     weight: float
     spot_scoring_time: datetime
+    question_id: int
+    post_id: int
+
+    @property
+    def url(self) -> str:
+        return f"https://www.metaculus.com/questions/{self.post_id}/"
 
 class User(BaseModel):
     name: str
-    type: Literal["pro", "bot", "cp"]
+    type: UserType
     is_aggregate: bool
     aggregated_users: list[User]
 

@@ -4,13 +4,9 @@ from typing import Literal
 import numpy as np
 from scipy.stats.mstats import gmean
 
-from refactored_notebook.data_models import ForecastType, ResolutionType
+from refactored_notebook.data_models import ForecastType, ResolutionType, QuestionType
 
 
-class QuestionType(Enum):
-    BINARY = "binary"
-    MULTIPLE_CHOICE = "multiple_choice"
-    NUMERIC = "numeric"
 
 def calculate_peer_score(
     forecast: ForecastType,
