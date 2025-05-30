@@ -533,7 +533,7 @@ def test_better_forecast_means_better_peer_score(
     [
         ("binary", [0.5], True, None, None, None),
         ("mc", [0.25, 0.25, 0.25, 0.25], "A", ["A", "B", "C", "D"], None, None),
-        ("numeric", generate_cdf_with_forecast_at_index(100, 0.999), 100, None, 0, 100),
+        ("numeric", generate_cdf_with_forecast_at_index(200, 0.999), 100, None, 0, 100),
         ("numeric", generate_uniform_cdf(), 50, None, 0, 100),
     ],
 )
@@ -656,7 +656,7 @@ def test_peer_score_average_zero(
             [
                 generate_uniform_cdf(),
                 generate_cdf_with_forecast_at_index(100, 0.999),
-                generate_cdf_with_forecast_at_index(101, 0.999),
+                generate_cdf_with_forecast_at_index(100, 0.999),
             ],
             50,
             None,
