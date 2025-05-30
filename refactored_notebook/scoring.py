@@ -47,8 +47,8 @@ def calculate_baseline_score(
     range_min: float | None = None,
     range_max: float | None = None,
     question_weight: float = 1.0,
-    open_upper_bound: bool | None = None,
-    open_lower_bound: bool | None = None,
+    open_upper_bound: bool | None = False,
+    open_lower_bound: bool | None = False,
     q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
 ) -> float:
     """
@@ -61,7 +61,13 @@ def calculate_baseline_score(
         question_type, forecast, resolution, options, range_min, range_max
     )
     baseline_prob = _determine_baseline(
-        question_type, resolution, options, range_min, range_max, open_upper_bound, open_lower_bound
+        question_type,
+        resolution,
+        options,
+        range_min,
+        range_max,
+        open_upper_bound,
+        open_lower_bound,
     )
     divisor = _determine_divisor_for_baseline_score(question_type, options)
     if prob_for_resolution <= 0 or baseline_prob <= 0:
@@ -94,23 +100,31 @@ def _determine_baseline(
         baseline_prob = 1 / len(options)
     elif question_type == QuestionType.NUMERIC:
         if open_upper_bound is None or open_lower_bound is None:
-            raise ValueError("Open upper bound and lower bound are required for numeric questions")
+            raise ValueError(
+                "Open upper bound and lower bound are required for numeric questions"
+            )
         if range_min is None or range_max is None:
-            raise ValueError("Range min and range max are required for numeric questions")
+            raise ValueError(
+                "Range min and range max are required for numeric questions"
+            )
         if not isinstance(resolution, float):
             raise ValueError("Resolution must be a float for numeric questions")
 
         # @Check: Which version is correct?
         # Version 1:
         resolved_outside_bounds = False
-        assert range_min is not None and range_max is not None and resolution is not None, f"These need to be not None: Range min: {range_min}, range max: {range_max}, resolution: {resolution}"
+        assert (
+            range_min is not None and range_max is not None and resolution is not None
+        ), f"These need to be not None: Range min: {range_min}, range max: {range_max}, resolution: {resolution}"
         if resolution > range_max or resolution < range_min:
             resolved_outside_bounds = True
         if resolved_outside_bounds:
             baseline_prob = 0.05
         else:
             open_bound_count = bool(open_upper_bound) + bool(open_lower_bound)
-            baseline_prob = (1 - 0.05 * open_bound_count) / 200 # PMF has 202 bins, 2 of which represent the bounds. So 200 is the internal bins
+            baseline_prob = (
+                1 - 0.05 * open_bound_count
+            ) / 200  # PMF has 202 bins, 2 of which represent the bounds. So 200 is the internal bins
 
         # Version 2:
         # open_bound_count = bool(open_upper_bound) + bool(open_lower_bound)
@@ -147,16 +161,23 @@ def _determine_probability_for_resolution(
     """
     resolution = _normalize_resolution(q_type, resolution, range_min, range_max)
 
-    if forecast is None or resolution is None:
+    if resolution is None:
+        raise ValueError(
+            "Cannot score a forecast with an annulled or ambiguous resolution"
+        )
+
+    if forecast is None:
         raise NotImplementedError(
-            "Havent decided how to handle null forecasts or anulled resolutions"
+            "Havent decided how to handle null forecasts. I think we can probably just avoid scoring these?"
         )
 
     try:
         if len(forecast) == 0:
             raise ValueError("Forecast is empty")
     except Exception as e:
-        raise ValueError(f"Error encountered for question of type {q_type} with resolution {resolution} and forecast {forecast}: {e}")
+        raise ValueError(
+            f"Error encountered for question of type {q_type} with resolution {resolution} and forecast {forecast}: {e}"
+        )
 
     if not q_type == QuestionType.NUMERIC and any(p <= 0 or p >= 1 for p in forecast):
         raise ValueError("Forecast contains probabilities outside of 0 to 1 range")
@@ -176,15 +197,19 @@ def _determine_probability_for_resolution(
             raise ValueError(
                 "Range min and range max are required for numeric questions"
             )
+        assert isinstance(
+            resolution, float
+        ), f"Resolution is {resolution} which is not a float"
         prob_for_resolution = _numeric_resolution_prob(
             forecast, resolution, range_min, range_max
         )
     else:
-        raise ValueError("Unknown question type")
+        raise ValueError(f"Unknown question type: {q_type}")
 
-    assert (
-        0 <= prob_for_resolution <= 1
-    ), f"Probability for resolution is {prob_for_resolution} which is not between 0 and 1"
+    if not 0 < prob_for_resolution < 1:
+        raise ValueError(
+            f"Probability for resolution is {prob_for_resolution} which is not between 0 and 1"
+        )
     return prob_for_resolution
 
 
@@ -209,14 +234,16 @@ def _multiple_choice_resolution_prob(
         raise ValueError("Forecast and options have different lengths")
 
     pmf = [float(p) for p in forecast]
-    options = [str(opt) for opt in options] # @Check: TODO: For whatever reason, options had " and ' surrounding them, and were not parsed at this point. This is the easier way to handle it, but should be dealt with earlier in the pipeline.
+    options = [
+        str(opt) for opt in options
+    ]  # @Check: TODO: For whatever reason, options had " and ' surrounding them, and were not parsed at this point. This is the easier way to handle it, but should be dealt with earlier in the pipeline.
     resolution_idx = options.index(str(resolution))
     prob_for_resolution = pmf[resolution_idx]
     return prob_for_resolution
 
 
 def _numeric_resolution_prob(
-    forecast: list[float], resolution: float | str, range_min: float, range_max: float
+    forecast: list[float], resolution: float, range_min: float, range_max: float
 ) -> float:
     if len(forecast) != 201:
         raise ValueError("CDF should have 201 bins")
@@ -238,14 +265,9 @@ def _numeric_resolution_prob(
     )
     assert len(pmf) == 202, f"There should be 202 bins, but there are {len(pmf)}"
 
-    resolution = float(resolution)
-    # bin_edges = np.linspace(range_min, range_max, 200)
-    # resolution_bin_idx = np.searchsorted(bin_edges, resolution, side="right")
-    cdf_location = nominal_location_to_cdf_location(resolution, range_min, range_max)
-    resolution_bin_idx = min(int(cdf_location * (len(pmf) - 1)), len(pmf) - 1)
-
-    if resolution_bin_idx >= len(pmf):
-        raise ValueError("Resolution is out of bounds")
+    resolution_bin_idx = _resolution_value_to_pmf_index(
+        pmf, resolution, range_min, range_max
+    )
 
     prob_for_resolution = pmf[resolution_bin_idx]
 
@@ -266,22 +288,78 @@ def _determine_divisor_for_baseline_score(
     else:
         raise ValueError("Unknown question type")
 
-def nominal_location_to_cdf_location(
-    nominal_location: float,
+
+def _resolution_value_to_pmf_index(
+    pmf: list[float], resolution: float, range_min: float, range_max: float
+) -> int:
+    if len(pmf) != 202:
+        raise ValueError(f"PMF should have 202 bins, but has {len(pmf)}")
+    if resolution > range_max:
+        resolution_bin_idx = 202
+    elif resolution < range_min:
+        resolution_bin_idx = 0
+    else:
+        position_in_range = _resolution_value_to_position_in_numeric_range(
+            resolution, range_min, range_max
+        )
+        resolution_bin_idx = int(position_in_range * 200) + 1
+    if resolution_bin_idx >= len(pmf) or resolution_bin_idx < 0:
+        raise ValueError(
+            f"Invalid resolution bin index: {resolution_bin_idx}. Resolution: {resolution}, Range min: {range_min}, Range max: {range_max}"
+        )
+    _test_resolution_bin_idx_edge_cases(resolution_bin_idx, resolution, range_min, range_max)
+    return resolution_bin_idx
+
+
+def _test_resolution_bin_idx_edge_cases(
+    resolution_bin_idx: int,
+    resolution: float,
+    range_min: float,
+    range_max: float,
+) -> None:
+    """
+    Test the edge cases for the resolution bin index
+    An index of 0 means the resolution is BELOW the lower bound
+    An index of 1 means the resolution is AT (or very near) the lower bound
+    etc
+    """
+    assert 0 <= resolution_bin_idx <= 202, f"Resolution bin index is {resolution_bin_idx} which is not between 0 and 202"
+    if resolution > range_max:
+        assert (
+            resolution_bin_idx == 202
+        ), f"Resolution bin index is {resolution_bin_idx} which is not the last index"
+    if resolution < range_min:
+        assert (
+            resolution_bin_idx == 0
+        ), f"Resolution bin index is {resolution_bin_idx} which is not the first index"
+    if resolution == range_max:
+        assert (
+            resolution_bin_idx == 201
+        ), f"Resolution bin index is {resolution_bin_idx} which is not the second to last index"
+    if resolution == range_min:
+        assert (
+            resolution_bin_idx == 1
+        ), f"Resolution bin index is {resolution_bin_idx} which is not the second index"
+
+
+def _resolution_value_to_position_in_numeric_range(
+    resolution: float,
     range_min: float,
     range_max: float,
     zero_point: float | None = None,
 ) -> float:
     """
-    Takes a location in nominal format (e.g. 123, "123", or datetime in iso format) and scales it to
+    Takes a location in nominal format (e.g. resolution 176 for a question with bounds 0-500) and scales it to
     metaculus's "internal representation" range [0, 1] incorporating question scaling
     0.8 would incidate the nomial locatoin is at cdf index 201 * 0.8
     Values higher/lower than 0 and 1 are resolutions that are above/below the upper/lower bound
     """
-    assert isinstance(zero_point, float | None)
+    assert isinstance(
+        zero_point, float | None
+    ), f"Zero point is {zero_point} which is not a float or None"
 
     # TODO: Make sure to use datetime.fromisoformat(nominal_location).timestamp() if you start using date questions
-    scaled_location = float(nominal_location)
+    scaled_location = float(resolution)
 
     # Unscale the value to put it into the range [0,1]
     if zero_point is not None:
@@ -299,32 +377,52 @@ def nominal_location_to_cdf_location(
         unscaled_location = (scaled_location - range_min) / (range_max - range_min)
     return unscaled_location
 
-def _normalize_resolution(question_type: QuestionType, resolution: ResolutionType, range_min: float | None, range_max: float | None) -> ResolutionType:
+
+def _normalize_resolution(
+    question_type: QuestionType,
+    resolution: ResolutionType,
+    range_min: float | None,
+    range_max: float | None,
+) -> ResolutionType:
     if resolution == "annulled" or resolution == "ambiguous":
         return None
 
     if question_type == QuestionType.NUMERIC:
         if range_min is None or range_max is None:
-            raise ValueError("Range min and range max are required for numeric questions")
+            raise ValueError(
+                "Range min and range max are required for numeric questions"
+            )
         if resolution == "above_upper_bound":
-            return range_max + 0.1
+            return (
+                range_max + 1.1
+            )  # Adding arbitrary buffer to put the resolution beyond the bounds
         elif resolution == "below_lower_bound":
-            return range_min - 0.1
+            return range_min - 1.1
         else:
             return resolution
     else:
         return resolution
 
 
-def _determine_question_type(question_type: Literal["binary", "multiple_choice", "numeric"] | None, resolution: ResolutionType) -> QuestionType:
+def _determine_question_type(
+    question_type: Literal["binary", "multiple_choice", "numeric"] | None,
+    resolution: ResolutionType,
+) -> QuestionType:
     if question_type is None:
         if isinstance(resolution, bool):
             return QuestionType.BINARY
-        elif isinstance(resolution, float) or isinstance(resolution, int) or resolution == "above_upper_bound" or resolution == "below_lower_bound":
+        elif (
+            isinstance(resolution, float)
+            or isinstance(resolution, int)
+            or resolution == "above_upper_bound"
+            or resolution == "below_lower_bound"
+        ):
             return QuestionType.NUMERIC
         elif isinstance(resolution, str):
             return QuestionType.MULTIPLE_CHOICE
         else:
-            raise ValueError(f"Cannot infer question type from resolution. Please provide a question type. Resolution: {resolution}")
+            raise ValueError(
+                f"Cannot infer question type from resolution. Please provide a question type. Resolution: {resolution}"
+            )
     else:
         return QuestionType(question_type)

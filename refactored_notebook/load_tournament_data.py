@@ -55,8 +55,8 @@ def parse_forecast_row(
             post_id=int(row["post_id"]),
             type=QuestionType(row["type"]),
             options=parse_options(row),
-            upper_bound=parse_upper_bound(row),
-            lower_bound=parse_lower_bound(row),
+            range_max=parse_upper_bound(row),
+            range_min=parse_lower_bound(row),
             open_upper_bound=parse_open_upper_bound(row),
             open_lower_bound=parse_open_lower_bound(row),
         )
@@ -158,7 +158,7 @@ def parse_lower_bound(forecast_row: dict) -> float | None:
     return None
 
 
-def parse_open_upper_bound(forecast_row: dict) -> float | None:
+def parse_open_upper_bound(forecast_row: dict) -> bool | None:
     if forecast_row["type"] == "numeric":
         open_upper = forecast_row.get("open_upper_bound")
         if open_upper is not None and pd.notnull(open_upper) and open_upper != "":
@@ -167,7 +167,7 @@ def parse_open_upper_bound(forecast_row: dict) -> float | None:
     return None
 
 
-def parse_open_lower_bound(forecast_row: dict) -> float | None:
+def parse_open_lower_bound(forecast_row: dict) -> bool | None:
     if forecast_row["type"] == "numeric":
         open_lower = forecast_row.get("open_lower_bound")
         if open_lower is not None and pd.notnull(open_lower) and open_lower != "":
