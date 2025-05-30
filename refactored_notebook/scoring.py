@@ -4,8 +4,11 @@ from typing import Literal
 import numpy as np
 from scipy.stats.mstats import gmean
 
-from refactored_notebook.data_models import ForecastType, ResolutionType, QuestionType
-
+from refactored_notebook.custom_types import (
+    ForecastType,
+    QuestionType,
+    ResolutionType,
+)
 
 
 def calculate_peer_score(
@@ -44,8 +47,8 @@ def calculate_baseline_score(
     range_min: float | None = None,
     range_max: float | None = None,
     question_weight: float = 1.0,
-    open_upper_bound: bool = False,
-    open_lower_bound: bool = False,
+    open_upper_bound: bool | None = None,
+    open_lower_bound: bool | None = None,
     q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
 ) -> float:
     """
