@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+import random
 from typing import Literal
 
 from pydantic import BaseModel, model_validator
@@ -124,6 +125,8 @@ class Score(BaseModel):
             raise ValueError("Forecast's question resolution must not be None. You cannot assign a score to ambiguous/annulled resolution")
         return self
 
+    def display_score_and_question(self) -> str:
+        return f"({self.score:.3f}) {self.forecast.question.question_text}"
 
 class Question(BaseModel):
     question_id: int
@@ -220,6 +223,8 @@ class Leaderboard(BaseModel):
         return self
 
 
+
+
 class LeaderboardEntry(BaseModel):
     scores: list[Score]
 
@@ -228,6 +233,13 @@ class LeaderboardEntry(BaseModel):
         user_names = {score.forecast.user.name for score in self.scores}
         if len(user_names) != 1:
             raise ValueError(f"Leaderboard entry should have exactly one user, found: {user_names}")
+        return self
+
+    @model_validator(mode="after")
+    def check_all_scores_same_type(self: Self) -> Self:
+        score_types = {score.type for score in self.scores}
+        if len(score_types) > 1:
+            raise ValueError(f"All scores must have the same type, found: {score_types}")
         return self
 
     @property
@@ -247,3 +259,13 @@ class LeaderboardEntry(BaseModel):
     @property
     def question_count(self) -> int:
         return len(set([score.forecast.question.question_id for score in self.scores]))
+
+    def top_n_scores(self, n: int) -> list[Score]:
+        return sorted(self.scores, key=lambda x: x.score, reverse=True)[:n]
+
+    def bottom_n_scores(self, n: int) -> list[Score]:
+        return sorted(self.scores, key=lambda x: x.score, reverse=False)[:n]
+
+
+    def randomly_sample_scores(self, n: int) -> list[Score]:
+        return random.sample(self.scores, n)
