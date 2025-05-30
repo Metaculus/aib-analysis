@@ -11,7 +11,7 @@ sys.path.append(top_level_dir)
 from refactored_notebook.data_models import Leaderboard, ScoreType, UserType
 from refactored_notebook.load_tournament_data import load_tournament
 from refactored_notebook.simulated_tournament import SimulatedTournament
-
+from conftest import initialize_logging
 
 def display_tournament(tournament: SimulatedTournament):
     forecasts = tournament.forecasts
@@ -74,6 +74,7 @@ def cached_load_tournament(path: str, user_type: UserType) -> SimulatedTournamen
 
 
 def main():
+    initialize_logging()
     st.title("Tournament Forecast Explorer")
     pro_path = "input_data/pro_forecasts_q1.csv"
     bot_path = "input_data/bot_forecasts_q1.csv"

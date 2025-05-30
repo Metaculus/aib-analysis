@@ -21,23 +21,74 @@ def calculate_peer_score(
     question_weight: float = 1.0,
     q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
 ) -> float:
-    question_type = _determine_question_type(q_type, resolution)
-    resolution = _normalize_resolution(question_type, resolution, range_min, range_max)
-    forecast_for_resolution = _determine_probability_for_resolution(
-        question_type, forecast, resolution, options, range_min, range_max
-    )
-    other_user_forecasts = [
-        _determine_probability_for_resolution(
-            question_type, forecast, resolution, options, range_min, range_max
-        )
-        for forecast in forecast_for_other_users
-    ]
+    num_other_forecasters = len(forecast_for_other_users)
+    if num_other_forecasters <= 0:
+        raise ValueError(f"Number of other forecasts has to be greater than 0")
+    num_forecasters = num_other_forecasters + 1
+    all_forecasts = [forecast] + forecast_for_other_users
 
-    geometric_mean = gmean(other_user_forecasts)
-    peer_score = np.log(forecast_for_resolution / geometric_mean)
-    if isinstance(resolution, float):  # @Check: shouldn't other q types get a divsor?
+    question_type = _determine_question_type(q_type, resolution)
+    normalized_resolution = _normalize_resolution(
+        question_type, resolution, range_min, range_max
+    )
+
+    forecast_for_resolution = _determine_probability_for_resolution(
+        question_type, forecast, normalized_resolution, options, range_min, range_max
+    )
+
+    geometric_mean_prediction = _get_geometric_mean_prediction(
+        question_type=question_type,
+        forecasts=all_forecasts,
+        resolution=normalized_resolution,
+        options=options,
+        range_min=range_min,
+        range_max=range_max,
+    )
+    peer_score = (
+        100
+        * (num_forecasters / (num_forecasters - 1))
+        * np.log(forecast_for_resolution / geometric_mean_prediction)
+    )
+
+    if question_type == QuestionType.NUMERIC:
         peer_score /= 2
+
     return peer_score * question_weight
+
+
+def _get_geometric_mean_prediction(
+    question_type: QuestionType,
+    forecasts: list[ForecastType],
+    resolution: ResolutionType,
+    options: list[str] | None = None,
+    range_min: float | None = None,
+    range_max: float | None = None,
+) -> float:
+    pmfs = []
+    for forecast in forecasts:
+        assert forecast is not None
+        if question_type == QuestionType.NUMERIC:
+            pmf = cdf_to_pmf(forecast)
+        else:
+            pmf = forecast
+        pmfs.append(pmf)
+
+    geometric_mean_pmf: list[float] = gmean(forecasts, axis=0)
+    if question_type == QuestionType.NUMERIC:
+        geometric_mean_forecast = pmf_to_cdf(geometric_mean_pmf)
+    else:
+        geometric_mean_forecast = geometric_mean_pmf
+
+    probability_for_forecast = _determine_probability_for_resolution(
+        question_type,
+        geometric_mean_forecast,
+        resolution,
+        options,
+        range_min,
+        range_max,
+    )
+
+    return probability_for_forecast
 
 
 def calculate_baseline_score(
@@ -255,6 +306,22 @@ def _numeric_resolution_prob(
         previous_prob = current_prob
 
     cdf = [float(p) for p in forecast]
+    pmf = cdf_to_pmf(cdf)
+
+    resolution_bin_idx = _resolution_value_to_pmf_index(
+        pmf, resolution, range_min, range_max
+    )
+
+    prob_for_resolution = pmf[resolution_bin_idx]
+    if prob_for_resolution <= 0 or prob_for_resolution >= 1:
+        raise ValueError(
+            f"Numeric forecast probability for resolution is {prob_for_resolution} which is not between 0 and 1"
+        )
+
+    return prob_for_resolution
+
+
+def cdf_to_pmf(cdf: list[float]) -> list[float]:
     assert len(cdf) == 201, f"There should be 201 bins, but there are {len(cdf)}"
     lower_bound_prob = cdf[0]
     upper_bound_prob = 1 - cdf[-1]
@@ -264,16 +331,18 @@ def _numeric_resolution_prob(
         + [upper_bound_prob]
     )
     assert len(pmf) == 202, f"There should be 202 bins, but there are {len(pmf)}"
+    return pmf
 
-    resolution_bin_idx = _resolution_value_to_pmf_index(
-        pmf, resolution, range_min, range_max
-    )
 
-    prob_for_resolution = pmf[resolution_bin_idx]
-    if prob_for_resolution <= 0 or prob_for_resolution >= 1:
-        raise ValueError(f"Numeric forecast probability for resolution is {prob_for_resolution} which is not between 0 and 1")
-
-    return prob_for_resolution
+def pmf_to_cdf(pmf: list[float]) -> list[float]:
+    assert len(pmf) == 202, f"There should be 202 bins, but there are {len(pmf)}"
+    cdf = []
+    total = 0.0
+    for p in pmf:
+        total += p
+        cdf.append(total)
+    assert len(cdf) == 201, f"There should be 201 bins, but there are {len(cdf)}"
+    return cdf
 
 
 def _determine_divisor_for_baseline_score(
@@ -297,7 +366,7 @@ def _resolution_value_to_pmf_index(
     if len(pmf) != 202:
         raise ValueError(f"PMF should have 202 bins, but has {len(pmf)}")
     if resolution > range_max:
-        resolution_bin_idx = 201 # 202nd index
+        resolution_bin_idx = 201  # 202nd index
     elif resolution < range_min:
         resolution_bin_idx = 0
     else:
@@ -309,7 +378,9 @@ def _resolution_value_to_pmf_index(
         raise ValueError(
             f"Invalid resolution bin index: {resolution_bin_idx}. Resolution: {resolution}, Range min: {range_min}, Range max: {range_max}"
         )
-    _test_resolution_bin_idx_edge_cases(pmf, resolution_bin_idx, resolution, range_min, range_max)
+    _test_resolution_bin_idx_edge_cases(
+        pmf, resolution_bin_idx, resolution, range_min, range_max
+    )
     return resolution_bin_idx
 
 
@@ -326,7 +397,9 @@ def _test_resolution_bin_idx_edge_cases(
     An index of 1 means the resolution is AT (or very near) the lower bound
     etc
     """
-    assert 0 <= resolution_bin_idx < 202, f"Resolution bin index is {resolution_bin_idx} which is not between 0 and 201 (i.e. 202 options)"
+    assert (
+        0 <= resolution_bin_idx < 202
+    ), f"Resolution bin index is {resolution_bin_idx} which is not between 0 and 201 (i.e. 202 options)"
     if resolution > range_max:
         assert (
             resolution_bin_idx == len(pmf) - 1
@@ -400,11 +473,15 @@ def _normalize_resolution(
             # Adding arbitrary buffer to put the resolution beyond the bounds
         elif resolution == "below_lower_bound":
             updated_resolution = range_min - 1.1
-        else:
+        elif not isinstance(resolution, float):
             try:
-                updated_resolution = float(resolution) # type: ignore
+                updated_resolution = float(resolution)  # type: ignore
             except Exception:
-                updated_resolution = resolution
+                raise ValueError(
+                    f"Resolution {resolution} could not be cast to float for numeric question."
+                )
+        else:
+            updated_resolution = resolution
         return updated_resolution
     else:
         return resolution

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 
 from pydantic import BaseModel, PrivateAttr, model_validator
 from typing_extensions import Self
@@ -29,34 +30,24 @@ class SimulatedTournament(BaseModel):
     )  # The latest forecast for each question that is before the spot scoring time
 
     _question_to_forecast_cache: dict[int, list[Forecast]] = PrivateAttr(
-        default_factory=dict
+        default_factory=lambda: defaultdict(list)
+    )
+    _question_to_spot_forecasts_cache: dict[int, list[Forecast]] = PrivateAttr(
+        default_factory=lambda: defaultdict(list)
     )
 
     _question_to_scores_cache: dict[int, list[Score]] = PrivateAttr(default_factory=dict)
     _forecast_to_scores_cache: dict[str, list[Score]] = PrivateAttr(default_factory=dict)
     _user_to_scores_cache: dict[str, list[Score]] = PrivateAttr(default_factory=dict)
     _user__question__type__to_scores_cache: dict[str, list[Score]] = PrivateAttr(
-        default_factory=dict
+        default_factory=lambda: defaultdict(list)
     )
 
-    def _get_spot_forecasts(self) -> list[Forecast]:
-        spot_forecasts: dict[tuple[str, int], Forecast] = {}
-        for forecast in self.forecasts:
-            question = forecast.question
-            user_name = forecast.user.name
-            spot_time = question.spot_scoring_time
-            if forecast.prediction_time >= spot_time:
-                continue
-            key = (user_name, question.question_id)
-            current = spot_forecasts.get(key)
-            if current is None or forecast.prediction_time > current.prediction_time:
-                spot_forecasts[key] = forecast
-        return list(spot_forecasts.values())
 
     @model_validator(mode="after")
     def initialize_caches(self) -> Self:
         logger.info("Initializing caches")
-        self._spot_forecasts_cache = self._get_spot_forecasts()
+        self._inialize_spot_forecast_cache()
 
         self._user_cache = {
             forecast.user.name: forecast.user for forecast in self.forecasts
@@ -65,11 +56,14 @@ class SimulatedTournament(BaseModel):
             forecast.question.question_id: forecast.question
             for forecast in self.forecasts
         }
-        self._question_to_forecast_cache = {
-            forecast.question.question_id: [forecast] for forecast in self.forecasts
-        }
 
-        logger.info("Finished initializing caches part 1")
+        for forecast in self.forecasts:
+            question_id = forecast.question.question_id
+            self._question_to_forecast_cache[question_id].append(forecast)
+            if forecast in self._spot_forecasts_cache:
+                self._question_to_spot_forecasts_cache[question_id].append(forecast)
+
+        logger.info("Finished initializing non-scoring caches")
 
         log_every_n = 100
         for i, forecast in enumerate(self._spot_forecasts_cache):
@@ -81,9 +75,25 @@ class SimulatedTournament(BaseModel):
             for new_score in new_scores:
                 self._add_new_score_to_caches(new_score)
 
-        logger.info("Finished initializing caches part 2")
+        logger.info("Finished initializing scoring caches")
 
+        self._test_caches()
         return self
+
+    def _inialize_spot_forecast_cache(self) -> None:
+        spot_forecasts: dict[tuple[str, int], Forecast] = {}
+        for forecast in self.forecasts:
+            question = forecast.question
+            user_name = forecast.user.name
+            spot_time = question.spot_scoring_time
+            if forecast.prediction_time >= spot_time:
+                continue
+            key = (user_name, question.question_id)
+            current = spot_forecasts.get(key)
+            if current is None or forecast.prediction_time > current.prediction_time:
+                spot_forecasts[key] = forecast
+        self._spot_forecasts_cache = list(spot_forecasts.values())
+
 
     def _add_new_score_to_caches(self, score: Score) -> None:
         forecast = score.forecast
@@ -92,15 +102,6 @@ class SimulatedTournament(BaseModel):
         hash = self._get_hash_for_user_question_score_type(
             forecast.user.name, forecast.question.question_id, score.type
         )
-
-        if question_id not in self._question_to_scores_cache:
-            self._question_to_scores_cache[question_id] = []
-        if forecast.id not in self._forecast_to_scores_cache:
-            self._forecast_to_scores_cache[forecast.id] = []
-        if forecast.user.name not in self._user_to_scores_cache:
-            self._user_to_scores_cache[forecast.user.name] = []
-        if hash not in self._user__question__type__to_scores_cache:
-            self._user__question__type__to_scores_cache[hash] = []
 
         self._question_to_scores_cache[question_id].append(score)
         self._forecast_to_scores_cache[forecast.id].append(score)
@@ -113,6 +114,7 @@ class SimulatedTournament(BaseModel):
             ), "Spot scores should have exactly one score per question"
         else:
             self._user__question__type__to_scores_cache[hash].append(score)
+
 
     @property
     def users(self) -> list[User]:
@@ -223,15 +225,8 @@ class SimulatedTournament(BaseModel):
         if isinstance(resolution, AmbiguousResolutionType):
             return []
 
-        spot_forecasts_from_others: list[Forecast] = []
-        forecasts_for_question = self._question_to_forecast_cache[forecast_to_score.question.question_id]
-        for forecast in forecasts_for_question:
-            if (
-                forecast in self._spot_forecasts_cache
-                and forecast.user != forecast_to_score.user
-            ):
-                spot_forecasts_from_others.append(forecast)
-
+        spot_forecasts_from_others: list[Forecast] = self._question_to_spot_forecasts_cache[forecast_to_score.question.question_id]
+        spot_forecasts_from_others.remove(forecast_to_score)
         spot_peer_score = forecast_to_score.get_spot_peer_score(
             resolution, spot_forecasts_from_others
         )
@@ -239,3 +234,13 @@ class SimulatedTournament(BaseModel):
 
         scores = [spot_peer_score, spot_baseline_score]
         return scores
+
+    def _test_caches(self) -> None:
+        assert len(self._question_to_forecast_cache.values()) == len(self.questions)
+        for value in self._question_to_forecast_cache.values():
+            assert len(value) >= len(self.users) / 2, "Heuristic: something is up if less than half of people forecast on a question"
+
+        assert len(self._question_to_spot_forecasts_cache.values()) == len(self.questions)
+        for value in self._question_to_spot_forecasts_cache.values():
+            for forecast in value:
+                assert forecast in self._spot_forecasts_cache, "Forecast should be in spot forecasts cache"
