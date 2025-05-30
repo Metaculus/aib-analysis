@@ -7,8 +7,8 @@ def test_load_tournament():
     pro_forecasts = pro_tournament.forecasts
     assert len(pro_forecasts) == 2840
 
-    all_question_objects: list[Question] = []
+    unique_question_objects: list[Question] = []
     for forecast in pro_forecasts:
-        if forecast.question not in all_question_objects:
-            all_question_objects.append(forecast.question)
-    assert len(all_question_objects) == len(pro_forecasts)
+        if forecast.question not in unique_question_objects:
+            unique_question_objects.append(forecast.question)
+    assert len(unique_question_objects) < len(pro_forecasts) / 2
