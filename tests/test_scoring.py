@@ -230,6 +230,7 @@ def test_binary_baseline_examples(
 
 
 def test_numeric_baseline_when_perfect_forecast():
+    # NOTE: I think we found that 183 is in fact an inccorect max score, and was based on old site conventions
     correct_index = 31
     length_of_cdf = 201
     index_to_answer_ratio = 3

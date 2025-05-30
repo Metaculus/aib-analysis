@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
+from typing_extensions import Self
 
-from refactored_notebook.data_models import Forecast, Question, Score, User
+from refactored_notebook.data_models import Forecast, Question, Score, User, Leaderboard, LeaderboardEntry, ScoreType
 
 
 class SimulatedTournament(BaseModel):
@@ -41,6 +42,14 @@ class SimulatedTournament(BaseModel):
                 forecast.get_spot_baseline_score(forecast.question.resolution)
             )
         return spot_peer_scores + spot_baseline_scores
+
+    def get_leaderboard(self, score_type: ScoreType) -> Leaderboard:
+        peer_scores = [score for score in self.scores if score.type == score_type]
+        user_score_map: dict[User, list[Score]] = {}
+        for score in peer_scores:
+            user_score_map[score.forecast.user].append(score)
+        entries = [LeaderboardEntry(user=user, scores=scores) for user, scores in user_score_map.items()]
+        return Leaderboard(entries=entries, type=score_type)
 
     def get_ranking_by_spot_peer_score_lower_t_bound(
         self, confidence_level: float

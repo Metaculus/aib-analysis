@@ -8,10 +8,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 top_level_dir = os.path.abspath(os.path.join(current_dir, '../'))
 sys.path.append(top_level_dir)
 
-from refactored_notebook.data_models import UserType
-from refactored_notebook.main import load_tournament
+from refactored_notebook.data_models import Leaderboard, ScoreType, UserType
+from refactored_notebook.load_tournament_data import load_tournament
 from refactored_notebook.simulated_tournament import SimulatedTournament
-
 
 
 def display_tournament(tournament: SimulatedTournament):
@@ -41,6 +40,26 @@ def display_tournament(tournament: SimulatedTournament):
         hide_index=True,
     )
 
+
+def display_leaderboard(leaderboard: Leaderboard):
+    data = [
+        {
+            "user": entry.user.name,
+            "user_type": entry.user.type.value,
+            "sum_of_scores": entry.sum_of_scores,
+            "average_score": entry.average_score,
+            "num_questions": len(entry.scores),
+        }
+        for entry in leaderboard.entries
+    ]
+    df = pd.DataFrame(data)
+    st.dataframe(
+        df.sort_values(by="sum_of_scores", ascending=False),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
 @st.cache_data(show_spinner="Loading tournaments...")
 def cached_load_tournament(path: str, user_type: UserType) -> SimulatedTournament:
     return load_tournament(path, user_type)
@@ -50,10 +69,19 @@ def main():
     pro_path = "input_data/pro_forecasts_q1.csv"
     bot_path = "input_data/bot_forecasts_q1.csv"
     pro_tournament = cached_load_tournament(pro_path, UserType.PRO)
+    with st.expander("Pro Tournament Forecasts"):
+        display_tournament(pro_tournament)
+    pro_leaderboard = pro_tournament.get_leaderboard(ScoreType.SPOT_PEER)
+    with st.expander("Pro Peer Leaderboard"):
+        display_leaderboard(pro_leaderboard)
+
     bot_tournament = cached_load_tournament(bot_path, UserType.BOT)
-    # with st.expander("Pro Tournament Forecasts", expanded=False):
-    display_tournament(pro_tournament)
-    display_tournament(bot_tournament)
+    with st.expander("Bot Tournament Forecasts"):
+        display_tournament(bot_tournament)
+    bot_leaderboard = bot_tournament.get_leaderboard(ScoreType.SPOT_PEER)
+    with st.expander("Bot Peer Leaderboard"):
+        display_leaderboard(bot_leaderboard)
+    st.write("Hello World")
 
 if __name__ == "__main__":
     main()

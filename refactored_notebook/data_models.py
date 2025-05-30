@@ -6,25 +6,14 @@ from typing import Literal
 
 from pydantic import BaseModel, model_validator
 from typing_extensions import Self
-
-ResolutionType = (
-    bool | str | float | None
-)  # binary, MC, numeric, or 'annulled/ambiguous'
-ForecastType = (
-    list[float] | None
-)  # binary: [p_yes, p_no], multiple choice: [p_a, p_b, p_c], numeric: [p_0, p_1, p_2, ...]
-
-
-class UserType(Enum):
-    PRO = "pro"
-    BOT = "bot"
-    CP = "cp"
-
-
-class QuestionType(Enum):
-    BINARY = "binary"
-    MULTIPLE_CHOICE = "multiple_choice"
-    NUMERIC = "numeric"
+from refactored_notebook.scoring import calculate_baseline_score, calculate_peer_score
+from refactored_notebook.custom_types import (
+    ForecastType,
+    ResolutionType,
+    QuestionType,
+    ScoreType,
+    UserType,
+)
 
 
 class Forecast(BaseModel):
@@ -33,16 +22,55 @@ class Forecast(BaseModel):
     prediction: ForecastType
     prediction_time: datetime
     comment: str | None = None
+    _id: str | None = None
+
+    @property
+    def id(self) -> str:
+        if self._id is None:
+            self._id = f"{self.user.name}_{self.question.post_id}_{self.prediction_time.strftime('%Y-%m-%d_%H-%M-%S')}"
+
+        return self._id
 
     def get_spot_baseline_score(self, resolution: ResolutionType) -> Score:
-        raise NotImplementedError("Not implemented")
+        q = self.question
+        score_value = calculate_baseline_score(
+            forecast=self.prediction,
+            resolution=resolution,
+            question_weight=q.weight,
+            q_type=q.type.value,
+            options=q.options,
+            open_upper_bound=q.open_upper_bound,
+            open_lower_bound=q.open_lower_bound,
+        )
+
+        return Score(
+            score=score_value,
+            type=ScoreType.SPOT_BASELINE,
+            forecast=self,
+            users_used_in_scoring=None,
+        )
 
     def get_spot_peer_score(
         self, resolution: ResolutionType, other_users_forecasts: list[Forecast]
     ) -> Score:
-        # assert only one forecast per user
-        # assert that forecasts are in time range of question
-        raise NotImplementedError("Not implemented")
+        other_preds = [f.prediction for f in other_users_forecasts]
+        q = self.question
+        score_value = calculate_peer_score(
+            forecast=self.prediction,
+            forecast_for_other_users=other_preds,
+            resolution=resolution,
+            question_weight=q.weight,
+            q_type=q.type.value,
+            options=q.options,
+            range_min=q.lower_bound,
+            range_max=q.upper_bound,
+        )
+        return Score(
+            score=score_value,
+            type=ScoreType.SPOT_PEER,
+            forecast=self,
+            users_used_in_scoring=[f.user for f in other_users_forecasts],
+        )
 
     @model_validator(mode="after")
     def check_prediction_type_matches(self) -> Self:
@@ -80,19 +108,24 @@ class Forecast(BaseModel):
 
 class Score(BaseModel):
     score: float
-    type: Literal["spot_peer", "spot_baseline"]
+    type: ScoreType
     forecast: Forecast
     users_used_in_scoring: list[User] | None  # Empty if baseline
 
 
 class Question(BaseModel):
-    question_text: str
+    post_id: int
+    question_id: int
     type: QuestionType
+    question_text: str
     resolution: ResolutionType
+    options: list[str] | None
+    upper_bound: float | None
+    lower_bound: float | None
+    open_upper_bound: bool | None
+    open_lower_bound: bool | None
     weight: float
     spot_scoring_time: datetime
-    question_id: int
-    post_id: int
 
     @model_validator(mode="after")
     def check_resolution_type_matches(self) -> Self:
@@ -113,6 +146,31 @@ class Question(BaseModel):
                 raise ValueError("Resolution must be a float for numeric questions.")
         return self
 
+    @model_validator(mode="after")
+    def check_misc_constraints(self) -> Self:
+        if not (0 <= self.weight <= 1):
+            raise ValueError("Weight must be between 0 and 1.")
+        if not self.question_text.strip():
+            raise ValueError("Question text must not be empty.")
+        if self.options is not None and len(self.options) < 2:
+            raise ValueError("Multiple choice questions must have at least two options.")
+        return self
+
+    @model_validator(mode="after")
+    def check_question_type_has_right_fields(self) -> Self:
+        if self.type == QuestionType.NUMERIC:
+            if (
+                self.upper_bound is None or
+                self.lower_bound is None or
+                self.open_upper_bound is None or
+                self.open_lower_bound is None
+            ):
+                raise ValueError("Numeric questions must have all bound information (upper_bound, lower_bound, open_upper_bound, open_lower_bound).")
+        if self.type == QuestionType.MULTIPLE_CHOICE:
+            if not self.options or len(self.options) < 2:
+                raise ValueError("Multiple choice questions must have at least two options.")
+        return self
+
     @property
     def url(self) -> str:
         return f"https://www.metaculus.com/questions/{self.post_id}/"
@@ -127,3 +185,32 @@ class User(BaseModel):
     @property
     def is_metac_bot(self) -> bool:
         return "metac-" in self.name
+
+
+class Leaderboard(BaseModel):
+    entries: list[LeaderboardEntry]
+    type: ScoreType
+
+    @model_validator(mode="after")
+    def check_all_entries_same_score_type(self: Self) -> Self:
+        if self.entries:
+            flat_scores: list[Score] = [score for entry in self.entries for score in entry.scores]
+            score_types = {score.type for score in flat_scores}
+            if len(score_types) > 1:
+                raise ValueError(f"All entries must have the same score type, found: {score_types}")
+            if self.type != list(score_types)[0]:
+                raise ValueError(f"Leaderboard type {self.type} does not match score type {list(score_types)[0]}")
+        return self
+
+
+class LeaderboardEntry(BaseModel):
+    user: User
+    scores: list[Score]
+
+    @property
+    def sum_of_scores(self) -> float:
+        return sum(score.score for score in self.scores)
+
+    @property
+    def average_score(self) -> float:
+        return self.sum_of_scores / len(self.scores)
