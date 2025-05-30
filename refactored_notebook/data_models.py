@@ -61,6 +61,9 @@ class Forecast(BaseModel):
         self, resolution: ResolutionType, other_users_forecasts: list[Forecast]
     ) -> Score:
         other_preds = [f.prediction for f in other_users_forecasts]
+        users_used_in_scoring = [f.user for f in other_users_forecasts]
+        if self.user in users_used_in_scoring:
+            raise ValueError("Forecast Author cannot be in other users forecasts list for peer score")
         q = self.question
         score_value = calculate_peer_score(
             forecast=self.prediction,
