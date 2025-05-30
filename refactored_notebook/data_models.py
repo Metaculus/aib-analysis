@@ -6,13 +6,17 @@ from typing import Literal
 
 from pydantic import BaseModel, model_validator
 from typing_extensions import Self
-from refactored_notebook.scoring import calculate_baseline_score, calculate_peer_score
+
 from refactored_notebook.custom_types import (
     ForecastType,
-    ResolutionType,
     QuestionType,
+    ResolutionType,
     ScoreType,
     UserType,
+)
+from refactored_notebook.scoring import (
+    calculate_baseline_score,
+    calculate_peer_score,
 )
 
 
@@ -39,6 +43,8 @@ class Forecast(BaseModel):
             question_weight=q.weight,
             q_type=q.type.value,
             options=q.options,
+            range_min=q.range_min,
+            range_max=q.range_max,
             open_upper_bound=q.open_upper_bound,
             open_lower_bound=q.open_lower_bound,
         )
@@ -62,8 +68,8 @@ class Forecast(BaseModel):
             question_weight=q.weight,
             q_type=q.type.value,
             options=q.options,
-            range_min=q.lower_bound,
-            range_max=q.upper_bound,
+            range_min=q.range_min,
+            range_max=q.range_max,
         )
         return Score(
             score=score_value,
@@ -112,19 +118,25 @@ class Score(BaseModel):
     forecast: Forecast
     users_used_in_scoring: list[User] | None  # Empty if baseline
 
+    @model_validator(mode="after")
+    def check_forecast_resolution_not_none(self) -> Self:
+        if self.forecast.question.resolution is None:
+            raise ValueError("Forecast's question resolution must not be None. You cannot assign a score to ambiguous/annulled resolution")
+        return self
+
 
 class Question(BaseModel):
-    post_id: int
     question_id: int
     type: QuestionType
     question_text: str
     resolution: ResolutionType
     options: list[str] | None
-    upper_bound: float | None
-    lower_bound: float | None
+    range_max: float | None
+    range_min: float | None
     open_upper_bound: bool | None
     open_lower_bound: bool | None
     weight: float
+    post_id: int
     spot_scoring_time: datetime
 
     @model_validator(mode="after")
@@ -160,8 +172,8 @@ class Question(BaseModel):
     def check_question_type_has_right_fields(self) -> Self:
         if self.type == QuestionType.NUMERIC:
             if (
-                self.upper_bound is None or
-                self.lower_bound is None or
+                self.range_max is None or
+                self.range_min is None or
                 self.open_upper_bound is None or
                 self.open_lower_bound is None
             ):

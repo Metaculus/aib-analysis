@@ -1,12 +1,16 @@
 from enum import Enum
 
-ResolutionType = (
-    bool | str | float | None
-)  # binary, MC, numeric, or 'annulled/ambiguous'
-ForecastType = (
-    list[float] | None
-)  # binary: [p_yes, p_no], multiple choice: [p_a, p_b, p_c], numeric: [p_0, p_1, p_2, ...]
+AmbiguousResolutionType = type(None)
+BinaryResolutionType = bool
+MCResolutionType = str
+NumericResolutionType = float
+ResolutionType = BinaryResolutionType | MCResolutionType | NumericResolutionType | AmbiguousResolutionType
 
+BinaryForecastType = list[float]
+MCForecastType = list[float]
+NumericForecastType = list[float]
+ForecastType = BinaryForecastType | MCForecastType | NumericForecastType | None
+# binary: [p_yes, p_no], multiple choice: [p_a, p_b, p_c], numeric: [p_0, p_1, p_2, ...]
 
 class UserType(Enum):
     PRO = "pro"

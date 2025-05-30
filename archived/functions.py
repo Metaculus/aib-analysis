@@ -12,9 +12,9 @@ from scipy.optimize import minimize_scalar
 from scipy.stats import binom, norm
 
 from refactored_notebook.scoring import (
+    _resolution_value_to_position_in_numeric_range,
     calculate_baseline_score,
     calculate_peer_score,
-    nominal_location_to_cdf_location,
 )
 
 
@@ -983,7 +983,7 @@ def nominal_location_to_cdf_location_via_question_dict(nominal_location, questio
     range_max = question_data["range_max"]
     zero_point = question_data["zero_point"]
 
-    return nominal_location_to_cdf_location(
+    return _resolution_value_to_position_in_numeric_range(
         nominal_location, range_min, range_max, zero_point
     )
 
