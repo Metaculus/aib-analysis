@@ -20,7 +20,6 @@ ipykernel = "^6.29.5"
 notebook = "^7.2.2"
 pytest = "^8.3.2"
 dotenv = "^0.9.9"
-pytest-asyncio = "^1.0.0"
 pytest-mock = "^3.14.1"
 
 [build-system]

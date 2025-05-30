@@ -17,24 +17,24 @@ def setup_logging() -> None:
     dotenv.load_dotenv()
 
     # TODO: Right now logging set up is not working. Not sure why.
-    file_name = "logs/latest.log"
-    with open(file_name, "w") as f:
-        f.write("")  # Clear the contents of the log file
+    # file_name = "logs/latest.log"
+    # with open(file_name, "w") as f:
+    #     f.write("")  # Clear the contents of the log file
 
-    logging.basicConfig(
-        level=logging.INFO,
-        filename=file_name,
-        format="%(asctime)s - %(levelname)s - %(name)s - %(funcName)s  - %(message)s",
-    )
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s - %(levelname)s - %(name)s - %(funcName)s  - %(message)s"
-        )
-    )
-    logging.getLogger().addHandler(console_handler)
-    logger.info("Logging setup complete")
+    # logging.basicConfig(
+    #     level=logging.INFO,
+    #     filename=file_name,
+    #     format="%(asctime)s - %(levelname)s - %(name)s - %(funcName)s  - %(message)s",
+    # )
+    # console_handler = logging.StreamHandler()
+    # console_handler.setLevel(logging.INFO)
+    # console_handler.setFormatter(
+    #     logging.Formatter(
+    #         "%(asctime)s - %(levelname)s - %(name)s - %(funcName)s  - %(message)s"
+    #     )
+    # )
+    # logging.getLogger().addHandler(console_handler)
+    # logger.info("Logging setup complete")
 
 
 class CachedData:

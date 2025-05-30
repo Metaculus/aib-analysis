@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 import pandas as pd
@@ -13,20 +14,27 @@ from refactored_notebook.data_models import (
 )
 from refactored_notebook.simulated_tournament import SimulatedTournament
 
+logger = logging.getLogger(__name__)
+
 
 def load_tournament(
     forecast_file_path: str, user_type: UserType
 ) -> SimulatedTournament:
+    logger.info(f"Start loading tournament from {forecast_file_path}")
     forecasts = []
     question_cache: dict[int, Question] = {}
     user_cache: dict[str, User] = {}
-    for _, row in pd.read_csv(forecast_file_path, low_memory=False).iterrows():
+    dataframe = pd.read_csv(forecast_file_path, low_memory=False)
+    logger.info(f"Loaded {len(dataframe)} forecast rows")
+    for _, row in dataframe.iterrows():
         forecast, _, _ = parse_forecast_row(
             row.to_dict(), user_type, question_cache, user_cache
         )
         forecasts.append(forecast)
-    return SimulatedTournament(forecasts=forecasts)
-
+    logger.info(f"Finished parsing {len(forecasts)} forecast rows")
+    tournament = SimulatedTournament(forecasts=forecasts)
+    logger.info(f"Finished inializing tournament from forecasts")
+    return tournament
 
 def parse_forecast_row(
     row: dict,

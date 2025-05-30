@@ -44,8 +44,6 @@ def validate_scores_calculated_from_simulated_tournament(tournament: SimulatedTo
     # This test is mostly just running data validation.
     logger.info(f"Tournament has {len(tournament.questions)} questions")
     for question in tournament.questions:
-        if question.question_id in [34247, 34730]:
-            logger.info(f"Question {question.question_id} has resolution {question.resolution}.\n {question}")
         forecasters_on_question = tournament.get_forecasters_on_question(question.question_id)
         for user in forecasters_on_question:
             for score_type in ScoreType:

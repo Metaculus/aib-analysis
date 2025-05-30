@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import random
 from datetime import datetime
 from enum import Enum
-import random
 from typing import Literal
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
 from refactored_notebook.custom_types import (
@@ -32,7 +32,7 @@ class Forecast(BaseModel):
     @property
     def id(self) -> str:
         if self._id is None:
-            self._id = f"{self.user.name}_{self.question.post_id}_{self.prediction_time.strftime('%Y-%m-%d_%H-%M-%S')}"
+            self._id = f"U{self.user.name}_Q{self.question.post_id}_F{self.prediction_time.strftime('%Y-%m-%d_%H-%M-%S')}"
 
         return self._id
 

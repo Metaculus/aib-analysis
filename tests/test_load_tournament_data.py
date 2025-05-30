@@ -1,14 +1,18 @@
-import pytest
+from refactored_notebook.data_models import Question
+from refactored_notebook.simulated_tournament import SimulatedTournament
 
-from refactored_notebook.data_models import Question, UserType
-from refactored_notebook.load_tournament_data import load_tournament
 
-@pytest.mark.parametrize("user_type, file_name, expected_forecast_count", [
-    (UserType.PRO, "pro_forecasts_q1.csv", 2840),
-    (UserType.BOT, "bot_forecasts_q1.csv", 33121),
-])
-def test_load_tournament(user_type: UserType, file_name: str, expected_forecast_count: int):
-    tournament = load_tournament(f"tests/test_data/{file_name}", user_type)
+def test_load_pro_data(pro_tournament: SimulatedTournament):
+    validate_load_tournament_data(pro_tournament, 2840)
+
+
+def test_load_bot_data(bot_tournament: SimulatedTournament):
+    validate_load_tournament_data(bot_tournament, 33121)
+
+
+def validate_load_tournament_data(
+    tournament: SimulatedTournament, expected_forecast_count: int
+):
     forecasts = tournament.forecasts
 
     unique_question_objects: list[Question] = []
