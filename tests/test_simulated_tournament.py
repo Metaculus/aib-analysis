@@ -34,14 +34,13 @@ def test_simulated_tournament_leaderboard_ranking_runs(pro_tournament: Simulated
     leaderboard = tournament.get_leaderboard(ScoreType.SPOT_PEER)
     assert len(leaderboard.entries) == 10
 
-def test_scores_from_pro_tournament(pro_tournament: SimulatedTournament):
-    validate_scores_from_simulated_tournament(pro_tournament)
+def test_scores_are_calculated_from_pro_tournament(pro_tournament: SimulatedTournament):
+    validate_scores_calculated_from_simulated_tournament(pro_tournament)
 
-@pytest.mark.skip(reason="Bot tournament takes a while to run")
-def test_scores_from_bot_tournament(bot_tournament: SimulatedTournament):
-    validate_scores_from_simulated_tournament(bot_tournament)
+def test_scores_are_calculated_from_bot_tournament(bot_tournament: SimulatedTournament):
+    validate_scores_calculated_from_simulated_tournament(bot_tournament)
 
-def validate_scores_from_simulated_tournament(tournament: SimulatedTournament):
+def validate_scores_calculated_from_simulated_tournament(tournament: SimulatedTournament):
     # This test is mostly just running data validation.
     logger.info(f"Tournament has {len(tournament.questions)} questions")
     for question in tournament.questions:
