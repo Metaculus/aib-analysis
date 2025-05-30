@@ -21,74 +21,25 @@ def calculate_peer_score(
     question_weight: float = 1.0,
     q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
 ) -> float:
-    num_other_forecasters = len(forecast_for_other_users)
-    if num_other_forecasters <= 0:
-        raise ValueError(f"Number of other forecasts has to be greater than 0")
-    num_forecasters = num_other_forecasters + 1
-    all_forecasts = [forecast] + forecast_for_other_users
-
     question_type = _determine_question_type(q_type, resolution)
-    normalized_resolution = _normalize_resolution(
-        question_type, resolution, range_min, range_max
-    )
-
+    resolution = _normalize_resolution(question_type, resolution, range_min, range_max)
     forecast_for_resolution = _determine_probability_for_resolution(
-        question_type, forecast, normalized_resolution, options, range_min, range_max
+        question_type, forecast, resolution, options, range_min, range_max
     )
+    other_user_forecasts = [
+        _determine_probability_for_resolution(
+            question_type, forecast, resolution, options, range_min, range_max
+        )
+        for forecast in forecast_for_other_users
+    ]
 
-    geometric_mean_prediction = _get_geometric_mean_prediction(
-        question_type=question_type,
-        forecasts=all_forecasts,
-        resolution=normalized_resolution,
-        options=options,
-        range_min=range_min,
-        range_max=range_max,
-    )
-    peer_score = (
-        100
-        * (num_forecasters / (num_forecasters - 1))
-        * np.log(forecast_for_resolution / geometric_mean_prediction)
-    )
-
+    geometric_mean = gmean(other_user_forecasts)
+    peer_score = np.log(forecast_for_resolution / geometric_mean)
     if question_type == QuestionType.NUMERIC:
         peer_score /= 2
-
     return peer_score * question_weight
 
 
-def _get_geometric_mean_prediction(
-    question_type: QuestionType,
-    forecasts: list[ForecastType],
-    resolution: ResolutionType,
-    options: list[str] | None = None,
-    range_min: float | None = None,
-    range_max: float | None = None,
-) -> float:
-    pmfs = []
-    for forecast in forecasts:
-        assert forecast is not None
-        if question_type == QuestionType.NUMERIC:
-            pmf = cdf_to_pmf(forecast)
-        else:
-            pmf = forecast
-        pmfs.append(pmf)
-
-    geometric_mean_pmf: list[float] = gmean(forecasts, axis=0)
-    if question_type == QuestionType.NUMERIC:
-        geometric_mean_forecast = pmf_to_cdf(geometric_mean_pmf)
-    else:
-        geometric_mean_forecast = geometric_mean_pmf
-
-    probability_for_forecast = _determine_probability_for_resolution(
-        question_type,
-        geometric_mean_forecast,
-        resolution,
-        options,
-        range_min,
-        range_max,
-    )
-
-    return probability_for_forecast
 
 
 def calculate_baseline_score(
@@ -509,3 +460,83 @@ def _determine_question_type(
             )
     else:
         return QuestionType(question_type)
+
+
+# HOW TO CALCULATE PEER SCORE W/ GEOMETRIC MEAN AVERAGES
+# def calculate_peer_score(
+#     forecast: ForecastType,
+#     forecast_for_other_users: list[ForecastType],
+#     resolution: ResolutionType,
+#     options: list[str] | None = None,
+#     range_min: float | None = None,
+#     range_max: float | None = None,
+#     question_weight: float = 1.0,
+#     q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
+# ) -> float:
+#     num_other_forecasters = len(forecast_for_other_users)
+#     if num_other_forecasters <= 0:
+#         raise ValueError(f"Number of other forecasts has to be greater than 0")
+#     num_forecasters = num_other_forecasters + 1
+#     all_forecasts = [forecast] + forecast_for_other_users
+
+#     question_type = _determine_question_type(q_type, resolution)
+#     normalized_resolution = _normalize_resolution(
+#         question_type, resolution, range_min, range_max
+#     )
+
+#     forecast_for_resolution = _determine_probability_for_resolution(
+#         question_type, forecast, normalized_resolution, options, range_min, range_max
+#     )
+
+#     geometric_mean_prediction = _get_geometric_mean_prediction(
+#         question_type=question_type,
+#         forecasts=all_forecasts,
+#         resolution=normalized_resolution,
+#         options=options,
+#         range_min=range_min,
+#         range_max=range_max,
+#     )
+#     peer_score = (
+#         100
+#         * (num_forecasters / (num_forecasters - 1))
+#         * np.log(forecast_for_resolution / geometric_mean_prediction)
+#     )
+
+#     if question_type == QuestionType.NUMERIC:
+#         peer_score /= 2
+
+#     return peer_score * question_weight
+
+# def _get_geometric_mean_prediction(
+#     question_type: QuestionType,
+#     forecasts: list[ForecastType],
+#     resolution: ResolutionType,
+#     options: list[str] | None = None,
+#     range_min: float | None = None,
+#     range_max: float | None = None,
+# ) -> float:
+#     pmfs = []
+#     for forecast in forecasts:
+#         assert forecast is not None
+#         if question_type == QuestionType.NUMERIC:
+#             pmf = cdf_to_pmf(forecast)
+#         else:
+#             pmf = forecast
+#         pmfs.append(pmf)
+
+#     geometric_mean_pmf: list[float] = gmean(forecasts, axis=0)
+#     if question_type == QuestionType.NUMERIC:
+#         geometric_mean_forecast = pmf_to_cdf(geometric_mean_pmf)
+#     else:
+#         geometric_mean_forecast = geometric_mean_pmf
+
+#     probability_for_forecast = _determine_probability_for_resolution(
+#         question_type,
+#         geometric_mean_forecast,
+#         resolution,
+#         options,
+#         range_min,
+#         range_max,
+#     )
+
+#     return probability_for_forecast
