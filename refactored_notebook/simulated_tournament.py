@@ -26,8 +26,8 @@ class SimulatedTournament(BaseModel):
 
     _user_cache: dict[str, User] = PrivateAttr(default_factory=dict)
     _question_cache: dict[int, Question] = PrivateAttr(default_factory=dict)
-    _spot_forecasts_cache: list[Forecast] = PrivateAttr(
-        default_factory=list
+    _spot_forecasts_cache: dict[str, Forecast] = PrivateAttr(
+        default_factory=dict
     )  # The latest forecast for each question that is before the spot scoring time
     _scores_cache: dict[str, Score] = PrivateAttr(default_factory=dict)
 
@@ -49,14 +49,17 @@ class SimulatedTournament(BaseModel):
     @property
     def spot_forecasts(self) -> list[Forecast]:
         assert self._spot_forecasts_cache is not None, "Spot forecasts cache is not initialized"
-        return self._spot_forecasts_cache
+        return list(self._spot_forecasts_cache.values())
 
+
+    _question_to_spot_forecasts_cache: dict[int, list[Forecast]] = PrivateAttr(default_factory=dict)
     def question_to_spot_forecasts(self, question_id: int) -> list[Forecast]:
-        spot_forecasts = [
-            forecast
-            for forecast in self.spot_forecasts
-            if forecast.question.question_id == question_id
-        ]
+        if len(self._question_to_spot_forecasts_cache) == 0:
+            for forecast in self.spot_forecasts:
+                if forecast.question.question_id not in self._question_to_spot_forecasts_cache:
+                    self._question_to_spot_forecasts_cache[forecast.question.question_id] = []
+                self._question_to_spot_forecasts_cache[forecast.question.question_id].append(forecast)
+        spot_forecasts = self._question_to_spot_forecasts_cache[question_id]
         return spot_forecasts
 
     def user_to_scores(self, user_name: str) -> list[Score]:
@@ -96,16 +99,18 @@ class SimulatedTournament(BaseModel):
 
         log_every_n = 100
         all_scores: list[Score] = []
-        for i, forecast in enumerate(self._spot_forecasts_cache):
-            if i % log_every_n == 0:
+        for i, forecast in enumerate(self.spot_forecasts):
+            should_log_scoring = i % log_every_n == 0
+            if should_log_scoring:
                 logger.info(
-                    f"Caching scores for forecast {i} of {len(self._spot_forecasts_cache)}"
+                    f"Caching scores for forecast {i} of {len(self.spot_forecasts)}"
                 )
             if isinstance(forecast.question.resolution, AmbiguousResolutionType):
                 continue
             new_scores = self._calculate_spot_scores_for_forecast(forecast)
-            for new_score in new_scores:
-                all_scores.append(new_score)
+            all_scores.extend(new_scores)
+            if should_log_scoring:
+                logger.info(f"Finished caching scores for forecast {i}")
         self._scores_cache = {score.id: score for score in all_scores}
 
         logger.info("Finished initializing scoring caches")
@@ -123,13 +128,14 @@ class SimulatedTournament(BaseModel):
             current = spot_forecasts.get(key)
             if current is None or forecast.prediction_time > current.prediction_time:
                 spot_forecasts[key] = forecast
-        self._spot_forecasts_cache = list(spot_forecasts.values())
+        self._spot_forecasts_cache = {forecast.id: forecast for forecast in spot_forecasts.values()}
 
     def _calculate_spot_scores_for_forecast(
         self, forecast_to_score: Forecast
     ) -> list[Score]:
-        if forecast_to_score not in self._spot_forecasts_cache:
+        if forecast_to_score.id not in self._spot_forecasts_cache:
             raise ValueError("Forecast to score must be in spot forecasts cache")
+
         resolution = forecast_to_score.question.resolution
         if isinstance(resolution, AmbiguousResolutionType):
             return []
@@ -142,6 +148,5 @@ class SimulatedTournament(BaseModel):
             resolution, spot_forecasts_from_others
         )
         spot_baseline_score = forecast_to_score.get_spot_baseline_score(resolution)
-
         scores = [spot_peer_score, spot_baseline_score]
         return scores
