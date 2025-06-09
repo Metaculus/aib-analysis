@@ -11,9 +11,10 @@ from aib_analysis.data_models import (
 from aib_analysis.simulated_tournament import SimulatedTournament
 
 problem_questions = [
-    "How many Grammy awards will Taylor Swift win in 2025?", # Pro/Bot question have different options (but the one that resolved was the same)
-    "Which party will win the 2nd highest number of seats in the 2025 German federal election?", # Same as above
+    "How many Grammy awards will Taylor Swift win in 2025?",  # Pro/Bot question have different options (but the one that resolved was the same)
+    "Which party will win the 2nd highest number of seats in the 2025 German federal election?",  # Same as above
 ]
+
 
 def get_leaderboard(
     tournament: SimulatedTournament, score_type: ScoreType
@@ -82,11 +83,28 @@ def _assert_questions_match_in_important_ways(
     ), f"Question open lower bound does not match for {question_1_text}. {question_1.open_lower_bound} != {question_2.open_lower_bound}. URL: {question_1.url} vs {question_2.url}"
     assert (
         question_1.options == question_2.options
-        ), f"Question options do not match for {question_1_text}. {question_1.options} != {question_2.options}. URL: {question_1.url} vs {question_2.url}"
+    ), f"Question options do not match for {question_1_text}. {question_1.options} != {question_2.options}. URL: {question_1.url} vs {question_2.url}"
     assert (
         question_1.spot_scoring_time == question_2.spot_scoring_time
     ), f"Question spot scoring times do not match for {question_1_text}. {question_1.spot_scoring_time} != {question_2.spot_scoring_time}. URL: {question_1.url} vs {question_2.url}"
 
+
+def create_aggregate(
+    tournament: SimulatedTournament, users: list[User], name: str
+) -> list[Forecast]:
+    # TODO: @Check
+    # Grab all the forecasts of the list of users
+    # Aggregate those forecasts
+    # Make a new user and assign them to the forecasts w/ name
+    # Return the new forecasts
+    raise NotImplementedError("Not implemented")
+
+
+def create_team(tournament: SimulatedTournament, team_size: int, score_type: ScoreType) -> list[User]:
+    # TODO: @Check
+    # leaderboard = get_leaderboard(tournament, score_type)
+    # ...
+    raise NotImplementedError("Not implemented")
 
 def get_ranking_by_spot_peer_score_lower_t_bound(
     tournament: SimulatedTournament, confidence_level: float

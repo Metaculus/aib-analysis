@@ -57,7 +57,9 @@ class Forecast(BaseModel):
         other_preds = [f.prediction for f in other_users_forecasts]
         users_used_in_scoring = [f.user for f in other_users_forecasts]
         if self.user in users_used_in_scoring:
-            raise ValueError("Forecast Author cannot be in other users forecasts list for peer score")
+            raise ValueError(
+                "Forecast Author cannot be in other users forecasts list for peer score"
+            )
         q = self.question
         score_value = calculate_peer_score(
             forecast=self.prediction,
@@ -123,12 +125,13 @@ class Score(BaseModel):
     @model_validator(mode="after")
     def check_forecast_resolution_not_none(self) -> Self:
         if self.forecast.question.resolution is None:
-            raise ValueError("Forecast's question resolution must not be None. You cannot assign a score to ambiguous/annulled resolution")
+            raise ValueError(
+                "Forecast's question resolution must not be None. You cannot assign a score to ambiguous/annulled resolution"
+            )
         return self
 
     def display_score_and_question(self) -> str:
         return f"({self.score:.3f}) {self.forecast.question.url}"
-
 
 
 class Question(BaseModel):
@@ -171,22 +174,28 @@ class Question(BaseModel):
         if not self.question_text.strip():
             raise ValueError("Question text must not be empty.")
         if self.options is not None and len(self.options) < 2:
-            raise ValueError("Multiple choice questions must have at least two options.")
+            raise ValueError(
+                "Multiple choice questions must have at least two options."
+            )
         return self
 
     @model_validator(mode="after")
     def check_question_type_has_right_fields(self) -> Self:
         if self.type == QuestionType.NUMERIC:
             if (
-                self.range_max is None or
-                self.range_min is None or
-                self.open_upper_bound is None or
-                self.open_lower_bound is None
+                self.range_max is None
+                or self.range_min is None
+                or self.open_upper_bound is None
+                or self.open_lower_bound is None
             ):
-                raise ValueError("Numeric questions must have all bound information (upper_bound, lower_bound, open_upper_bound, open_lower_bound).")
+                raise ValueError(
+                    "Numeric questions must have all bound information (upper_bound, lower_bound, open_upper_bound, open_lower_bound)."
+                )
         if self.type == QuestionType.MULTIPLE_CHOICE:
             if not self.options or len(self.options) < 2:
-                raise ValueError("Multiple choice questions must have at least two options.")
+                raise ValueError(
+                    "Multiple choice questions must have at least two options."
+                )
         return self
 
     @property
@@ -232,12 +241,18 @@ class Leaderboard(BaseModel):
     @model_validator(mode="after")
     def check_all_entries_same_score_type(self: Self) -> Self:
         if self.entries:
-            flat_scores: list[Score] = [score for entry in self.entries for score in entry.scores]
+            flat_scores: list[Score] = [
+                score for entry in self.entries for score in entry.scores
+            ]
             score_types = {score.type for score in flat_scores}
             if len(score_types) > 1:
-                raise ValueError(f"All entries must have the same score type, found: {score_types}")
+                raise ValueError(
+                    f"All entries must have the same score type, found: {score_types}"
+                )
             if self.type != list(score_types)[0]:
-                raise ValueError(f"Leaderboard type {self.type} does not match score type {list(score_types)[0]}")
+                raise ValueError(
+                    f"Leaderboard type {self.type} does not match score type {list(score_types)[0]}"
+                )
         return self
 
     @model_validator(mode="after")
@@ -252,9 +267,6 @@ class Leaderboard(BaseModel):
         return sorted(self.entries, key=lambda x: x.average_score, reverse=True)
 
 
-
-
-
 class LeaderboardEntry(BaseModel):
     scores: list[Score]
 
@@ -262,14 +274,18 @@ class LeaderboardEntry(BaseModel):
     def check_single_user(self: Self) -> Self:
         user_names = {score.forecast.user.name for score in self.scores}
         if len(user_names) != 1:
-            raise ValueError(f"Leaderboard entry should have exactly one user, found: {user_names}")
+            raise ValueError(
+                f"Leaderboard entry should have exactly one user, found: {user_names}"
+            )
         return self
 
     @model_validator(mode="after")
     def check_all_scores_same_type(self: Self) -> Self:
         score_types = {score.type for score in self.scores}
         if len(score_types) > 1:
-            raise ValueError(f"All scores must have the same type, found: {score_types}")
+            raise ValueError(
+                f"All scores must have the same type, found: {score_types}"
+            )
         return self
 
     @property
@@ -295,7 +311,6 @@ class LeaderboardEntry(BaseModel):
 
     def bottom_n_scores(self, n: int) -> list[Score]:
         return sorted(self.scores, key=lambda x: x.score, reverse=False)[:n]
-
 
     def randomly_sample_scores(self, n: int) -> list[Score]:
         return random.sample(self.scores, n)
