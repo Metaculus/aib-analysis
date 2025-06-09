@@ -198,6 +198,26 @@ class Question(BaseModel):
     def url(self) -> str:
         return f"https://www.metaculus.com/questions/{self.post_id}/"
 
+    def __hash__(self) -> int:
+        # Convert options list to tuple for hashing if it exists
+        options_tuple = tuple(self.options) if self.options is not None else None
+        # Create a tuple of all fields that should be used for hashing
+        hash_tuple = (
+            self.question_id,
+            self.type,
+            self.question_text,
+            self.resolution,
+            options_tuple,
+            self.range_max,
+            self.range_min,
+            self.open_upper_bound,
+            self.open_lower_bound,
+            self.weight,
+            self.post_id,
+            self.spot_scoring_time,
+        )
+        return hash(hash_tuple)
+
 
 class User(BaseModel):
     name: str
