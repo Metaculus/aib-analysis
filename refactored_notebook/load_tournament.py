@@ -26,7 +26,11 @@ def load_tournament(
     user_cache: dict[str, User] = {}
     dataframe = pd.read_csv(forecast_file_path, low_memory=False)
     logger.info(f"Loaded {len(dataframe)} forecast rows")
-    for _, row in dataframe.iterrows():
+    log_every_n = 1000
+    for i, (_, row) in enumerate(dataframe.iterrows()):
+        should_log_parsing = i % log_every_n == 0
+        if should_log_parsing:
+            logger.info(f"Parsing forecast {i} of {len(dataframe)}")
         forecast, _, _ = _parse_forecast_row(
             row.to_dict(), user_type, question_cache, user_cache
         )
@@ -69,7 +73,6 @@ def _parse_forecast_row(
             open_lower_bound=_parse_open_lower_bound(row),
         )
         question_cache[question_id] = question
-
     if username in user_cache:
         user = user_cache[username]
     else:
@@ -80,7 +83,6 @@ def _parse_forecast_row(
             aggregated_users=[],
         )
         user_cache[username] = user
-
     forecast = Forecast(
         question=question,
         user=user,
@@ -94,21 +96,24 @@ def _parse_forecast(forecast_row: dict) -> ForecastType:
     row = forecast_row
     question_type = row["type"]
     if question_type == "binary":
-        if pd.notnull(row["probability_yes"]):
+        probability_yes = row["probability_yes"]
+        if pd.notnull(probability_yes):
             prediction = [
-                float(row["probability_yes"]),
-                1 - float(row["probability_yes"]),
+                float(probability_yes),
+                1 - float(probability_yes),
             ]
         else:
             prediction = None
     elif question_type == "multiple_choice":
-        if pd.notnull(row["probability_yes_per_category"]):
-            prediction = eval(row["probability_yes_per_category"])
+        probability_yes_per_category = row["probability_yes_per_category"]
+        if pd.notnull(probability_yes_per_category):
+            prediction = eval(probability_yes_per_category)
         else:
             prediction = None
     elif question_type == "numeric":
-        if pd.notnull(row["continuous_cdf"]):
-            prediction = eval(row["continuous_cdf"])
+        continuous_cdf = row["continuous_cdf"]
+        if pd.notnull(continuous_cdf):
+            prediction = eval(continuous_cdf)
         else:
             prediction = None
     else:
@@ -137,7 +142,7 @@ def _parse_resolution(forecast_row: dict) -> ResolutionType:
         return str(raw_resolution)
     elif q_type == "numeric":
         if raw_resolution == "above_upper_bound":
-            return 1000000000000000000000000000000000.0
+            return 1000000000000000000000000000000000.0 # Make it super obvious this is a fake number that is above upper bount
         if raw_resolution == "below_lower_bound":
             return -100000000000000000000000000000000.0
         return float(raw_resolution)
