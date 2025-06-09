@@ -11,10 +11,10 @@ sys.path.append(top_level_dir)
 from refactored_notebook.data_models import Leaderboard, ScoreType, UserType
 from refactored_notebook.load_tournament import load_tournament
 from refactored_notebook.simulated_tournament import SimulatedTournament
-from refactored_notebook.process_tournament import get_leaderboard
+from refactored_notebook.process_tournament import combine_on_question_title_intersection, get_leaderboard
 from conftest import initialize_logging
 
-def display_tournament(tournament: SimulatedTournament):
+def display_forecasts(tournament: SimulatedTournament):
     forecasts = tournament.forecasts
     if not forecasts:
         st.write("No forecasts available.")
@@ -47,13 +47,14 @@ def display_tournament(tournament: SimulatedTournament):
 
 def display_leaderboard(leaderboard: Leaderboard):
     data = []
-    for entry in leaderboard.entries_via_sum_of_scores():
+    for i, entry in enumerate(leaderboard.entries_via_sum_of_scores()):
         num_to_display = 5
         random_sample_of_scores = entry.randomly_sample_scores(num_to_display)
         top_n_scores = entry.top_n_scores(num_to_display)
         bottom_n_scores = entry.bottom_n_scores(num_to_display)
         data.append(
             {
+                "rank": i + 1,
                 "user": entry.user.name,
                 "user_type": entry.user.type.value,
                 "sum_of_scores": entry.sum_of_scores,
@@ -77,30 +78,28 @@ def load_and_cache_tournament(path: str, user_type: UserType) -> SimulatedTourna
     return load_tournament(path, user_type)
 
 
+def display_tournament(tournament: SimulatedTournament, name: str):
+    st.subheader(f"{name} Tournament")
+    with st.expander(f"{name} Tournament Forecasts"):
+        display_forecasts(tournament)
+    with st.expander(f"{name} Peer Leaderboard"):
+        leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
+        display_leaderboard(leaderboard)
+    with st.expander(f"{name} Baseline Leaderboard"):
+        leaderboard = get_leaderboard(tournament, ScoreType.SPOT_BASELINE)
+        display_leaderboard(leaderboard)
+
 def main():
     initialize_logging()
     st.title("Tournament Forecast Explorer")
     pro_path = "input_data/pro_forecasts_q1.csv"
     bot_path = "input_data/bot_forecasts_q1.csv"
-    with st.expander("Pro Tournament Forecasts"):
-        pro_tournament = load_and_cache_tournament(pro_path, UserType.PRO)
-        display_tournament(pro_tournament)
-    with st.expander("Pro Peer Leaderboard"):
-        pro_leaderboard = get_leaderboard(pro_tournament, ScoreType.SPOT_PEER)
-        display_leaderboard(pro_leaderboard)
-    with st.expander("Pro Baseline Leaderboard"):
-        pro_leaderboard = get_leaderboard(pro_tournament, ScoreType.SPOT_BASELINE)
-        display_leaderboard(pro_leaderboard)
-
-    with st.expander("Bot Tournament Forecasts"):
-        bot_tournament = load_and_cache_tournament(bot_path, UserType.BOT)
-        display_tournament(bot_tournament)
-    with st.expander("Bot Peer Leaderboard"):
-        bot_leaderboard = get_leaderboard(bot_tournament, ScoreType.SPOT_PEER)
-        display_leaderboard(bot_leaderboard)
-    with st.expander("Bot Baseline Leaderboard"):
-        bot_leaderboard = get_leaderboard(bot_tournament, ScoreType.SPOT_BASELINE)
-        display_leaderboard(bot_leaderboard)
+    pro_tournament = load_and_cache_tournament(pro_path, UserType.PRO)
+    display_tournament(pro_tournament, "Pro")
+    bot_tournament = load_and_cache_tournament(bot_path, UserType.BOT)
+    display_tournament(bot_tournament, "Bot")
+    combined_tournament = combine_on_question_title_intersection(pro_tournament, bot_tournament)
+    display_tournament(combined_tournament, "Pro + Bot (No Teams)")
 
 
 if __name__ == "__main__":

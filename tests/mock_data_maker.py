@@ -1,18 +1,19 @@
+import random
 from datetime import datetime
 
 from refactored_notebook.custom_types import QuestionType, UserType
-from refactored_notebook.data_models import Question, User, Forecast
+from refactored_notebook.data_models import Forecast, Question, User
 
 
 def make_user(name: str, user_type: UserType = UserType.PRO) -> User:
     return User(name=name, type=user_type, is_aggregate=False, aggregated_users=[])
 
-def make_question_binary() -> Question:
+def make_question_binary(question_text: str = "Will it rain tomorrow?") -> Question:
     return Question(
-        post_id=1,
-        question_id=1,
+        post_id=random.randint(30000, 40000),
+        question_id=random.randint(30000, 40000),
         type=QuestionType.BINARY,
-        question_text="Will it rain tomorrow?",
+        question_text=question_text,
         resolution=True,
         options=None,
         range_max=None,
@@ -25,8 +26,8 @@ def make_question_binary() -> Question:
 
 def make_question_mc() -> Question:
     return Question(
-        post_id=2,
-        question_id=2,
+        post_id=random.randint(30000, 40000),
+        question_id=random.randint(30000, 40000),
         type=QuestionType.MULTIPLE_CHOICE,
         question_text="Which color?",
         resolution="Red",
@@ -39,10 +40,10 @@ def make_question_mc() -> Question:
         spot_scoring_time=datetime(2025, 5, 30, 0, 46, 31),
     )
 
-def make_quesQuestionType() -> Question:
+def make_question_numeric() -> Question:
     return Question(
-        post_id=3,
-        question_id=3,
+        post_id=random.randint(30000, 40000),
+        question_id=random.randint(30000, 40000),
         type=QuestionType.NUMERIC,
         question_text="How many apples?",
         resolution=42.0,
@@ -52,10 +53,12 @@ def make_quesQuestionType() -> Question:
         open_upper_bound=False,
         open_lower_bound=False,
         weight=1.0,
-        spot_scoring_time=datetime(2025, 5, 0, 46, 31),
+        spot_scoring_time=datetime(2025, 5, 30, 0, 46, 31),
     )
 
 def make_forecast(question: Question, user: User, prediction: list[float]) -> Forecast:
+    if len(prediction) == 1:
+        prediction = [prediction[0], 1 - prediction[0]]
     return Forecast(
         question=question,
         user=user,
