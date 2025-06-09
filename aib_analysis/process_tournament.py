@@ -31,6 +31,14 @@ def combine_on_question_title_intersection(
 ) -> SimulatedTournament:
     combined_forecasts: list[Forecast] = []
     unique_question_titles = set()
+    if (
+        set([user.name for user in tournament_1.users])
+        & set([user.name for user in tournament_2.users])
+        != set()
+    ):
+        raise NotImplementedError(
+            "Both tournaments have some of the same users. This is currently not supported."
+        )
     for question_1 in tournament_1.questions:
         for question_2 in tournament_2.questions:
             question_1_text = question_1.question_text.lower()
@@ -100,11 +108,14 @@ def create_aggregate(
     raise NotImplementedError("Not implemented")
 
 
-def create_team(tournament: SimulatedTournament, team_size: int, score_type: ScoreType) -> list[User]:
+def create_team(
+    tournament: SimulatedTournament, team_size: int, score_type: ScoreType
+) -> list[User]:
     # TODO: @Check
     # leaderboard = get_leaderboard(tournament, score_type)
     # ...
     raise NotImplementedError("Not implemented")
+
 
 def get_ranking_by_spot_peer_score_lower_t_bound(
     tournament: SimulatedTournament, confidence_level: float
