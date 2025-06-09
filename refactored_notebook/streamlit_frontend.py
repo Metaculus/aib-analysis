@@ -9,7 +9,7 @@ top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
 sys.path.append(top_level_dir)
 
 from refactored_notebook.data_models import Leaderboard, ScoreType, UserType
-from refactored_notebook.load_tournament_data import load_tournament
+from refactored_notebook.load_tournament import load_tournament
 from refactored_notebook.simulated_tournament import SimulatedTournament
 from refactored_notebook.process_tournament import get_leaderboard
 from conftest import initialize_logging

@@ -654,9 +654,26 @@ def test_peer_score_average_zero(
         # Numeric
         (
             [
-                generate_uniform_cdf(),
-                generate_cdf_with_forecast_at_index(100, 0.999),
-                generate_cdf_with_forecast_at_index(100, 0.999),
+                generate_cdf(
+                    [
+                        Percentile(value=20, probability_below=0.4),
+                        Percentile(value=80, probability_below=0.6),
+                    ],
+                    lower_bound=-1,
+                    upper_bound=96,
+                    open_lower_bound=True,
+                    open_upper_bound=True,
+                ),
+                generate_cdf(
+                    [
+                        Percentile(value=10, probability_below=0.1),
+                        Percentile(value=70, probability_below=0.3),
+                    ],
+                    lower_bound=-1,
+                    upper_bound=96,
+                    open_lower_bound=False,
+                    open_upper_bound=False,
+                ),
             ],
             50,
             None,
