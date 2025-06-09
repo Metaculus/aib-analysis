@@ -1,4 +1,3 @@
-from refactored_notebook.custom_types import ScoreType
 from refactored_notebook.simulated_tournament import SimulatedTournament
 
 
