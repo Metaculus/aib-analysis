@@ -291,6 +291,13 @@ def _determine_divisor_for_baseline_score(
 def _resolution_value_to_pmf_index(
     pmf: list[float], resolution: float, range_min: float, range_max: float
 ) -> int:
+    """
+    PMF explanation:
+    - 200 bins for the internal range
+    - 1 bin for the 'above upper bound'
+    - 1 bin for the 'below lower bound'
+    - 202 total bins
+    """
     if len(pmf) != 202:
         raise ValueError(f"PMF should have 202 bins, but has {len(pmf)}")
     position_in_range: float | None = None
@@ -298,6 +305,10 @@ def _resolution_value_to_pmf_index(
         resolution_bin_idx = 201  # 202nd index
     elif resolution < range_min:
         resolution_bin_idx = 0
+    elif resolution == range_max:
+        resolution_bin_idx = 200
+    elif resolution == range_min:
+        resolution_bin_idx = 1
     else:
         position_in_range = _resolution_value_to_position_in_numeric_range(
             resolution, range_min, range_max
