@@ -53,16 +53,24 @@ class SimulatedTournament(BaseModel):
         default_factory=dict
     )
 
-
     def question_to_spot_forecasts(self, question_id: int) -> list[Forecast]:
         if len(self._question_to_spot_forecasts_cache) == 0:
             for forecast in self.spot_forecasts:
                 question_id_to_cache = forecast.question.question_id
                 if question_id_to_cache not in self._question_to_spot_forecasts_cache:
                     self._question_to_spot_forecasts_cache[question_id_to_cache] = []
-                self._question_to_spot_forecasts_cache[question_id_to_cache].append(forecast)
+                self._question_to_spot_forecasts_cache[question_id_to_cache].append(
+                    forecast
+                )
         spot_forecasts = self._question_to_spot_forecasts_cache[question_id]
         return spot_forecasts.copy()
+
+    def question_to_forecasts(self, question_id: int) -> list[Forecast]:
+        return [
+            forecast
+            for forecast in self.forecasts
+            if forecast.question.question_id == question_id
+        ]
 
     def user_to_scores(
         self, user_name: str, score_type: ScoreType | None = None
