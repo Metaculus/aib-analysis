@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from typing import Any
 
-from pydantic import BaseModel, PrivateAttr, model_validator
+from pydantic import BaseModel, PrivateAttr, field_validator, model_validator
 from typing_extensions import Self
 
 from refactored_notebook.custom_types import AmbiguousResolutionType, UserType
@@ -36,13 +37,34 @@ class SimulatedTournament(BaseModel):
         default_factory=lambda: defaultdict(list)
     )
 
-    _question_to_scores_cache: dict[int, list[Score]] = PrivateAttr(default_factory=dict)
-    _forecast_to_scores_cache: dict[str, list[Score]] = PrivateAttr(default_factory=dict)
-    _user_to_scores_cache: dict[str, list[Score]] = PrivateAttr(default_factory=dict)
+    _question_to_scores_cache: dict[int, list[Score]] = PrivateAttr(
+        default_factory=lambda: defaultdict(list)
+    )
+    _forecast_to_scores_cache: dict[str, list[Score]] = PrivateAttr(
+        default_factory=lambda: defaultdict(list)
+    )
+    _user_to_scores_cache: dict[str, list[Score]] = PrivateAttr(
+        default_factory=lambda: defaultdict(list)
+    )
     _user__question__type__to_scores_cache: dict[str, list[Score]] = PrivateAttr(
         default_factory=lambda: defaultdict(list)
     )
 
+    @field_validator("forecasts")
+    @classmethod
+    def validate_forecast_uniqueness(cls, value: Any) -> list[Forecast]:
+        forecasts: list[Forecast] = value
+        id_to_forecasts = defaultdict(list)
+        for forecast in forecasts:
+            id_to_forecasts[forecast.id].append(forecast)
+        duplicate_ids = [
+            fid for fid, items in id_to_forecasts.items() if len(items) > 1
+        ]
+        if len(duplicate_ids) > 0:
+            raise ValueError(
+                f"Forecasts should be unique, but found duplicate ids: {duplicate_ids}"
+            )
+        return forecasts
 
     @model_validator(mode="after")
     def initialize_caches(self) -> Self:
@@ -68,7 +90,9 @@ class SimulatedTournament(BaseModel):
         log_every_n = 100
         for i, forecast in enumerate(self._spot_forecasts_cache):
             if i % log_every_n == 0:
-                logger.info(f"Caching scores for forecast {i} of {len(self._spot_forecasts_cache)}")
+                logger.info(
+                    f"Caching scores for forecast {i} of {len(self._spot_forecasts_cache)}"
+                )
             if isinstance(forecast.question.resolution, AmbiguousResolutionType):
                 continue
             new_scores = self._calculate_spot_scores_for_forecast(forecast)
@@ -94,7 +118,6 @@ class SimulatedTournament(BaseModel):
                 spot_forecasts[key] = forecast
         self._spot_forecasts_cache = list(spot_forecasts.values())
 
-
     def _add_new_score_to_caches(self, score: Score) -> None:
         forecast = score.forecast
         question = forecast.question
@@ -114,7 +137,6 @@ class SimulatedTournament(BaseModel):
             ), "Spot scores should have exactly one score per question"
         else:
             self._user__question__type__to_scores_cache[hash].append(score)
-
 
     @property
     def users(self) -> list[User]:
@@ -173,7 +195,9 @@ class SimulatedTournament(BaseModel):
         assert (
             self._user__question__type__to_scores_cache is not None
         ), "User question score type cache is not initialized"
-        scores = self._user__question__type__to_scores_cache[user_question_score_type_hash]
+        scores = self._user__question__type__to_scores_cache[
+            user_question_score_type_hash
+        ]
         assert len(scores) == 1, "Expected exactly for question for user if spot score"
         return scores[0]
 
@@ -225,7 +249,11 @@ class SimulatedTournament(BaseModel):
         if isinstance(resolution, AmbiguousResolutionType):
             return []
 
-        spot_forecasts_from_others: list[Forecast] = self._question_to_spot_forecasts_cache[forecast_to_score.question.question_id]
+        spot_forecasts_from_others: list[Forecast] = (
+            self._question_to_spot_forecasts_cache[
+                forecast_to_score.question.question_id
+            ]
+        )
         spot_forecasts_from_others.remove(forecast_to_score)
         spot_peer_score = forecast_to_score.get_spot_peer_score(
             resolution, spot_forecasts_from_others
@@ -237,10 +265,26 @@ class SimulatedTournament(BaseModel):
 
     def _test_caches(self) -> None:
         assert len(self._question_to_forecast_cache.values()) == len(self.questions)
-        for value in self._question_to_forecast_cache.values():
-            assert len(value) >= len(self.users) / 2, "Heuristic: something is up if less than half of people forecast on a question"
+        for forecast_list in self._question_to_forecast_cache.values():
+            assert (
+                len(forecast_list) >= len(self.users) / 2
+            ), "Heuristic: something is up if less than half of people forecast on a question"
 
-        assert len(self._question_to_spot_forecasts_cache.values()) == len(self.questions)
-        for value in self._question_to_spot_forecasts_cache.values():
-            for forecast in value:
-                assert forecast in self._spot_forecasts_cache, "Forecast should be in spot forecasts cache"
+            unique_forecasts = set([forecast.id for forecast in forecast_list])
+            assert len(unique_forecasts) == len(
+                forecast_list
+            ), "Forecasts should be unique"
+
+        assert len(self._question_to_spot_forecasts_cache.values()) == len(
+            self.questions
+        )
+        for forecast_list in self._question_to_spot_forecasts_cache.values():
+            for forecast in forecast_list:
+                assert (
+                    forecast in self._spot_forecasts_cache
+                ), "Forecast should be in spot forecasts cache"
+
+            unique_forecasts = set([forecast.id for forecast in forecast_list])
+            assert len(unique_forecasts) == len(
+                forecast_list
+            ), "Forecasts should be unique"

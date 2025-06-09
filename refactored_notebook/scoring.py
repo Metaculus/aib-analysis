@@ -293,6 +293,7 @@ def _resolution_value_to_pmf_index(
 ) -> int:
     if len(pmf) != 202:
         raise ValueError(f"PMF should have 202 bins, but has {len(pmf)}")
+    position_in_range: float | None = None
     if resolution > range_max:
         resolution_bin_idx = 201  # 202nd index
     elif resolution < range_min:
@@ -301,19 +302,20 @@ def _resolution_value_to_pmf_index(
         position_in_range = _resolution_value_to_position_in_numeric_range(
             resolution, range_min, range_max
         )
-        resolution_bin_idx =int(position_in_range * 200 + 0.5)
+        resolution_bin_idx = round(position_in_range * 200 + 0.501) # python rounds 0.5 down when near 0 so add 0.001
     if resolution_bin_idx >= len(pmf) or resolution_bin_idx < 0:
         raise ValueError(
             f"Invalid resolution bin index: {resolution_bin_idx}. Resolution: {resolution}, Range min: {range_min}, Range max: {range_max}"
         )
     _test_resolution_bin_idx_edge_cases(
-        pmf, resolution_bin_idx, resolution, range_min, range_max
+        pmf, position_in_range, resolution_bin_idx, resolution, range_min, range_max
     )
     return resolution_bin_idx
 
 
 def _test_resolution_bin_idx_edge_cases(
     pmf: list[float],
+    position_in_range: float | None,
     resolution_bin_idx: int,
     resolution: float,
     range_min: float,
@@ -331,19 +333,19 @@ def _test_resolution_bin_idx_edge_cases(
     if resolution > range_max:
         assert (
             resolution_bin_idx == len(pmf) - 1
-        ), f"Resolution bin index is {resolution_bin_idx} which is not the last index"
+        ), f"Resolution bin index is {resolution_bin_idx} which is not the last index. The position in range is {position_in_range}"
     elif resolution < range_min:
         assert (
             resolution_bin_idx == 0
-        ), f"Resolution bin index is {resolution_bin_idx} which is not the first index"
+        ), f"Resolution bin index is {resolution_bin_idx} which is not the first index. The position in range is {position_in_range}"
     elif resolution == range_max:
         assert (
             resolution_bin_idx == len(pmf) - 2
-        ), f"Resolution bin index is {resolution_bin_idx} which is not the second to last index"
+        ), f"Resolution bin index is {resolution_bin_idx} which is not the second to last index. The position in range is {position_in_range}"
     elif resolution == range_min:
         assert (
             resolution_bin_idx == 1
-        ), f"Resolution bin index is {resolution_bin_idx} which is not the second index"
+        ), f"Resolution bin index is {resolution_bin_idx} which is not the second index. The position in range is {position_in_range}"
 
 
 def _resolution_value_to_position_in_numeric_range(
