@@ -27,7 +27,7 @@ def load_tournament(
     dataframe = pd.read_csv(forecast_file_path, low_memory=False)
     logger.info(f"Loaded {len(dataframe)} forecast rows")
     for _, row in dataframe.iterrows():
-        forecast, _, _ = parse_forecast_row(
+        forecast, _, _ = _parse_forecast_row(
             row.to_dict(), user_type, question_cache, user_cache
         )
         forecasts.append(forecast)
@@ -36,14 +36,14 @@ def load_tournament(
     logger.info(f"Finished inializing tournament from forecasts")
     return tournament
 
-def parse_forecast_row(
+def _parse_forecast_row(
     row: dict,
     user_type: UserType,
     question_cache: dict[int, Question],
     user_cache: dict[str, User],
 ) -> tuple[Forecast, Question, User]:
-    prediction = parse_forecast(row)
-    resolution = parse_resolution(row)
+    prediction = _parse_forecast(row)
+    resolution = _parse_resolution(row)
     question_id = int(row["question_id"])
     username = row["forecaster"]
 
@@ -62,11 +62,11 @@ def parse_forecast_row(
             question_id=question_id,
             post_id=int(row["post_id"]),
             type=QuestionType(row["type"]),
-            options=parse_options(row),
-            range_max=parse_upper_bound(row),
-            range_min=parse_lower_bound(row),
-            open_upper_bound=parse_open_upper_bound(row),
-            open_lower_bound=parse_open_lower_bound(row),
+            options=_parse_options(row),
+            range_max=_parse_upper_bound(row),
+            range_min=_parse_lower_bound(row),
+            open_upper_bound=_parse_open_upper_bound(row),
+            open_lower_bound=_parse_open_lower_bound(row),
         )
         question_cache[question_id] = question
 
@@ -90,7 +90,7 @@ def parse_forecast_row(
     return forecast, question, user
 
 
-def parse_forecast(forecast_row: dict) -> ForecastType:
+def _parse_forecast(forecast_row: dict) -> ForecastType:
     row = forecast_row
     question_type = row["type"]
     if question_type == "binary":
@@ -119,7 +119,7 @@ def parse_forecast(forecast_row: dict) -> ForecastType:
     return prediction
 
 
-def parse_resolution(forecast_row: dict) -> ResolutionType:
+def _parse_resolution(forecast_row: dict) -> ResolutionType:
     q_type = forecast_row["type"]
     raw_resolution = forecast_row["resolution"]
     if pd.isnull(raw_resolution) or str(raw_resolution).lower() in [
@@ -145,7 +145,7 @@ def parse_resolution(forecast_row: dict) -> ResolutionType:
     return raw_resolution
 
 
-def parse_options(forecast_row: dict) -> list[str] | None:
+def _parse_options(forecast_row: dict) -> list[str] | None:
     if forecast_row["type"] == "multiple_choice":
         options = forecast_row.get("options")
         if options is not None and pd.notnull(options) and options != "":
@@ -154,7 +154,7 @@ def parse_options(forecast_row: dict) -> list[str] | None:
     return None
 
 
-def parse_upper_bound(forecast_row: dict) -> float | None:
+def _parse_upper_bound(forecast_row: dict) -> float | None:
     if forecast_row["type"] == "numeric":
         upper = forecast_row.get("range_max")
         if upper is not None and pd.notnull(upper) and upper != "":
@@ -163,7 +163,7 @@ def parse_upper_bound(forecast_row: dict) -> float | None:
     return None
 
 
-def parse_lower_bound(forecast_row: dict) -> float | None:
+def _parse_lower_bound(forecast_row: dict) -> float | None:
     if forecast_row["type"] == "numeric":
         lower = forecast_row.get("range_min")
         if lower is not None and pd.notnull(lower) and lower != "":
@@ -172,25 +172,25 @@ def parse_lower_bound(forecast_row: dict) -> float | None:
     return None
 
 
-def parse_open_upper_bound(forecast_row: dict) -> bool | None:
+def _parse_open_upper_bound(forecast_row: dict) -> bool | None:
     if forecast_row["type"] == "numeric":
         open_upper = forecast_row.get("open_upper_bound")
         if open_upper is not None and pd.notnull(open_upper) and open_upper != "":
-            return parse_truth_value(open_upper)
+            return _parse_truth_value(open_upper)
         raise ValueError(f"Invalid open upper bound: {open_upper}")
     return None
 
 
-def parse_open_lower_bound(forecast_row: dict) -> bool | None:
+def _parse_open_lower_bound(forecast_row: dict) -> bool | None:
     if forecast_row["type"] == "numeric":
         open_lower = forecast_row.get("open_lower_bound")
         if open_lower is not None and pd.notnull(open_lower) and open_lower != "":
-            return parse_truth_value(open_lower)
+            return _parse_truth_value(open_lower)
         raise ValueError(f"Invalid open lower bound: {open_lower}")
     return None
 
 
-def parse_truth_value(string: str) -> bool:
+def _parse_truth_value(string: str) -> bool:
     if str(string).lower() == "true":
         return True
     if str(string).lower() == "false":

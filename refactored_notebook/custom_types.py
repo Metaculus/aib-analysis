@@ -9,8 +9,8 @@ ResolutionType = BinaryResolutionType | MCResolutionType | NumericResolutionType
 BinaryForecastType = list[float]
 MCForecastType = list[float]
 NumericForecastType = list[float]
-ForecastType = BinaryForecastType | MCForecastType | NumericForecastType | None
-# binary: [p_yes, p_no], multiple choice: [p_a, p_b, p_c], numeric: [p_0, p_1, p_2, ...]
+ForecastType = BinaryForecastType | MCForecastType | NumericForecastType | None # binary: [p_yes, p_no], multiple choice: [p_a, p_b, p_c], numeric: [p_0, p_1, p_2, ...]
+
 
 class UserType(Enum):
     PRO = "pro"

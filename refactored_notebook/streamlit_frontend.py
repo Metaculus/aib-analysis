@@ -11,6 +11,7 @@ sys.path.append(top_level_dir)
 from refactored_notebook.data_models import Leaderboard, ScoreType, UserType
 from refactored_notebook.load_tournament_data import load_tournament
 from refactored_notebook.simulated_tournament import SimulatedTournament
+from refactored_notebook.process_tournament import get_leaderboard
 from conftest import initialize_logging
 
 def display_tournament(tournament: SimulatedTournament):
@@ -69,7 +70,7 @@ def display_leaderboard(leaderboard: Leaderboard):
 
 
 @st.cache_data(show_spinner="Loading tournaments...")
-def cached_load_tournament(path: str, user_type: UserType) -> SimulatedTournament:
+def load_and_cache_tournament(path: str, user_type: UserType) -> SimulatedTournament:
     return load_tournament(path, user_type)
 
 
@@ -79,20 +80,20 @@ def main():
     pro_path = "input_data/pro_forecasts_q1.csv"
     bot_path = "input_data/bot_forecasts_q1.csv"
     with st.expander("Pro Tournament Forecasts"):
-        pro_tournament = cached_load_tournament(pro_path, UserType.PRO)
+        pro_tournament = load_and_cache_tournament(pro_path, UserType.PRO)
         display_tournament(pro_tournament)
     with st.expander("Pro Peer Leaderboard"):
-        pro_leaderboard = pro_tournament.get_leaderboard(ScoreType.SPOT_PEER)
+        pro_leaderboard = get_leaderboard(pro_tournament, ScoreType.SPOT_PEER)
         display_leaderboard(pro_leaderboard)
     with st.expander("Pro Baseline Leaderboard"):
-        pro_leaderboard = pro_tournament.get_leaderboard(ScoreType.SPOT_BASELINE)
+        pro_leaderboard = get_leaderboard(pro_tournament, ScoreType.SPOT_BASELINE)
         display_leaderboard(pro_leaderboard)
 
     with st.expander("Bot Tournament Forecasts"):
-        bot_tournament = cached_load_tournament(bot_path, UserType.BOT)
+        bot_tournament = load_and_cache_tournament(bot_path, UserType.BOT)
         display_tournament(bot_tournament)
     with st.expander("Bot Peer Leaderboard"):
-        bot_leaderboard = bot_tournament.get_leaderboard(ScoreType.SPOT_PEER)
+        bot_leaderboard = get_leaderboard(bot_tournament, ScoreType.SPOT_PEER)
         display_leaderboard(bot_leaderboard)
 
 

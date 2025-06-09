@@ -121,6 +121,10 @@ class Score(BaseModel):
     forecast: Forecast
     users_used_in_scoring: list[User] | None  # Empty if baseline
 
+    @property
+    def id(self) -> str:
+        return f"{self.forecast.id}_{self.type.value}"
+
     @model_validator(mode="after")
     def check_forecast_resolution_not_none(self) -> Self:
         if self.forecast.question.resolution is None:
@@ -129,6 +133,8 @@ class Score(BaseModel):
 
     def display_score_and_question(self) -> str:
         return f"({self.score:.3f}) {self.forecast.question.question_text}"
+
+
 
 class Question(BaseModel):
     question_id: int
@@ -223,6 +229,7 @@ class Leaderboard(BaseModel):
     def sort_entries(self: Self) -> Self:
         self.entries.sort(key=lambda x: x.sum_of_scores, reverse=True)
         return self
+
 
 
 
