@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from aib_analysis.data_models import Forecast, ScoreType
+from aib_analysis.data_models import Forecast
 from aib_analysis.simulated_tournament import SimulatedTournament
 
 
