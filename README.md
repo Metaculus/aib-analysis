@@ -40,5 +40,5 @@ Refactor advantages
 - Easier to unit test
 - More reusable (e.g. We can use this structure for regular peer score comparisons in the future)
 - Git diffs are easier to read
-
+- We can eventually publish our results as an interactive app if we want to (and if not, we can more easily check and interact with the data ourselves)
 
