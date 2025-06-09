@@ -16,7 +16,7 @@ def test_leaderboard_entry_and_leaderboard_binary():
     question = make_question_binary()
     forecast = make_forecast(question, user, [0.8])
     score = forecast.get_spot_baseline_score(question.resolution)
-    entry = LeaderboardEntry(user=user, scores=[score])
+    entry = LeaderboardEntry(scores=[score])
     leaderboard = Leaderboard(entries=[entry], type=ScoreType.SPOT_BASELINE)
     assert leaderboard.entries[0].user.name == "alice"
     assert leaderboard.entries[0].sum_of_scores == pytest.approx(score.score)
@@ -28,7 +28,7 @@ def test_leaderboard_type_consistency():
     question = make_question_binary()
     forecast = make_forecast(question, user, [0.5])
     score = forecast.get_spot_baseline_score(question.resolution)
-    entry = LeaderboardEntry(user=user, scores=[score])
+    entry = LeaderboardEntry(scores=[score])
     # Should succeed
     Leaderboard(entries=[entry], type=ScoreType.SPOT_BASELINE)
     # Should fail if type mismatches
@@ -47,9 +47,9 @@ def test_leaderboard_ranking_good_forecast_higher():
     score_good = forecast_good.get_spot_baseline_score(question.resolution)
     score_medium = forecast_medium.get_spot_baseline_score(question.resolution)
     score_bad = forecast_bad.get_spot_baseline_score(question.resolution)
-    entry_good = LeaderboardEntry(user=user_good, scores=[score_good])
-    entry_medium = LeaderboardEntry(user=user_medium, scores=[score_medium])
-    entry_bad = LeaderboardEntry(user=user_bad, scores=[score_bad])
+    entry_good = LeaderboardEntry(scores=[score_good])
+    entry_medium = LeaderboardEntry(scores=[score_medium])
+    entry_bad = LeaderboardEntry(scores=[score_bad])
     leaderboard = Leaderboard(entries=[entry_good, entry_medium, entry_bad], type=ScoreType.SPOT_BASELINE)
     # Sort entries by sum_of_scores descending
     sorted_entries = sorted(leaderboard.entries, key=lambda e: e.sum_of_scores, reverse=True)
