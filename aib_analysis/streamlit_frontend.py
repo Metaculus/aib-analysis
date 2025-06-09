@@ -8,11 +8,15 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
 sys.path.append(top_level_dir)
 
-from refactored_notebook.data_models import Leaderboard, ScoreType, UserType
-from refactored_notebook.load_tournament import load_tournament
-from refactored_notebook.simulated_tournament import SimulatedTournament
-from refactored_notebook.process_tournament import combine_on_question_title_intersection, get_leaderboard
+from aib_analysis.data_models import Leaderboard, ScoreType, UserType
+from aib_analysis.load_tournament import load_tournament
+from aib_analysis.process_tournament import (
+    combine_on_question_title_intersection,
+    get_leaderboard,
+)
+from aib_analysis.simulated_tournament import SimulatedTournament
 from conftest import initialize_logging
+
 
 def display_forecasts(tournament: SimulatedTournament):
     forecasts = tournament.forecasts

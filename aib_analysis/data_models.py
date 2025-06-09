@@ -6,17 +6,14 @@ from datetime import datetime
 from pydantic import BaseModel, model_validator
 from typing_extensions import Self
 
-from refactored_notebook.custom_types import (
+from aib_analysis.custom_types import (
     ForecastType,
     QuestionType,
     ResolutionType,
     ScoreType,
     UserType,
 )
-from refactored_notebook.scoring import (
-    calculate_baseline_score,
-    calculate_peer_score,
-)
+from aib_analysis.scoring import calculate_baseline_score, calculate_peer_score
 
 
 class Forecast(BaseModel):

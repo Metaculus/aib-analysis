@@ -1,7 +1,7 @@
 from collections import defaultdict
 
-from refactored_notebook.data_models import Forecast, ScoreType
-from refactored_notebook.simulated_tournament import SimulatedTournament
+from aib_analysis.data_models import Forecast, ScoreType
+from aib_analysis.simulated_tournament import SimulatedTournament
 
 
 def validate_simulated_tournament(tournament: SimulatedTournament):

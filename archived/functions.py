@@ -11,7 +11,7 @@ from scipy import stats
 from scipy.optimize import minimize_scalar
 from scipy.stats import binom, norm
 
-from refactored_notebook.scoring import (
+from aib_analysis.scoring import (
     _resolution_value_to_position_in_numeric_range,
     calculate_baseline_score,
     calculate_peer_score,

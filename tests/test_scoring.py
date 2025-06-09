@@ -3,8 +3,8 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
-from refactored_notebook.data_models import ForecastType
-from refactored_notebook.scoring import calculate_baseline_score, calculate_peer_score
+from aib_analysis.data_models import ForecastType
+from aib_analysis.scoring import calculate_baseline_score, calculate_peer_score
 
 # TODO:
 # For each of Multiple Choice, Binary, and Numeric questions

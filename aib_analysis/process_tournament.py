@@ -1,6 +1,6 @@
 import copy
 
-from refactored_notebook.data_models import (
+from aib_analysis.data_models import (
     Forecast,
     Leaderboard,
     LeaderboardEntry,
@@ -8,7 +8,7 @@ from refactored_notebook.data_models import (
     ScoreType,
     User,
 )
-from refactored_notebook.simulated_tournament import SimulatedTournament
+from aib_analysis.simulated_tournament import SimulatedTournament
 
 problem_questions = [
     "How many Grammy awards will Taylor Swift win in 2025?", # Pro/Bot question have different options (but the one that resolved was the same)

@@ -2,13 +2,13 @@ import logging
 
 import pytest
 
-from refactored_notebook.custom_types import ScoreType, UserType
-from refactored_notebook.load_tournament import load_tournament
-from refactored_notebook.process_tournament import (
+from aib_analysis.custom_types import ScoreType, UserType
+from aib_analysis.load_tournament import load_tournament
+from aib_analysis.process_tournament import (
     combine_on_question_title_intersection,
     get_leaderboard,
 )
-from refactored_notebook.simulated_tournament import SimulatedTournament
+from aib_analysis.simulated_tournament import SimulatedTournament
 from tests.mock_data_maker import (
     make_forecast,
     make_question_binary,
