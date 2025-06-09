@@ -26,13 +26,12 @@ class Forecast(BaseModel):
     user: User
     prediction: ForecastType
     prediction_time: datetime
-    comment: str | None = None
     _id: str | None = None
 
     @property
     def id(self) -> str:
         if self._id is None:
-            self._id = f"U{self.user.name}_Q{self.question.post_id}_F{self.prediction_time.strftime('%Y-%m-%d_%H-%M-%S')}"
+            self._id = f"U{self.user.name}_Q{self.question.question_id}_F{self.prediction_time.strftime('%Y-%m-%d_%H-%M-%S_%f')}"
 
         return self._id
 

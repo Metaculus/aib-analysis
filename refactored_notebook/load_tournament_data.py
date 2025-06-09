@@ -85,8 +85,7 @@ def parse_forecast_row(
         question=question,
         user=user,
         prediction=prediction,
-        prediction_time=pd.to_datetime(row["created_at"]),
-        comment=None,
+        prediction_time=pd.to_datetime(row["forecast_timestamp"]),
     )
     return forecast, question, user
 
