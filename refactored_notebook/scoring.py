@@ -37,7 +37,7 @@ def calculate_peer_score(
     peer_score = np.log(forecast_for_resolution / geometric_mean)
     if question_type == QuestionType.NUMERIC:
         peer_score /= 2
-    return peer_score * question_weight
+    return peer_score * question_weight * 100
 
 
 

@@ -30,6 +30,9 @@ def display_tournament(tournament: SimulatedTournament):
             "prediction_time": f.prediction_time,
             "resolution": f.question.resolution,
             "weight": f.question.weight,
+            "options": f.question.options,
+            "range_max": f.question.range_max,
+            "range_min": f.question.range_min,
         }
         for f in forecasts
     ]
@@ -44,7 +47,7 @@ def display_tournament(tournament: SimulatedTournament):
 
 def display_leaderboard(leaderboard: Leaderboard):
     data = []
-    for entry in leaderboard.entries:
+    for entry in leaderboard.entries_via_sum_of_scores():
         num_to_display = 5
         random_sample_of_scores = entry.randomly_sample_scores(num_to_display)
         top_n_scores = entry.top_n_scores(num_to_display)
@@ -94,6 +97,9 @@ def main():
         display_tournament(bot_tournament)
     with st.expander("Bot Peer Leaderboard"):
         bot_leaderboard = get_leaderboard(bot_tournament, ScoreType.SPOT_PEER)
+        display_leaderboard(bot_leaderboard)
+    with st.expander("Bot Baseline Leaderboard"):
+        bot_leaderboard = get_leaderboard(bot_tournament, ScoreType.SPOT_BASELINE)
         display_leaderboard(bot_leaderboard)
 
 

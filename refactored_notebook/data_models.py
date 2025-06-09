@@ -130,7 +130,7 @@ class Score(BaseModel):
         return self
 
     def display_score_and_question(self) -> str:
-        return f"({self.score:.3f}) {self.forecast.question.question_text}"
+        return f"({self.score:.3f}) {self.forecast.question.url}"
 
 
 
