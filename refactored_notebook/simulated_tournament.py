@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
-from typing import Any
 
-from pydantic import BaseModel, PrivateAttr, field_validator, model_validator
+from pydantic import BaseModel, PrivateAttr, model_validator
 from typing_extensions import Self
 
-from refactored_notebook.custom_types import AmbiguousResolutionType, UserType
+from refactored_notebook.custom_types import AmbiguousResolutionType
 from refactored_notebook.data_models import (
     Forecast,
-    Leaderboard,
-    LeaderboardEntry,
     Question,
     Score,
     ScoreType,
@@ -23,13 +19,6 @@ logger = logging.getLogger(__name__)
 
 class SimulatedTournament(BaseModel):
     forecasts: list[Forecast]
-
-    _user_cache: dict[str, User] = PrivateAttr(default_factory=dict)
-    _question_cache: dict[int, Question] = PrivateAttr(default_factory=dict)
-    _spot_forecasts_cache: dict[str, Forecast] = PrivateAttr(
-        default_factory=dict
-    )  # The latest forecast for each question that is before the spot scoring time
-    _scores_cache: dict[str, Score] = PrivateAttr(default_factory=dict)
 
     @property
     def users(self) -> list[User]:
@@ -48,26 +37,42 @@ class SimulatedTournament(BaseModel):
 
     @property
     def spot_forecasts(self) -> list[Forecast]:
-        assert self._spot_forecasts_cache is not None, "Spot forecasts cache is not initialized"
+        assert (
+            self._spot_forecasts_cache is not None
+        ), "Spot forecasts cache is not initialized"
         return list(self._spot_forecasts_cache.values())
 
+    _user_cache: dict[str, User] = PrivateAttr(default_factory=dict)
+    _question_cache: dict[int, Question] = PrivateAttr(default_factory=dict)
+    _spot_forecasts_cache: dict[str, Forecast] = PrivateAttr(
+        default_factory=dict
+    )  # The latest forecast for each question that is before the spot scoring time
+    _scores_cache: dict[str, Score] = PrivateAttr(default_factory=dict)
 
-    _question_to_spot_forecasts_cache: dict[int, list[Forecast]] = PrivateAttr(default_factory=dict)
+    _question_to_spot_forecasts_cache: dict[int, list[Forecast]] = PrivateAttr(
+        default_factory=dict
+    )
+
+
     def question_to_spot_forecasts(self, question_id: int) -> list[Forecast]:
         if len(self._question_to_spot_forecasts_cache) == 0:
             for forecast in self.spot_forecasts:
-                question_id = forecast.question.question_id
-                if question_id not in self._question_to_spot_forecasts_cache:
-                    self._question_to_spot_forecasts_cache[question_id] = []
-                self._question_to_spot_forecasts_cache[question_id].append(forecast)
+                question_id_to_cache = forecast.question.question_id
+                if question_id_to_cache not in self._question_to_spot_forecasts_cache:
+                    self._question_to_spot_forecasts_cache[question_id_to_cache] = []
+                self._question_to_spot_forecasts_cache[question_id_to_cache].append(forecast)
         spot_forecasts = self._question_to_spot_forecasts_cache[question_id]
-        return spot_forecasts
+        return spot_forecasts.copy()
 
-    def user_to_scores(self, user_name: str, score_type: ScoreType | None = None) -> list[Score]:
-        scores = [score for score in self.scores if score.forecast.user.name == user_name]
+    def user_to_scores(
+        self, user_name: str, score_type: ScoreType | None = None
+    ) -> list[Score]:
+        scores = [
+            score for score in self.scores if score.forecast.user.name == user_name
+        ]
         if score_type is not None:
             scores = [score for score in scores if score.type == score_type]
-        return scores
+        return scores.copy()
 
     def get_spot_score_for_question_and_user(
         self, question_id: int, user_name: str, score_type: ScoreType
@@ -84,7 +89,6 @@ class SimulatedTournament(BaseModel):
         ]
         assert len(scores) == 1, "Expected exactly for question for user if spot score"
         return scores[0]
-
 
     @model_validator(mode="after")
     def initialize_tournament(self) -> Self:
@@ -130,7 +134,9 @@ class SimulatedTournament(BaseModel):
             current = spot_forecasts.get(key)
             if current is None or forecast.prediction_time > current.prediction_time:
                 spot_forecasts[key] = forecast
-        self._spot_forecasts_cache = {forecast.id: forecast for forecast in spot_forecasts.values()}
+        self._spot_forecasts_cache = {
+            forecast.id: forecast for forecast in spot_forecasts.values()
+        }
 
     def _calculate_spot_scores_for_forecast(
         self, forecast_to_score: Forecast
@@ -142,10 +148,11 @@ class SimulatedTournament(BaseModel):
         if isinstance(resolution, AmbiguousResolutionType):
             return []
 
-        spot_forecasts_from_others: list[Forecast] = (
-            self.question_to_spot_forecasts(forecast_to_score.question.question_id)
+        spot_forecasts_from_others: list[Forecast] = self.question_to_spot_forecasts(
+            forecast_to_score.question.question_id
         )
         spot_forecasts_from_others.remove(forecast_to_score)
+
         spot_peer_score = forecast_to_score.get_spot_peer_score(
             resolution, spot_forecasts_from_others
         )
