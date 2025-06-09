@@ -1,0 +1,36 @@
+The main entry point to the project is `streamlit_frontend.py`
+
+## Installing Dependencies
+To set up the project please run:
+Installing dependencies
+Make sure you have python and poetry installed (poetry is a python package manager).
+
+If you don't have poetry installed run the below:
+```
+sudo apt update -y
+sudo apt install -y pipx
+pipx install poetry
+
+# Optional
+poetry config virtualenvs.in-project true
+```
+
+Inside the terminal, go to the directory you cloned the repository into and run the following command:
+
+```
+poetry install
+```
+
+to install all required dependencies.
+
+## Running the Analysis
+To run the analysis please execute:
+```
+streamlit run aib_analysis/streamlit_frontened.py
+```
+
+This will bring up the visuals for the analysis. Make sure you have chosen the right input data in this script.
+
+
+## Structure
+The project is focused around the SimulatedTournament object. This is initialized with a number of Forecast objects (see `data_models.py`) and used to create other parts of a tournament (Users, Scores, etc). Every data analysis item we care about is just a tournament of some sort. Often this is a filter, aggregation, intersection, etc of forecasts from another tournament, but even a comparison of 2 people is a tournament.

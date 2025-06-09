@@ -31,6 +31,9 @@ class SimulatedTournament(BaseModel):
 
     @property
     def spot_forecasts(self) -> list[Forecast]:
+        """
+        The latest forecast for each user for each question that is before the spot scoring time
+        """
         assert (
             self._spot_forecasts_cache is not None
         ), "Spot forecasts cache is not initialized"
@@ -38,11 +41,11 @@ class SimulatedTournament(BaseModel):
 
     _user_cache: dict[str, User] = PrivateAttr(default_factory=dict)
     _question_cache: dict[int, Question] = PrivateAttr(default_factory=dict)
-    _spot_forecasts_cache: dict[str, Forecast] = PrivateAttr(
-        default_factory=dict
-    )  # The latest forecast for each question that is before the spot scoring time
     _scores_cache: dict[str, Score] = PrivateAttr(default_factory=dict)
 
+    _spot_forecasts_cache: dict[str, Forecast] = PrivateAttr(
+        default_factory=dict
+    )
     _question_to_spot_forecasts_cache: dict[int, list[Forecast]] = PrivateAttr(
         default_factory=dict
     )
