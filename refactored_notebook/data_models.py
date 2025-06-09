@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import random
 from datetime import datetime
-from enum import Enum
-from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, model_validator
 from typing_extensions import Self
 
 from refactored_notebook.custom_types import (
@@ -249,6 +247,12 @@ class Leaderboard(BaseModel):
     def sort_entries(self: Self) -> Self:
         self.entries.sort(key=lambda x: x.sum_of_scores, reverse=True)
         return self
+
+    def entries_via_sum_of_scores(self) -> list[LeaderboardEntry]:
+        return sorted(self.entries, key=lambda x: x.sum_of_scores, reverse=True)
+
+    def entries_via_average_score(self) -> list[LeaderboardEntry]:
+        return sorted(self.entries, key=lambda x: x.average_score, reverse=True)
 
 
 

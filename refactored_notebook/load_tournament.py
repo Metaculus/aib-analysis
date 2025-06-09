@@ -40,6 +40,7 @@ def load_tournament(
     logger.info(f"Finished inializing tournament from forecasts")
     return tournament
 
+
 def _parse_forecast_row(
     row: dict,
     user_type: UserType,
@@ -142,7 +143,7 @@ def _parse_resolution(forecast_row: dict) -> ResolutionType:
         return str(raw_resolution)
     elif q_type == "numeric":
         if raw_resolution == "above_upper_bound":
-            return 1000000000000000000000000000000000.0 # Make it super obvious this is a fake number that is above upper bount
+            return 1000000000000000000000000000000000.0  # Make it super obvious this is a fake number that is above upper bount
         if raw_resolution == "below_lower_bound":
             return -100000000000000000000000000000000.0
         return float(raw_resolution)

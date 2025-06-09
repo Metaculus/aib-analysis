@@ -56,14 +56,18 @@ class SimulatedTournament(BaseModel):
     def question_to_spot_forecasts(self, question_id: int) -> list[Forecast]:
         if len(self._question_to_spot_forecasts_cache) == 0:
             for forecast in self.spot_forecasts:
-                if forecast.question.question_id not in self._question_to_spot_forecasts_cache:
-                    self._question_to_spot_forecasts_cache[forecast.question.question_id] = []
-                self._question_to_spot_forecasts_cache[forecast.question.question_id].append(forecast)
+                question_id = forecast.question.question_id
+                if question_id not in self._question_to_spot_forecasts_cache:
+                    self._question_to_spot_forecasts_cache[question_id] = []
+                self._question_to_spot_forecasts_cache[question_id].append(forecast)
         spot_forecasts = self._question_to_spot_forecasts_cache[question_id]
         return spot_forecasts
 
-    def user_to_scores(self, user_name: str) -> list[Score]:
-        return [score for score in self.scores if score.forecast.user.name == user_name]
+    def user_to_scores(self, user_name: str, score_type: ScoreType | None = None) -> list[Score]:
+        scores = [score for score in self.scores if score.forecast.user.name == user_name]
+        if score_type is not None:
+            scores = [score for score in scores if score.type == score_type]
+        return scores
 
     def get_spot_score_for_question_and_user(
         self, question_id: int, user_name: str, score_type: ScoreType
@@ -109,8 +113,6 @@ class SimulatedTournament(BaseModel):
                 continue
             new_scores = self._calculate_spot_scores_for_forecast(forecast)
             all_scores.extend(new_scores)
-            if should_log_scoring:
-                logger.info(f"Finished caching scores for forecast {i}")
         self._scores_cache = {score.id: score for score in all_scores}
 
         logger.info("Finished initializing scoring caches")
