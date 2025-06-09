@@ -4,7 +4,7 @@ from typing import Literal
 import numpy as np
 from scipy.stats.mstats import gmean
 
-from refactored_notebook.custom_types import (
+from aib_analysis.custom_types import (
     ForecastType,
     QuestionType,
     ResolutionType,

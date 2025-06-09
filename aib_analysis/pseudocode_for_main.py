@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from typing import Literal, Callable
 from datetime import datetime
+from typing import Callable, Literal
+
 from pydantic import BaseModel
-from refactored_notebook.data_models import User, Forecast, Question, Score
-from refactored_notebook.simulated_tournament import SimulatedTournament
+
+from aib_analysis.data_models import Forecast, Question, Score, User
+from aib_analysis.simulated_tournament import SimulatedTournament
 
 # TODO: Since I'm already creating spot score calculations,
 #   I might as well just input forecasts rather than scores into the tournament

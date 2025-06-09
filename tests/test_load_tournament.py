@@ -1,4 +1,4 @@
-from refactored_notebook.simulated_tournament import SimulatedTournament
+from aib_analysis.simulated_tournament import SimulatedTournament
 
 
 def test_load_pro_data(pro_tournament: SimulatedTournament):

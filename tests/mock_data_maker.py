@@ -1,8 +1,8 @@
 import random
 from datetime import datetime
 
-from refactored_notebook.custom_types import QuestionType, UserType
-from refactored_notebook.data_models import Forecast, Question, User
+from aib_analysis.custom_types import QuestionType, UserType
+from aib_analysis.data_models import Forecast, Question, User
 
 
 def make_user(name: str, user_type: UserType = UserType.PRO) -> User:

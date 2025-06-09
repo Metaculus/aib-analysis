@@ -1,13 +1,14 @@
 # This file is run before any tests are run in order to configure tests
 
+import copy
 import logging
+
 import dotenv
 import pytest
-import copy
 
-from refactored_notebook.custom_types import UserType
-from refactored_notebook.load_tournament import load_tournament
-from refactored_notebook.simulated_tournament import SimulatedTournament
+from aib_analysis.custom_types import UserType
+from aib_analysis.load_tournament import load_tournament
+from aib_analysis.simulated_tournament import SimulatedTournament
 
 logger = logging.getLogger(__name__)
 
