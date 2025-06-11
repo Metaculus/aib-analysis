@@ -1,0 +1,75 @@
+from datetime import datetime
+
+import pytest
+
+from aib_analysis.aggregate_forecasts import (
+    AggregateUser,
+    create_aggregated_user_at_spot_time,
+)
+from aib_analysis.custom_types import QuestionType, UserType
+from aib_analysis.data_models import Forecast, Question, User
+from aib_analysis.simulated_tournament import SimulatedTournament
+from tests.mock_data_maker import make_tournament
+
+# TODO: Test Aggregate forecasts:
+# - binary aggregate forecast is less tham max and greater than min
+# - mc aggregate forecast is the most common answer
+# - numeric aggregate forecast is the mean
+# - Errors on wrong type, 1 or 0 forecasts, forecasts with probability >1 or < 0.
+# TODO: Validate other edge cases
+# - mixed question types
+# - Signle and no forecasts provided
+# - Duplicate forecasts
+# - different predictio ntimes
+
+def test_create_aggregated_user_user_not_in_tournament() -> None:
+    sample_tournament = make_tournament()
+    invalid_user = User(name="Invalid User", type=UserType.PRO, aggregated_users=[])
+    with pytest.raises(ValueError):
+        create_aggregated_user_at_spot_time([invalid_user], sample_tournament, "Aggregate User")
+
+def test_create_aggregated_user_empty_users_list() -> None:
+    sample_tournament = make_tournament()
+    with pytest.raises(ValueError):
+        create_aggregated_user_at_spot_time([], sample_tournament, "Aggregate User")
+
+
+def test_create_aggregated_user_generally_correct() -> None:
+    tournament = make_tournament()
+    all_users = tournament.users
+    select_users = all_users[:3]
+    aggregate_name = "Aggregate User"
+    result = create_aggregated_user_at_spot_time(select_users, tournament, aggregate_name)
+    _assert_aggregate_user_correct(result, select_users, tournament, aggregate_name)
+
+
+def test_create_aggregated_user_pro_tournemaent(
+    pro_tournament: SimulatedTournament
+) -> None:
+    aggregate_name = "Aggregate User"
+    pro_users = pro_tournament.users
+    select_pro_users = pro_users[:3]
+    result = create_aggregated_user_at_spot_time(select_pro_users, pro_tournament, aggregate_name)
+    _assert_aggregate_user_correct(result, select_pro_users, pro_tournament, aggregate_name)
+
+
+def test_create_aggregated_user_bot_tournament(
+    bot_tournament: SimulatedTournament
+) -> None:
+    aggregate_name = "Aggregate User"
+    bot_users = bot_tournament.users
+    select_bot_users = bot_users[:15]
+    result = create_aggregated_user_at_spot_time(select_bot_users, bot_tournament, aggregate_name)
+    _assert_aggregate_user_correct(result, select_bot_users, bot_tournament, aggregate_name)
+
+def _assert_aggregate_user_correct(aggregate_user: AggregateUser, users_to_aggregate: list[User], tournament: SimulatedTournament, aggregate_name: str) -> None:
+    assert len(aggregate_user.forecasts) == len(tournament.questions)
+    assert aggregate_user.user.name == aggregate_name
+    assert aggregate_user.user.type == UserType.AGGREGATE
+    assert len(aggregate_user.user.aggregated_users) == len(users_to_aggregate)
+    for user in users_to_aggregate:
+        assert user in aggregate_user.user.aggregated_users
+    for aggregate_forecast in aggregate_user.forecasts:
+        for input_forecast in aggregate_forecast.forecasts_inputted:
+            assert input_forecast.user in users_to_aggregate
+

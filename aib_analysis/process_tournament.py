@@ -97,17 +97,6 @@ def _assert_questions_match_in_important_ways(
     ), f"Question spot scoring times do not match for {question_1_text}. {question_1.spot_scoring_time} != {question_2.spot_scoring_time}. URL: {question_1.url} vs {question_2.url}"
 
 
-def create_aggregate(
-    tournament: SimulatedTournament, users: list[User], name: str
-) -> list[Forecast]:
-    # TODO: @Check
-    # Grab all the forecasts of the list of users
-    # Aggregate those forecasts
-    # Make a new user and assign them to the forecasts w/ name
-    # Return the new forecasts
-    raise NotImplementedError("Not implemented")
-
-
 def create_team(
     tournament: SimulatedTournament, team_size: int, score_type: ScoreType
 ) -> list[User]:
@@ -115,7 +104,6 @@ def create_team(
     # leaderboard = get_leaderboard(tournament, score_type)
     # ...
     raise NotImplementedError("Not implemented")
-
 
 def get_ranking_by_spot_peer_score_lower_t_bound(
     tournament: SimulatedTournament, confidence_level: float

@@ -6,16 +6,17 @@ MCResolutionType = str
 NumericResolutionType = float
 ResolutionType = BinaryResolutionType | MCResolutionType | NumericResolutionType | AmbiguousResolutionType
 
-BinaryForecastType = list[float]
-MCForecastType = list[float]
-NumericForecastType = list[float]
-ForecastType = BinaryForecastType | MCForecastType | NumericForecastType | None # binary: [p_yes, p_no], multiple choice: [p_a, p_b, p_c], numeric: [p_0, p_1, p_2, ...]
+BinaryForecastType = list[float] # binary: [p_yes, p_no]
+MCForecastType = list[float] # multiple choice: [p_a, p_b, p_c],
+NumericForecastType = list[float] # numeric: [p_0, p_1, p_2, ...]
+ForecastType = BinaryForecastType | MCForecastType | NumericForecastType | None
 
 
 class UserType(Enum):
     PRO = "pro"
     BOT = "bot"
-    CP = "cp"
+    CP = "community_prediction"
+    AGGREGATE = "aggregate"
 
 
 class QuestionType(Enum):
