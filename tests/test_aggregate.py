@@ -1,21 +1,22 @@
 from datetime import datetime, timedelta
+
 import pytest
 
 from aib_analysis.aggregate import (
     AggregateUser,
-    create_aggregated_user_at_spot_time,
     aggregate_forecasts,
+    create_aggregated_user_at_spot_time,
 )
 from aib_analysis.custom_types import UserType
-from aib_analysis.data_models import (
-    User,
-    Question,
-    QuestionType,
-    ResolutionType,
-    Forecast,
-)
+from aib_analysis.data_models import User
 from aib_analysis.simulated_tournament import SimulatedTournament
-from tests.mock_data_maker import make_tournament, make_question_binary, make_forecast, make_user
+from tests.mock_data_maker import (
+    make_forecast,
+    make_question_binary,
+    make_question_mc,
+    make_tournament,
+    make_user,
+)
 
 # TODO: Test Aggregate forecasts:
 # - binary aggregate forecast is less tham max and greater than min
@@ -26,11 +27,11 @@ from tests.mock_data_maker import make_tournament, make_question_binary, make_fo
 # - mixed question types
 # - Signle and no forecasts provided
 # - Duplicate forecasts
-# - different predictio ntimes
+# - different prediction times
 
 
 def test_binary_aggregate() -> None:
-    forecasts = [[0.4], [0.6], [0.3]]
+    forecasts = [[0.4], [0.7], [0.3]]
     question = make_question_binary()
     forecasts = [
         make_forecast(question, make_user(f"User {i}"), forecast)
@@ -39,6 +40,36 @@ def test_binary_aggregate() -> None:
     aggregate_user = make_user("Aggregate User", UserType.AGGREGATE)
     aggregate_forecast = aggregate_forecasts(forecasts, aggregate_user, datetime.now())
     assert aggregate_forecast.aggregate.prediction == [0.4, 0.6]
+
+
+def test_multiple_choice_aggregate() -> None:
+    forecasts = [[0.4, 0.3, 0.3], [0.6, 0.3, 0.1], [0.3, 0.65, 0.05]]
+    question = make_question_mc()
+    forecasts = [
+        make_forecast(question, make_user(f"User {i}"), forecast)
+        for i, forecast in enumerate(forecasts)
+    ]
+    aggregate_user = make_user("Aggregate User", UserType.AGGREGATE)
+    aggregate_forecast = aggregate_forecasts(forecasts, aggregate_user, datetime.now())
+    prediction = aggregate_forecast.aggregate.prediction
+    assert prediction
+    assert len(prediction) == 3
+    assert prediction[0] == pytest.approx(0.4333333333)
+    assert sum(prediction) == 1.0
+
+
+def test_prediction_time_after_aggregation_time() -> None:
+    forecasts = [[0.4], [0.6], [0.3]]
+    question = make_question_binary()
+    forecast_time = datetime.now() + timedelta(days=1)
+    forecasts = [
+        make_forecast(question, make_user(f"User {i}"), forecast, forecast_time)
+        for i, forecast in enumerate(forecasts)
+    ]
+    aggregate_user = make_user("Aggregate User", UserType.AGGREGATE)
+    aggregation_time = datetime.now()
+    with pytest.raises(ValueError):
+        aggregate_forecasts(forecasts, aggregate_user, aggregation_time)
 
 
 def test_create_aggregated_user_user_not_in_tournament() -> None:

@@ -57,14 +57,14 @@ def make_question_numeric() -> Question:
         spot_scoring_time=datetime(2025, 5, 30, 0, 46, 31),
     )
 
-def make_forecast(question: Question, user: User, prediction: list[float]) -> Forecast:
+def make_forecast(question: Question, user: User, prediction: list[float], forecast_time: datetime = datetime(2025, 5, 30, 0, 46, 31)) -> Forecast:
     if len(prediction) == 1:
         prediction = [prediction[0], 1 - prediction[0]]
     return Forecast(
         question=question,
         user=user,
         prediction=prediction,
-        prediction_time=datetime(2025, 5, 30, 0, 46, 31),
+        prediction_time=forecast_time,
     )
 
 
