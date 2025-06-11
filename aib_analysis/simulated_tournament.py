@@ -117,7 +117,7 @@ class SimulatedTournament(BaseModel):
 
         logger.info("Finished initializing non-scoring caches")
 
-        log_every_n = 100
+        log_every_n = 250
         all_scores: list[Score] = []
         for i, forecast in enumerate(self.spot_forecasts):
             should_log_scoring = i % log_every_n == 0
