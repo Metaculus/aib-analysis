@@ -18,12 +18,9 @@ from tests.mock_data_maker import (
     make_user,
 )
 
-# TODO: Test Aggregate forecasts:
-# - binary aggregate forecast is less tham max and greater than min
-# - mc aggregate forecast is the most common answer
-# - numeric aggregate forecast is the mean
-# - Errors on wrong type, 1 or 0 forecasts, forecasts with probability >1 or < 0.
+
 # TODO: Validate other edge cases
+# - Test a specific numeric aggregate forecast
 # - mixed question types
 # - Signle and no forecasts provided
 # - Duplicate forecasts
