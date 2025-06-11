@@ -3,7 +3,8 @@ from datetime import datetime
 
 from aib_analysis.custom_types import QuestionType, UserType
 from aib_analysis.data_models import Forecast, Question, User
-
+from aib_analysis.simulated_tournament import SimulatedTournament
+from tests.test_scoring import generate_cdf, Percentile
 
 def make_user(name: str, user_type: UserType = UserType.PRO) -> User:
     return User(name=name, type=user_type, is_aggregate=False, aggregated_users=[])
@@ -65,3 +66,37 @@ def make_forecast(question: Question, user: User, prediction: list[float]) -> Fo
         prediction=prediction,
         prediction_time=datetime(2025, 5, 30, 0, 46, 31),
     )
+
+
+def make_tournament() -> SimulatedTournament:
+    questions = [make_question_binary(), make_question_mc(), make_question_numeric()]
+    users = [make_user(f"User {i}") for i in range(1, 10)]
+
+    forecasts = []
+    for question in questions:
+        for user in users:
+            # Create a simple forecast for each user-question pair
+            if question.type == QuestionType.BINARY:
+                prediction = [0.5, 0.5]  # [p_yes, p_no]
+            elif question.type == QuestionType.MULTIPLE_CHOICE:
+                prediction = [0.33, 0.33, 0.34]  # [p_red, p_blue, p_green]
+            else:  # NUMERIC
+                prediction = generate_cdf(
+                    [
+                        Percentile(value=20, probability_below=0.1),
+                        Percentile(value=50, probability_below=0.9),
+                    ],
+                    lower_bound=-1,
+                    upper_bound=96,
+                    open_lower_bound=False,
+                    open_upper_bound=False,
+                )
+
+            forecast = Forecast(
+                question=question,
+                user=user,
+                prediction=prediction,
+                prediction_time=datetime(2024, 12, 1)
+            )
+            forecasts.append(forecast)
+    return SimulatedTournament(forecasts=forecasts)

@@ -60,7 +60,7 @@ class SimulatedTournament(BaseModel):
                     forecast
                 )
         spot_forecasts = self._question_to_spot_forecasts_cache[question_id]
-        return spot_forecasts.copy()
+        return spot_forecasts.copy() # Shallow copy (so you don't modify order of original list)
 
     def question_to_forecasts(self, question_id: int) -> list[Forecast]:
         return [
@@ -78,6 +78,13 @@ class SimulatedTournament(BaseModel):
         if score_type is not None:
             scores = [score for score in scores if score.type == score_type]
         return scores.copy()
+
+    def user_to_spot_forecasts(self, user_name: str) -> list[Forecast]:
+        return [
+            forecast
+            for forecast in self.spot_forecasts
+            if forecast.user.name == user_name
+        ]
 
     def get_spot_score_for_question_and_user(
         self, question_id: int, user_name: str, score_type: ScoreType

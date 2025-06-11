@@ -26,8 +26,14 @@ class Forecast(BaseModel):
     @property
     def id(self) -> str:
         if self._id is None:
-            self._id = f"U{self.user.name}_Q{self.question.question_id}_F{self.prediction_time.strftime('%Y-%m-%d_%H-%M-%S_%f')}"
-
+            id = f"U{self.user.name}_"
+            id += f"Q{self.question.question_id}_"
+            id += f"F{self.prediction_time.strftime('%Y-%m-%d_%H-%M-%S_%f')}_"
+            if self.prediction:
+                id += f"P{sum(self.prediction)}"
+            else:
+                id += f"P{None}"
+            self._id = id
         return self._id
 
     def get_spot_baseline_score(self, resolution: ResolutionType) -> Score:
@@ -100,6 +106,8 @@ class Forecast(BaseModel):
                     raise ValueError(
                         "Prediction must be a list of floats (length >= 2) for multiple choice questions."
                     )
+                if abs(sum(self.prediction) - 1) > 1e-6:
+                    raise ValueError("Prediction must sum to 1 for multiple choice questions.")
             elif q_type == QuestionType.NUMERIC:
                 if not (
                     isinstance(self.prediction, list)
@@ -109,7 +117,24 @@ class Forecast(BaseModel):
                     raise ValueError(
                         "Prediction must be a list of 201 floats for numeric questions."
                     )
+        if self.prediction is not None:
+            for p in self.prediction:
+                if not (0 <= p <= 1):
+                    raise ValueError(f"Prediction must be between 0 and 1, got {p}. Full prediction: {self.prediction}")
         return self
+
+
+    def __hash__(self) -> int:
+        # Convert options list to tuple for hashing if it exists
+        hash_tuple = (
+            self.id,
+            self.question.question_id,
+            self.user.name,
+            self.prediction,
+            self.prediction_time,
+        )
+        return hash(hash_tuple)
+
 
 
 class Score(BaseModel):
@@ -226,7 +251,6 @@ class Question(BaseModel):
 class User(BaseModel):
     name: str
     type: UserType
-    is_aggregate: bool
     aggregated_users: list[User]
 
     @property
