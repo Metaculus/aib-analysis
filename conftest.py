@@ -2,6 +2,7 @@
 
 import copy
 import logging
+import os
 
 import dotenv
 import pytest
@@ -22,9 +23,13 @@ def setup_logging() -> None:
 
 
 def initialize_logging() -> None:
-    file_name = "logs/latest.log"
-    with open(file_name, "w") as f:
-        f.write("")  # Clear the contents of the log file
+    enable_file_writing = os.getenv("ENABLE_FILE_WRITING", "true").lower() == "true"
+    if enable_file_writing:
+        file_name = "logs/latest.log"
+        with open(file_name, "w") as f:
+            f.write("")  # Clear the contents of the log file
+    else:
+        file_name = None
 
     logging.basicConfig(
         level=logging.INFO,
