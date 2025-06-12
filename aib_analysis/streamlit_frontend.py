@@ -27,22 +27,40 @@ from conftest import initialize_logging
 
 def main():
     initialize_logging()
-    st.title("Tournament Forecast Explorer")
+    st.title("AI Benchmarking Analysis")
     pro_path = "input_data/pro_forecasts_q1.csv"
     bot_path = "input_data/bot_forecasts_q1.csv"
-    pro_tournament = load_and_cache_tournament(pro_path, UserType.PRO)
-    display_tournament(pro_tournament, "Pro")
-    bot_tournament = load_and_cache_tournament(bot_path, UserType.BOT)
-    display_tournament(bot_tournament, "Bot")
-    combined_tournament = combine_on_question_title_intersection(
-        pro_tournament, bot_tournament
-    )
-    display_tournament(combined_tournament, "Pro + Bot (No Teams)")
-    pro_bot_aggregate_tournament = create_pro_bot_aggregate_tournament(
-        pro_tournament, bot_tournament
-    )
-    display_tournament(pro_bot_aggregate_tournament, "Pro vs Bot (Teams)")
-    display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament)
+
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "Pro Tournament",
+        "Bot Tournament",
+        "Combined Tournament",
+        "Pro vs Bot Teams",
+        "Hypothesis Test"
+    ])
+
+    with tab1:
+        pro_tournament = load_and_cache_tournament(pro_path, UserType.PRO)
+        display_tournament(pro_tournament, "Pro")
+
+    with tab2:
+        bot_tournament = load_and_cache_tournament(bot_path, UserType.BOT)
+        display_tournament(bot_tournament, "Bot")
+
+    with tab3:
+        combined_tournament = combine_on_question_title_intersection(
+            pro_tournament, bot_tournament
+        )
+        display_tournament(combined_tournament, "Pro + Bot (No Teams)")
+
+    with tab4:
+        pro_bot_aggregate_tournament = create_pro_bot_aggregate_tournament(
+            pro_tournament, bot_tournament
+        )
+        display_tournament(pro_bot_aggregate_tournament, "Pro vs Bot (Teams)")
+
+    with tab5:
+        display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament)
 
 
 @st.cache_data(show_spinner="Loading tournaments...")
