@@ -47,6 +47,11 @@ def load_and_cache_tournament(path: str, user_type: UserType) -> SimulatedTourna
 
 def display_tournament(tournament: SimulatedTournament, name: str):
     st.subheader(f"{name} Tournament")
+
+    # Display tournament statistics
+    with st.expander(f"{name} Tournament Statistics"):
+        display_tournament_stats(tournament)
+
     with st.expander(f"{name} Tournament Forecasts"):
         display_forecasts(tournament)
     with st.expander(f"{name} Peer Leaderboard"):
@@ -56,6 +61,73 @@ def display_tournament(tournament: SimulatedTournament, name: str):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_BASELINE)
         display_leaderboard(leaderboard)
 
+
+def display_tournament_stats(tournament: SimulatedTournament) -> None:
+    forecasts = tournament.forecasts
+    if not forecasts:
+        st.write("No forecasts available.")
+        return
+
+    # Calculate basic statistics
+    num_forecasts = len(forecasts)
+    num_users = len(tournament.users)
+    num_questions = len(tournament.questions)
+    num_scores_calculated = len(tournament.scores)
+    num_peer_scores_calculated = len([s for s in tournament.scores if s.type == ScoreType.SPOT_PEER])
+    num_baseline_scores_calculated = len([s for s in tournament.scores if s.type == ScoreType.SPOT_BASELINE])
+    num_annulled = len([f for f in forecasts if f.question.resolution is None])
+
+    # Calculate averages
+    forecasts_per_user = num_forecasts / num_users if num_users > 0 else 0
+    forecasts_per_question = num_forecasts / num_questions if num_questions > 0 else 0
+    forecasts_per_user_per_question = forecasts_per_user / num_questions if num_questions > 0 else 0
+
+    # Display statistics
+    st.write("### Basic Statistics")
+    st.write(f"Number of forecasts: {num_forecasts}")
+    st.write(f"Number of users: {num_users}")
+    st.write(f"Number of questions: {num_questions}")
+    st.write(f"Number of annulled questions: {num_annulled}")
+    st.write(f"Number of scores calculated: {num_scores_calculated}")
+    st.write(f"Number of peer scores calculated: {num_peer_scores_calculated}")
+    st.write(f"Number of baseline scores calculated: {num_baseline_scores_calculated}")
+
+    st.write("### Average Statistics")
+    st.write(f"Average forecasts per user: {forecasts_per_user:.2f}")
+    st.write(f"Average forecasts per question: {forecasts_per_question:.2f}")
+    st.write(f"Average forecasts per user per question: {forecasts_per_user_per_question:.2f}")
+
+    # Calculate and display user type distribution
+    user_types = {}
+    for forecast in forecasts:
+        user_type = forecast.user.type.value
+        user_types[user_type] = user_types.get(user_type, 0) + 1
+
+    st.write("### User Type Distribution")
+    for user_type, count in user_types.items():
+        st.write(f"{user_type}: {count} forecasts")
+
+    # Calculate and display question type distribution
+    question_type_forecasts = {}
+    for forecast in forecasts:
+        question_type = forecast.question.type.value
+        question_type_forecasts[question_type] = question_type_forecasts.get(question_type, 0) + 1
+
+    question_type_questions = {}
+    for question in tournament.questions:
+        question_type = question.type.value
+        question_type_questions[question_type] = question_type_questions.get(question_type, 0) + 1
+
+    percent_resolved_yes = len([q for q in tournament.questions if q.resolution == True]) / num_questions * 100
+
+    st.write("### Question Type Distribution")
+    st.write(f"**Forecasts**: {num_forecasts}")
+    for question_type, count in question_type_forecasts.items():
+        st.write(f"- {question_type}: {count} forecasts")
+    st.write(f"**Questions**: {num_questions}")
+    for question_type, count in question_type_questions.items():
+        st.write(f"- {question_type}: {count} questions")
+    st.write(f"**Percent Binary that resolved yes**: {percent_resolved_yes:.2f}%")
 
 def display_forecasts(tournament: SimulatedTournament):
     forecasts = tournament.forecasts
