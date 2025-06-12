@@ -64,8 +64,8 @@ def display_tournament(tournament: SimulatedTournament, name: str):
     with st.expander(f"{name} Baseline Leaderboard"):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_BASELINE)
         display_leaderboard(leaderboard)
-    with st.expander(f"{name} Calibration Curve"):
-        display_calibration_curve(tournament)
+    # with st.expander(f"{name} Calibration Curve"):
+    #     display_calibration_curve(tournament)
 
 def display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament: SimulatedTournament) -> None:
     hypothesis_mean = 0
