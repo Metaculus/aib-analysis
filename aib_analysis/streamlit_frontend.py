@@ -3,18 +3,19 @@ import sys
 
 import pandas as pd
 import streamlit as st
+import typeguard
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
 sys.path.append(top_level_dir)
 
-from aib_analysis.data_models import Leaderboard, ScoreType, UserType
+from aib_analysis.aggregate import create_aggregated_user_at_spot_time
+from aib_analysis.data_models import Forecast, Leaderboard, ScoreType, UserType
 from aib_analysis.load_tournament import load_tournament
 from aib_analysis.process_tournament import (
     combine_on_question_title_intersection,
+    create_team_from_leaderboard,
     get_leaderboard,
-    create_aggregate,
-    create_team,
 )
 from aib_analysis.simulated_tournament import SimulatedTournament
 from conftest import initialize_logging
@@ -33,11 +34,11 @@ def main():
         pro_tournament, bot_tournament
     )
     display_tournament(combined_tournament, "Pro + Bot (No Teams)")
-    # TODO: @Check
-    # pro_bot_aggregate_tournament = create_pro_bot_aggregate_tournament(
-    #     pro_tournament, bot_tournament
-    # )
-    # display_tournament(pro_bot_aggregate_tournament, "Pro + Bot (W/ Teams)")
+    pro_bot_aggregate_tournament = create_pro_bot_aggregate_tournament(
+        pro_tournament, bot_tournament
+    )
+    display_tournament(pro_bot_aggregate_tournament, "Pro vs Bot (Teams)")
+
 
 @st.cache_data(show_spinner="Loading tournaments...")
 def load_and_cache_tournament(path: str, user_type: UserType) -> SimulatedTournament:
@@ -94,6 +95,14 @@ def display_leaderboard(leaderboard: Leaderboard):
         random_sample_of_scores = entry.randomly_sample_scores(num_to_display)
         top_n_scores = entry.top_n_scores(num_to_display)
         bottom_n_scores = entry.bottom_n_scores(num_to_display)
+        confidence_level = 0.95
+        try:
+            confidence_interval = entry.get_confidence_interval(confidence_level)
+            upper_bound = confidence_interval.upper_bound
+            lower_bound = confidence_interval.lower_bound
+        except ValueError:
+            upper_bound = "Failed Normality"
+            lower_bound = "Failed Normality"
         data.append(
             {
                 "rank": i + 1,
@@ -101,6 +110,8 @@ def display_leaderboard(leaderboard: Leaderboard):
                 "user_type": entry.user.type.value,
                 "sum_of_scores": entry.sum_of_scores,
                 "average_score": entry.average_score,
+                "average_upper_bound": upper_bound,
+                "average_lower_bound": lower_bound,
                 "num_questions": entry.question_count,
                 "random_sample_of_scores": [
                     score.display_score_and_question()
@@ -114,6 +125,7 @@ def display_leaderboard(leaderboard: Leaderboard):
                 ],
             }
         )
+    st.write(f"**Confidence level**: {confidence_level}")
     df = pd.DataFrame(data)
     st.dataframe(
         df.sort_values(by="sum_of_scores", ascending=False),
@@ -125,15 +137,25 @@ def display_leaderboard(leaderboard: Leaderboard):
 def create_pro_bot_aggregate_tournament(
     pro_tournament: SimulatedTournament, bot_tournament: SimulatedTournament
 ) -> SimulatedTournament:
-    # TODO: @Check
-    raise NotImplementedError("Not implemented")
     pro_users = pro_tournament.users
-    top_10_bot_users = create_team(bot_tournament, 10)
-    pro_aggregate = create_aggregate(pro_tournament, pro_users, "Pro Aggregate")
-    bot_aggregate = create_aggregate(bot_tournament, top_10_bot_users, "Bot Aggregate")
-    pro_agg_tournament = SimulatedTournament(forecasts=pro_aggregate)
-    bot_agg_tournament = SimulatedTournament(forecasts=bot_aggregate)
-    return combine_on_question_title_intersection(pro_agg_tournament, bot_agg_tournament)
+    top_10_bot_users = create_team_from_leaderboard(
+        bot_tournament, 10, ScoreType.SPOT_PEER, "sum"
+    )
+    pro_aggregate = create_aggregated_user_at_spot_time(
+        pro_users, pro_tournament, "Pro Team"
+    )
+    bot_aggregate = create_aggregated_user_at_spot_time(
+        top_10_bot_users, bot_tournament, "Bot Team"
+    )
+
+    pro_forecasts = typeguard.check_type(pro_aggregate.aggregate_forecasts, list[Forecast])
+    bot_forecasts = typeguard.check_type(bot_aggregate.aggregate_forecasts, list[Forecast])
+
+    pro_agg_tournament = SimulatedTournament(forecasts=pro_forecasts)
+    bot_agg_tournament = SimulatedTournament(forecasts=bot_forecasts)
+    return combine_on_question_title_intersection(
+        pro_agg_tournament, bot_agg_tournament
+    )
 
 
 if __name__ == "__main__":

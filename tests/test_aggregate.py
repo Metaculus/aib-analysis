@@ -18,7 +18,6 @@ from tests.mock_data_maker import (
     make_user,
 )
 
-
 # TODO: Validate other edge cases
 # - Test a specific numeric aggregate forecast
 # - mixed question types
@@ -36,7 +35,7 @@ def test_binary_aggregate() -> None:
     ]
     aggregate_user = make_user("Aggregate User", UserType.AGGREGATE)
     aggregate_forecast = aggregate_forecasts(forecasts, aggregate_user, datetime.now())
-    assert aggregate_forecast.aggregate.prediction == [0.4, 0.6]
+    assert aggregate_forecast.forecast.prediction == [0.4, 0.6]
 
 
 def test_multiple_choice_aggregate() -> None:
@@ -48,7 +47,7 @@ def test_multiple_choice_aggregate() -> None:
     ]
     aggregate_user = make_user("Aggregate User", UserType.AGGREGATE)
     aggregate_forecast = aggregate_forecasts(forecasts, aggregate_user, datetime.now())
-    prediction = aggregate_forecast.aggregate.prediction
+    prediction = aggregate_forecast.forecast.prediction
     assert prediction
     assert len(prediction) == 3
     assert prediction[0] == pytest.approx(0.4333333333)
@@ -131,12 +130,12 @@ def _assert_aggregate_user_correct(
     tournament: SimulatedTournament,
     aggregate_name: str,
 ) -> None:
-    assert len(aggregate_user.forecasts) == len(tournament.questions)
+    assert len(aggregate_user.aggregate_forecasts) == len(tournament.questions)
     assert aggregate_user.user.name == aggregate_name
     assert aggregate_user.user.type == UserType.AGGREGATE
     assert len(aggregate_user.user.aggregated_users) == len(users_to_aggregate)
     for user in users_to_aggregate:
         assert user in aggregate_user.user.aggregated_users
-    for aggregate_forecast in aggregate_user.forecasts:
+    for aggregate_forecast in aggregate_user.aggregate_forecasts:
         for input_forecast in aggregate_forecast.forecasts_inputted:
             assert input_forecast.user in users_to_aggregate
