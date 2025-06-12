@@ -21,6 +21,7 @@ from aib_analysis.process_tournament import (
     get_leaderboard,
 )
 from aib_analysis.simulated_tournament import SimulatedTournament
+from aib_analysis.stats import MeanHypothesisCalculator
 from conftest import initialize_logging
 
 
@@ -41,6 +42,8 @@ def main():
         pro_tournament, bot_tournament
     )
     display_tournament(pro_bot_aggregate_tournament, "Pro vs Bot (Teams)")
+    display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament)
+
 
 @st.cache_data(show_spinner="Loading tournaments...")
 def load_and_cache_tournament(path: str, user_type: UserType) -> SimulatedTournament:
@@ -64,6 +67,29 @@ def display_tournament(tournament: SimulatedTournament, name: str):
     with st.expander(f"{name} Calibration Curve"):
         display_calibration_curve(tournament)
 
+def display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament: SimulatedTournament) -> None:
+    hypothesis_mean = 0
+    confidence_level = 0.95
+    leaderboard = get_leaderboard(pro_bot_aggregate_tournament, ScoreType.SPOT_PEER)
+    st.subheader(f"Pro vs Bot (Team) Hypothesis Test")
+    with st.expander("Pro vs Bot (Team) Hypothesis Test"):
+        st.write(f"## The Test")
+        st.write("The below runs 2 tests: 1) tests if the each team's average spot peer score is not equal to zero and 2) if it is greater than zero. If its not equal to zero, then we can conclude that there is a statistically significant difference between bots and pros performance. If its greater than zero, then we can conclude that one group is doing better than another.")
+        for entry in leaderboard.entries_via_sum_of_scores():
+            observations = [s.score for s in entry.scores]
+            equal_to_hypothesis_test = MeanHypothesisCalculator.test_if_mean_is_equal_to_than_hypothesis_mean(
+                observations, hypothesis_mean, confidence_level
+            )
+            greater_than_hypothesis_test = MeanHypothesisCalculator.test_if_mean_is_greater_than_hypothesis_mean(
+                observations, hypothesis_mean, confidence_level
+            )
+            st.write(f"## {entry.user.name}")
+            st.write(f"### Equal to {hypothesis_mean}")
+            st.write(f"**P-value**: {equal_to_hypothesis_test.p_value:.5f}")
+            st.write(equal_to_hypothesis_test.written_conclusion)
+            st.write(f"### Greater than {hypothesis_mean}")
+            st.write(f"**P-value**: {greater_than_hypothesis_test.p_value:.5f}")
+            st.write(greater_than_hypothesis_test.written_conclusion)
 
 def display_tournament_stats(tournament: SimulatedTournament) -> None:
     forecasts = tournament.forecasts

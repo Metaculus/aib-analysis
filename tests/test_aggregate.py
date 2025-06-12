@@ -35,7 +35,7 @@ def test_binary_aggregate() -> None:
     ]
     aggregate_user = make_user("Aggregate User", UserType.AGGREGATE)
     aggregate_forecast = aggregate_forecasts(forecasts, aggregate_user, datetime.now())
-    assert aggregate_forecast.forecast.prediction == [0.4, 0.6]
+    assert aggregate_forecast.prediction == [0.4, 0.6]
 
 
 def test_multiple_choice_aggregate() -> None:
@@ -47,7 +47,7 @@ def test_multiple_choice_aggregate() -> None:
     ]
     aggregate_user = make_user("Aggregate User", UserType.AGGREGATE)
     aggregate_forecast = aggregate_forecasts(forecasts, aggregate_user, datetime.now())
-    prediction = aggregate_forecast.forecast.prediction
+    prediction = aggregate_forecast.prediction
     assert prediction
     assert len(prediction) == 3
     assert prediction[0] == pytest.approx(0.4333333333)
