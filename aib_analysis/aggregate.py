@@ -19,18 +19,13 @@ from aib_analysis.simulated_tournament import SimulatedTournament
 logger = logging.getLogger(__name__)
 
 
-class AggregateForecast(BaseModel):
-    aggregate: Forecast
+class AggregateForecast(Forecast):
     forecasts_inputted: list[Forecast]
-
-    @property
-    def relevant_question(self) -> Question:
-        return self.aggregate.question
 
     @model_validator(mode="after")
     def all_forecasts_have_same_question(self) -> Self:
         if any(
-            forecast.question != self.relevant_question
+            forecast.question != self.question
             for forecast in self.forecasts_inputted
         ):
             raise ValueError("All forecasts must have the same question")
@@ -50,25 +45,21 @@ class AggregateForecast(BaseModel):
 
 class AggregateUser(BaseModel):
     user: User
-    forecasts: list[AggregateForecast]
+    aggregate_forecasts: list[AggregateForecast]
+
 
     @property
     def relevant_questions(self) -> list[Question]:
         questions = list(
-            set(forecast.relevant_question for forecast in self.forecasts)
+            set(forecast.question for forecast in self.aggregate_forecasts)
         )
         return questions
-
-    @property
-    def forecasts_that_were_aggregated(self) -> list[Forecast]:
-        forecasts = set(forecast.aggregate for forecast in self.forecasts)
-        return list(forecasts)
 
     @model_validator(mode="after")
     def all_forecasts_have_same_user(self) -> Self:
         if any(
-            forecast.aggregate.user != self.user
-            for forecast in self.forecasts
+            forecast.user != self.user
+            for forecast in self.aggregate_forecasts
         ):
             raise ValueError("All forecasts must have the same user")
         return self
@@ -111,7 +102,7 @@ def create_aggregated_user_at_spot_time(
         aggregated_forecasts.append(aggregated_forecast)
 
     return AggregateUser(
-        user=aggregate_user, forecasts=aggregated_forecasts
+        user=aggregate_user, aggregate_forecasts=aggregated_forecasts
     )
 
 
@@ -149,12 +140,10 @@ def aggregate_forecasts(
         raise ValueError(f"Unknown question type: {question_type}")
 
     return AggregateForecast(
-        aggregate=Forecast(
-            question=forecasts[0].question,
-            user=aggregate_user,
-            prediction=aggregated_forecast,
-            prediction_time=forecasts[0].prediction_time,
-        ),
+        question=forecasts[0].question,
+        user=aggregate_user,
+        prediction=aggregated_forecast,
+        prediction_time=forecasts[0].prediction_time,
         forecasts_inputted=forecasts,
     )
 

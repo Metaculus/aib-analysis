@@ -1,4 +1,5 @@
 import copy
+from typing import Literal
 
 from aib_analysis.data_models import (
     Forecast,
@@ -97,13 +98,23 @@ def _assert_questions_match_in_important_ways(
     ), f"Question spot scoring times do not match for {question_1_text}. {question_1.spot_scoring_time} != {question_2.spot_scoring_time}. URL: {question_1.url} vs {question_2.url}"
 
 
-def create_team(
-    tournament: SimulatedTournament, team_size: int, score_type: ScoreType
+def create_team_from_leaderboard(
+    tournament: SimulatedTournament,
+    team_size: int,
+    score_type: ScoreType,
+    approach: Literal["sum", "average", "average_lower_t"],
 ) -> list[User]:
-    # TODO: @Check
-    # leaderboard = get_leaderboard(tournament, score_type)
-    # ...
-    raise NotImplementedError("Not implemented")
+    leaderboard = get_leaderboard(tournament, score_type)
+    if approach == "sum":
+        entries = leaderboard.entries_via_sum_of_scores()
+    elif approach == "average":
+        entries = leaderboard.entries_via_average_score()
+    else:
+        raise ValueError(f"Approach not supported: {approach}")
+    top_entries = entries[:team_size]
+    users = [entry.user for entry in top_entries]
+    return users
+
 
 def get_ranking_by_spot_peer_score_lower_t_bound(
     tournament: SimulatedTournament, confidence_level: float

@@ -14,6 +14,7 @@ from aib_analysis.custom_types import (
     UserType,
 )
 from aib_analysis.scoring import calculate_baseline_score, calculate_peer_score
+from aib_analysis.stats import ConfidenceIntervalCalculator, ConfidenceInterval
 
 
 class Forecast(BaseModel):
@@ -338,3 +339,7 @@ class LeaderboardEntry(BaseModel):
 
     def randomly_sample_scores(self, n: int) -> list[Score]:
         return random.sample(self.scores, n)
+
+    def get_confidence_interval(self, confidence_level: float = 0.95) -> ConfidenceInterval:
+        score_observations = [score.score for score in self.scores]
+        return ConfidenceIntervalCalculator.confidence_interval_from_observations(score_observations, confidence_level)
