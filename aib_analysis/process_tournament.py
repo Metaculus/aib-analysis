@@ -1,8 +1,9 @@
 import copy
+import logging
 from typing import Literal
 
-from pydantic import BaseModel
 import numpy as np
+from pydantic import BaseModel
 from scipy.stats import binom
 
 from aib_analysis.custom_types import QuestionType
@@ -16,9 +17,17 @@ from aib_analysis.data_models import (
 )
 from aib_analysis.simulated_tournament import SimulatedTournament
 
-problem_questions = [
+logger = logging.getLogger(__name__)
+
+poor_questions = [
     "How many Grammy awards will Taylor Swift win in 2025?",  # Pro/Bot question have different options (but the one that resolved was the same)
     "Which party will win the 2nd highest number of seats in the 2025 German federal election?",  # Same as above
+    "What Premier League position will Nottingham Forest F.C. be in on March 8, 2025?", # The spot scoring time is different for bot/pro question (but only off by 2 days).
+]
+
+problem_questions = [
+    "How many arms sales globally will the US State Department approve in March 2025?", # The options for the pro vs bot questions are different, and different options resolved. Also the spot scoring time is off by 1.2 weeks.
+    # https://www.metaculus.com/questions/34706/ vs https://www.metaculus.com/questions/34382/
 ]
 
 
@@ -47,16 +56,24 @@ def combine_on_question_title_intersection(
         )
     for question_1 in tournament_1.questions:
         for question_2 in tournament_2.questions:
-            question_1_text = question_1.question_text.lower()
-            question_2_text = question_2.question_text.lower()
+            question_1_text = question_1.question_text.lower().strip()
+            question_2_text = question_2.question_text.lower().strip()
 
             if question_1_text == question_2_text:
                 if question_1_text in unique_question_titles:
                     continue
                 else:
                     unique_question_titles.add(question_1_text)
+                logger.info(f"Found match for '{question_1_text}' vs '{question_2_text}'")
 
-                _assert_questions_match_in_important_ways(question_1, question_2)
+                if question_1.question_text in problem_questions:
+                    # Skip questions that don't match in important ways.
+                    logger.warning(f"Skipping question {question_1_text} because it is in problem_questions. URL: {question_1.url} vs {question_2.url}")
+                    continue
+
+                if not question_1.question_text in poor_questions:
+                    _assert_questions_match_in_important_ways(question_1, question_2)
+
                 new_forecasts = []
                 new_forecasts.extend(
                     tournament_1.question_to_forecasts(question_1.question_id)
@@ -78,8 +95,6 @@ def _assert_questions_match_in_important_ways(
     question_1: Question, question_2: Question
 ) -> None:
     question_1_text = question_1.question_text
-    if question_1_text in problem_questions:
-        return
     assert (
         question_1.type == question_2.type
     ), f"Question types do not match for {question_1_text}. {question_1.type} != {question_2.type}. URL: {question_1.url} vs {question_2.url}"
