@@ -11,9 +11,11 @@ top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
 sys.path.append(top_level_dir)
 
 from aib_analysis.aggregate import create_aggregated_user_at_spot_time
+from aib_analysis.custom_types import QuestionType
 from aib_analysis.data_models import Forecast, Leaderboard, ScoreType, UserType
 from aib_analysis.load_tournament import load_tournament
 from aib_analysis.process_tournament import (
+    calculate_calibration_curve,
     combine_on_question_title_intersection,
     create_team_from_leaderboard,
     get_leaderboard,
@@ -40,7 +42,6 @@ def main():
     )
     display_tournament(pro_bot_aggregate_tournament, "Pro vs Bot (Teams)")
 
-
 @st.cache_data(show_spinner="Loading tournaments...")
 def load_and_cache_tournament(path: str, user_type: UserType) -> SimulatedTournament:
     return load_tournament(path, user_type)
@@ -52,7 +53,6 @@ def display_tournament(tournament: SimulatedTournament, name: str):
     # Display tournament statistics
     with st.expander(f"{name} Tournament Statistics"):
         display_tournament_stats(tournament)
-
     with st.expander(f"{name} Tournament Forecasts"):
         display_forecasts(tournament)
     with st.expander(f"{name} Peer Leaderboard"):
@@ -61,6 +61,8 @@ def display_tournament(tournament: SimulatedTournament, name: str):
     with st.expander(f"{name} Baseline Leaderboard"):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_BASELINE)
         display_leaderboard(leaderboard)
+    with st.expander(f"{name} Calibration Curve"):
+        display_calibration_curve(tournament)
 
 
 def display_tournament_stats(tournament: SimulatedTournament) -> None:
@@ -317,6 +319,99 @@ def create_pro_bot_aggregate_tournament(
     return combine_on_question_title_intersection(
         pro_agg_tournament, bot_agg_tournament
     )
+
+
+def _hex_to_rgba(hex_color: str, alpha: float) -> str:
+    """Convert hex color (e.g. #1f77b4) to rgba string with given alpha."""
+    hex_color = hex_color.lstrip('#')
+    if len(hex_color) == 6:
+        r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        return f'rgba({r},{g},{b},{alpha})'
+    raise ValueError(f"Invalid hex color: {hex_color}")
+
+
+def display_calibration_curve(tournament: SimulatedTournament) -> None:
+    # Get all binary forecasts with resolutions
+    binary_forecasts = [
+        f for f in tournament.forecasts
+        if f.question.type == QuestionType.BINARY and f.question.resolution is not None
+    ]
+
+    if not binary_forecasts:
+        st.warning("No binary forecasts with resolutions available for calibration curve.")
+        return
+
+    fig = go.Figure()
+
+    # Add perfect calibration line
+    fig.add_trace(
+        go.Scatter(
+            x=[0, 1],
+            y=[0, 1],
+            mode='lines',
+            line=dict(dash='dash', color='gray'),
+            name='Perfect Calibration'
+        )
+    )
+
+    color_sequence = [
+        '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+    ]
+    user_colors = {}
+    for idx, user in enumerate(tournament.users):
+        user_colors[user.name] = color_sequence[idx % len(color_sequence)]
+
+    for user in tournament.users:
+        user_forecasts = [f for f in binary_forecasts if f.user == user]
+        if not user_forecasts:
+            continue
+
+        calibration_curve = calculate_calibration_curve(user_forecasts)
+        bin_centers = [(b.lower_bound + b.upper_bound) / 2 for b in calibration_curve.curve]
+        avg_resolutions = [b.average_resolution for b in calibration_curve.curve]
+        lower_ci = [b.lower_confidence_interval for b in calibration_curve.curve]
+        upper_ci = [b.upper_confidence_interval for b in calibration_curve.curve]
+        bin_counts = [b.forecast_count for b in calibration_curve.curve]
+        color = user_colors[user.name]
+        fill_color = _hex_to_rgba(color, 0.15)
+
+        fig.add_trace(
+            go.Scatter(
+                x=bin_centers + bin_centers[::-1],
+                y=upper_ci + lower_ci[::-1],
+                fill='toself',
+                fillcolor=fill_color,
+                line=dict(color='rgba(255,255,255,0)'),
+                hoverinfo='skip',
+                showlegend=True,
+                name=f"{user.name} CI"
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=bin_centers,
+                y=avg_resolutions,
+                mode='lines+markers',
+                name=f"{user.name} ({len(user_forecasts)} forecasts)",
+                line=dict(width=2, color=color),
+                marker=dict(size=8, color=color),
+                hovertemplate="Probability: %{x:.2f}<br>Resolution Rate: %{y:.2f}<br>Forecasts in Bin: %{customdata}<extra></extra>",
+                customdata=bin_counts
+            )
+        )
+
+    fig.update_layout(
+        title='Calibration Curves by User',
+        xaxis_title='Assigned Probability',
+        yaxis_title='Fraction that Resolved "Yes"',
+        xaxis=dict(range=[0, 1]),
+        yaxis=dict(range=[0, 1]),
+        showlegend=True,
+        height=600
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
 
 if __name__ == "__main__":

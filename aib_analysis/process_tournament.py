@@ -1,6 +1,11 @@
 import copy
 from typing import Literal
 
+from pydantic import BaseModel
+import numpy as np
+from scipy.stats import binom
+
+from aib_analysis.custom_types import QuestionType
 from aib_analysis.data_models import (
     Forecast,
     Leaderboard,
@@ -116,28 +121,76 @@ def create_team_from_leaderboard(
     return users
 
 
-def get_ranking_by_spot_peer_score_lower_t_bound(
-    tournament: SimulatedTournament, confidence_level: float
-) -> list[tuple[User, float]]:
-    # Get all spot peer scores
-    # create a confidence interval for the spot peer score
-    # Sort by lower bound
-    raise NotImplementedError("Not implemented")
+class Bin(BaseModel):
+    lower_bound: float
+    upper_bound: float
+    lower_confidence_interval: float
+    average_resolution: float | None
+    upper_confidence_interval: float
+    perfect_calibration: float
+    forecast_count: int
 
 
-def get_ranking_by_spot_peer_score_sum(
-    tournament: SimulatedTournament,
-) -> list[tuple[User, float]]:
-    # Get all spot peer scores
-    # Sort by spot peer score
-    raise NotImplementedError("Not implemented")
+class CalibrationCurve(BaseModel):
+    curve: list[Bin]
 
 
-def get_ranking_by_spot_peer_score_bootstrap_lower_bound(
-    tournament: SimulatedTournament, confidence_level: float
-) -> list[tuple[User, float]]:
-    # Get all spot peer scores
-    # bootstrap the spot peer scores
-    # create a confidence interval for the spot peer score
-    # Sort by lower bound
-    raise NotImplementedError("Not implemented")
+def calculate_calibration_curve(input_forecasts: list[Forecast]) -> CalibrationCurve:
+    predictions: list[float] = []
+    resolutions: list[bool] = []
+    weights: list[float] = []
+    for f in input_forecasts:
+        resolution = f.question.resolution
+        if resolution is None:
+            continue
+        assert f.question.type == QuestionType.BINARY, "Calibration curve is only supported for binary questions"
+        assert f.prediction is not None, "Forecast prediction is None"
+        assert isinstance(resolution, bool), f"Resolution is not a bool: {resolution}"
+        predictions.append(f.prediction[0])
+        resolutions.append(resolution)
+        weights.append(f.question.weight)
+        # TODO: @Check should I check that each question only appears once (no duplicate questions)?
+
+    calibration_curve_bins = []
+    # Same number of forecasts in each bin
+    quintiles = np.quantile(predictions, [0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    bin_bounds = []
+    for i in range(len(quintiles) - 1):
+        bin_bounds.append((quintiles[i], quintiles[i + 1]))
+    for p_min, p_max in bin_bounds:
+        resolutions_for_bucket = []
+        weights_for_bucket = []
+        bin_center = (p_min + p_max) / 2
+        for value, weight, resolution in zip(predictions, weights, resolutions):
+            # For the last bin, include the upper bound
+            if i == len(bin_bounds) - 1:
+                if p_min <= value <= p_max:
+                    resolutions_for_bucket.append(resolution)
+                    weights_for_bucket.append(weight)
+            else:
+                if p_min <= value < p_max:
+                    resolutions_for_bucket.append(resolution)
+                    weights_for_bucket.append(weight)
+        count = max(len(resolutions_for_bucket), 1)
+        average_resolution = (
+            np.average(resolutions_for_bucket, weights=weights_for_bucket)
+            if sum(weights_for_bucket) > 0
+            else None
+        )
+        lower_confidence_interval = binom.ppf(0.05, count, p_min) / count
+        perfect_calibration = binom.ppf(0.50, count, bin_center) / count
+        upper_confidence_interval = binom.ppf(0.95, count, p_max) / count
+
+        calibration_curve_bins.append(
+            Bin(
+                lower_bound=p_min,
+                upper_bound=p_max,
+                lower_confidence_interval=float(lower_confidence_interval),
+                average_resolution=float(average_resolution) if average_resolution is not None else None,
+                upper_confidence_interval=float(upper_confidence_interval),
+                perfect_calibration=float(perfect_calibration),
+                forecast_count=len(resolutions_for_bucket),
+            )
+        )
+
+    return CalibrationCurve(curve=calibration_curve_bins)
