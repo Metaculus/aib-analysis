@@ -81,7 +81,6 @@ def _parse_forecast_row(
         user = User(
             name=username,
             type=user_type,
-            is_aggregate=False,
             aggregated_users=[],
         )
         user_cache[username] = user
@@ -152,11 +151,11 @@ def _parse_resolution(forecast_row: dict) -> ResolutionType:
     return raw_resolution
 
 
-def _parse_options(forecast_row: dict) -> list[str] | None:
+def _parse_options(forecast_row: dict) -> tuple[str, ...] | None:
     if forecast_row["type"] == "multiple_choice":
         options = forecast_row.get("options")
         if options is not None and pd.notnull(options) and options != "":
-            return eval(options)
+            return tuple(eval(options))
         raise ValueError(f"Invalid options: {options}")
     return None
 
