@@ -15,11 +15,17 @@ from aib_analysis.data_structures.data_models import (
     ScoreType,
     User,
 )
-from aib_analysis.data_structures.problem_questions import poor_questions, problem_questions
+from aib_analysis.data_structures.problem_questions import (
+    poor_questions,
+    problem_questions,
+    ProblemGroup,
+    ProblemType,
+    SolutionType,
+)
 from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
+from aib_analysis.data_structures.problem_questions import ProblemManager
 
 logger = logging.getLogger(__name__)
-
 
 
 def get_leaderboard(
@@ -59,14 +65,13 @@ def combine_on_question_title_intersection(
                     f"Found match for '{question_1_text}' vs '{question_2_text}'"
                 )
 
-                if question_1.question_text in problem_questions:
-                    # Skip questions that don't match in important ways.
-                    logger.warning(
-                        f"Skipping question {question_1_text} because it is in problem_questions. URL: {question_1.url} vs {question_2.url}"
-                    )
-                    continue
-
-                if not question_1.question_text in poor_questions:
+                problem_group = ProblemManager.find_matching_problem_group([question_1, question_2])
+                if problem_group:
+                    solution = problem_group.solve_problem_group([question_1, question_2])
+                    if solution == "skip_question":
+                        logger.info(f"Skipping question {question_1_text} because it is in am unresolvable problem group")
+                        continue
+                else:
                     _assert_questions_match_in_important_ways(question_1, question_2)
 
                 new_forecasts = []
@@ -91,32 +96,46 @@ def _assert_questions_match_in_important_ways(
     question_1: Question, question_2: Question
 ) -> None:
     question_1_text = question_1.question_text
-    question_comparison_table = f"\n{Question.question_comparison_table([question_1, question_2])}"
     try:
         assert (
             question_1.type == question_2.type
-        ), f"Question types do not match for {question_1_text}. {question_1.type} != {question_2.type}. {question_comparison_table}"
+        ), f"Question types do not match for {question_1_text}. {question_1.type} != {question_2.type}"
         assert (
             question_1.range_max == question_2.range_max
-        ), f"Question range max does not match for {question_1_text}. {question_1.range_max} != {question_2.range_max}. {question_comparison_table}"
+        ), f"Question range max does not match for {question_1_text}. {question_1.range_max} != {question_2.range_max}"
         assert (
             question_1.range_min == question_2.range_min
-        ), f"Question range min does not match for {question_1_text}. {question_1.range_min} != {question_2.range_min}. {question_comparison_table}"
+        ), f"Question range min does not match for {question_1_text}. {question_1.range_min} != {question_2.range_min}"
         assert (
             question_1.open_upper_bound == question_2.open_upper_bound
-        ), f"Question open upper bound does not match for {question_1_text}. {question_1.open_upper_bound} != {question_2.open_upper_bound}. {question_comparison_table}"
+        ), f"Question open upper bound does not match for {question_1_text}. {question_1.open_upper_bound} != {question_2.open_upper_bound}"
         assert (
             question_1.open_lower_bound == question_2.open_lower_bound
-        ), f"Question open lower bound does not match for {question_1_text}. {question_1.open_lower_bound} != {question_2.open_lower_bound}. {question_comparison_table}"
+        ), f"Question open lower bound does not match for {question_1_text}. {question_1.open_lower_bound} != {question_2.open_lower_bound}"
         assert (
             question_1.options == question_2.options
-        ), f"Question options do not match for {question_1_text}. {question_1.options} != {question_2.options}. {question_comparison_table}"
+        ), f"Question options do not match for {question_1_text}. {question_1.options} != {question_2.options}"
         assert (
             question_1.spot_scoring_time == question_2.spot_scoring_time
-        ), f"Question spot scoring times do not match for {question_1_text}. {question_1.spot_scoring_time} != {question_2.spot_scoring_time}. {question_comparison_table}"
+        ), f"Question spot scoring times do not match for {question_1_text}. {question_1.spot_scoring_time} != {question_2.spot_scoring_time}"
     except AssertionError as e:
+        if (
+            ProblemManager.find_matching_problem_group([question_1, question_2])
+            is not None
+        ):
+            ProblemManager.save_problem_group(
+                ProblemGroup(
+                    notes=f"AssertionError: {e}",
+                    questions=[question_1, question_2],
+                    problem_type=ProblemType.BETWEEN_TOURNAMENT,
+                )
+            )
+        question_comparison_table = (
+            f"\n{Question.question_comparison_table([question_1, question_2])}"
+        )
         logger.error(f"AssertionError: {e}.\n{question_comparison_table}")
         raise e
+
 
 def constrain_question_types(
     tournament: SimulatedTournament, question_types: list[QuestionType]
