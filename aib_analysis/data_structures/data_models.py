@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import logging
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from pydantic import BaseModel, ConfigDict, model_validator
 from typing_extensions import Self
@@ -23,6 +24,7 @@ from aib_analysis.math.stats import (
     ConfidenceIntervalCalculator,
 )
 
+logger = logging.getLogger(__name__)
 
 class Forecast(BaseModel):
     question: Question
@@ -260,6 +262,37 @@ class Question(BaseModel, frozen=True):
                 table += f"{question.model_dump()[field]} | "
             table += "\n"
         return table
+
+
+    @classmethod
+    def questions_equivalent_between_tournaments(cls, question_1: Question, question_2: Question) -> bool:
+        questions_equivalent = True
+        if question_1.get_tournament_matching_hash() != question_2.get_tournament_matching_hash():
+            questions_equivalent = False
+        time_diff = abs(question_1.spot_scoring_time - question_2.spot_scoring_time)
+        if time_diff > timedelta(hours=1) and questions_equivalent:
+            logger.warning(
+                f"Questions are equivalent for tournaments but spot scoring times differ by {time_diff}: "
+                f"Q1: {question_1.spot_scoring_time}, Q2: {question_2.spot_scoring_time}"
+            )
+        return questions_equivalent
+
+    def get_tournament_matching_hash(self) -> str:
+        spot_scoring_days = (self.spot_scoring_time - datetime.min).days
+        spot_scoring_window = spot_scoring_days // 3
+
+        hash_fields = (
+            self.question_text.lower().strip(),
+            self.type.value,
+            self.resolution,
+            self.options,
+            self.range_max,
+            self.range_min,
+            self.open_upper_bound,
+            self.open_lower_bound,
+            spot_scoring_window
+        )
+        return str(hash(hash_fields))
 
 class User(BaseModel):
     name: str
