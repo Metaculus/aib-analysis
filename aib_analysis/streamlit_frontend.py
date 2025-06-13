@@ -5,10 +5,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import typeguard
+import logging
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
 sys.path.append(top_level_dir)
+
 
 from aib_analysis.aggregate import create_aggregated_user_at_spot_time
 from aib_analysis.custom_types import QuestionType
@@ -17,13 +19,15 @@ from aib_analysis.load_tournament import load_tournament
 from aib_analysis.process_tournament import (
     calculate_calibration_curve,
     combine_on_question_title_intersection,
+    constrain_question_types,
     create_team_from_leaderboard,
     get_leaderboard,
-    constrain_question_types,
 )
 from aib_analysis.simulated_tournament import SimulatedTournament
 from aib_analysis.stats import MeanHypothesisCalculator
 from conftest import initialize_logging
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -49,22 +53,34 @@ def main():
         display_tournament(bot_tournament, "Bot")
         binary_tournament = constrain_question_types(bot_tournament, [QuestionType.BINARY])
         display_tournament(binary_tournament, "Bot (Binary)")
-        numeric_tournament = constrain_question_types(bot_tournament, [QuestionType.NUMERIC])
-        display_tournament(numeric_tournament, "Bot (Numeric)")
         multiple_choice_tournament = constrain_question_types(bot_tournament, [QuestionType.MULTIPLE_CHOICE])
         display_tournament(multiple_choice_tournament, "Bot (Multiple Choice)")
+        numeric_tournament = constrain_question_types(bot_tournament, [QuestionType.NUMERIC])
+        display_tournament(numeric_tournament, "Bot (Numeric)")
 
     with tab3:
         combined_tournament = combine_on_question_title_intersection(
             pro_tournament, bot_tournament
         )
         display_tournament(combined_tournament, "Pro + Bot (No Teams)")
+        binary_combined_tournament = constrain_question_types(combined_tournament, [QuestionType.BINARY])
+        display_tournament(binary_combined_tournament, "Pro + Bot (No Teams) (Binary)")
+        multiple_choice_combined_tournament = constrain_question_types(combined_tournament, [QuestionType.MULTIPLE_CHOICE])
+        display_tournament(multiple_choice_combined_tournament, "Pro + Bot (No Teams) (Multiple Choice)")
+        numeric_combined_tournament = constrain_question_types(combined_tournament, [QuestionType.NUMERIC])
+        display_tournament(numeric_combined_tournament, "Pro + Bot (No Teams) (Numeric)")
 
     with tab4:
         pro_bot_aggregate_tournament = create_pro_bot_aggregate_tournament(
             pro_tournament, bot_tournament
         )
         display_tournament(pro_bot_aggregate_tournament, "Pro vs Bot (Teams)")
+        binary_pro_bot_team_tournament = constrain_question_types(pro_bot_aggregate_tournament, [QuestionType.BINARY])
+        display_tournament(binary_pro_bot_team_tournament, "Pro vs Bot (Teams) (Binary)")
+        multiple_choice_pro_bot_team_tournament = constrain_question_types(pro_bot_aggregate_tournament, [QuestionType.MULTIPLE_CHOICE])
+        display_tournament(multiple_choice_pro_bot_team_tournament, "Pro vs Bot (Teams) (Multiple Choice)")
+        numeric_pro_bot_team_tournament = constrain_question_types(pro_bot_aggregate_tournament, [QuestionType.NUMERIC])
+        display_tournament(numeric_pro_bot_team_tournament, "Pro vs Bot (Teams) (Numeric)")
 
     with tab5:
         display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament)
@@ -79,16 +95,16 @@ def display_tournament(tournament: SimulatedTournament, name: str):
     st.subheader(f"{name} Tournament")
 
     # Display tournament statistics
-    with st.expander(f"{name} Tournament Statistics"):
-        display_tournament_stats(tournament)
-    with st.expander(f"{name} Tournament Forecasts"):
-        display_forecasts(tournament)
     with st.expander(f"{name} Peer Leaderboard"):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
         display_leaderboard(leaderboard)
     with st.expander(f"{name} Baseline Leaderboard"):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_BASELINE)
         display_leaderboard(leaderboard)
+    with st.expander(f"{name} Tournament Statistics"):
+        display_tournament_stats(tournament)
+    with st.expander(f"{name} Tournament Forecasts"):
+        display_forecasts(tournament)
     # with st.expander(f"{name} Calibration Curve"):
     #     display_calibration_curve(tournament)
 
@@ -240,7 +256,7 @@ def display_leaderboard(leaderboard: Leaderboard):
 def _display_leaderboard_table(leaderboard: Leaderboard, confidence_level: float):
     data = []
     for i, entry in enumerate(leaderboard.entries_via_sum_of_scores()):
-        num_to_display = 5
+        num_to_display = min(5, entry.question_count)
         random_sample_of_scores = entry.randomly_sample_scores(num_to_display)
         top_n_scores = entry.top_n_scores(num_to_display)
         bottom_n_scores = entry.bottom_n_scores(num_to_display)
@@ -248,9 +264,10 @@ def _display_leaderboard_table(leaderboard: Leaderboard, confidence_level: float
             confidence_interval = entry.get_confidence_interval(confidence_level)
             upper_bound = confidence_interval.upper_bound
             lower_bound = confidence_interval.lower_bound
-        except ValueError:
-            upper_bound = "Failed Normality"
-            lower_bound = "Failed Normality"
+        except Exception as e:
+            logger.error(f"Failed to get confidence interval for entry {entry.user.name}: {e}")
+            upper_bound = None
+            lower_bound = None
         data.append(
             {
                 "rank": i + 1,
@@ -291,17 +308,22 @@ def _display_average_scores_plot(
     for entry in leaderboard.entries_via_sum_of_scores():
         try:
             confidence_interval = entry.get_confidence_interval(confidence_level)
-            entries.append(
-                {
-                    "user": entry.user.name,
-                    "average_score": entry.average_score,
-                    "upper_bound": confidence_interval.upper_bound,
-                    "lower_bound": confidence_interval.lower_bound,
-                    "num_questions": entry.question_count,
-                }
-            )
-        except ValueError:
-            continue
+            upper_bound = confidence_interval.upper_bound
+            lower_bound = confidence_interval.lower_bound
+        except Exception as e:
+            logger.error(f"Failed to get confidence interval for entry {entry.user.name}: {e}")
+            upper_bound = 0
+            lower_bound = 0
+
+        entries.append(
+            {
+                "user": entry.user.name,
+                "average_score": entry.average_score,
+                "upper_bound": upper_bound,
+                "lower_bound": lower_bound,
+                "num_questions": entry.question_count,
+            }
+        )
 
     if not entries:
         st.warning("No valid entries with confidence intervals available for plotting.")
@@ -419,7 +441,7 @@ def display_calibration_curve(tournament: SimulatedTournament) -> None:
             continue
 
         calibration_curve = calculate_calibration_curve(user_forecasts)
-        bin_centers = [(b.lower_bound + b.upper_bound) / 2 for b in calibration_curve.curve]
+        bin_centers = [b.bin_center for b in calibration_curve.curve]
         avg_resolutions = [b.average_resolution for b in calibration_curve.curve]
         lower_ci = [b.lower_confidence_interval for b in calibration_curve.curve]
         upper_ci = [b.upper_confidence_interval for b in calibration_curve.curve]

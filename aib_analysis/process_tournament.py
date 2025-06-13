@@ -126,6 +126,7 @@ def _assert_questions_match_in_important_ways(
 def constrain_question_types(
     tournament: SimulatedTournament, question_types: list[QuestionType]
 ) -> SimulatedTournament:
+    # TODO: @Check should I do a deep copy here?
     filtered_forecasts = []
     for forecast in tournament.forecasts:
         if forecast.question.type in question_types:
@@ -159,6 +160,10 @@ class Bin(BaseModel):
     upper_confidence_interval: float
     perfect_calibration: float
     forecast_count: int
+
+    @property
+    def bin_center(self) -> float:
+        return (self.lower_bound + self.upper_bound) / 2
 
 
 class CalibrationCurve(BaseModel):
