@@ -99,27 +99,10 @@ class TestLeaderboard:
         assert entries[0].user.name == "manticAI"
         assert entries[0].sum_of_scores == pytest.approx(1691.05, abs=0.1)
         assert entries[1].user.name == "pgodzinai"
-        assert entries[13].user.name == "MWG"
-        assert entries[13].sum_of_scores == pytest.approx(215.99, abs=0.1)
-        assert entries[45].user.name == "InstitutPelFutur"
-        assert entries[45].sum_of_scores == pytest.approx(-2114.76, abs=0.1)
-
-    def test_leaderboard_numeric_bots(
-        self,
-        bot_tournament: SimulatedTournament,
-    ):
-        numeric_tournament = constrain_question_types(
-            bot_tournament, [QuestionType.NUMERIC]
-        )
-        leaderboard = get_leaderboard(numeric_tournament, ScoreType.SPOT_PEER)
-        entries = leaderboard.entries_via_sum_of_scores()
-        assert entries[0].user.name == "meta-o1-preview"
-        assert entries[0].sum_of_scores == pytest.approx(1683.54, abs=0.1)
-        assert entries[1].user.name == "mmBot"
-        assert entries[13].user.name == "metac-grok-2-1212"
-        assert entries[13].sum_of_scores == pytest.approx(153.21, abs=0.1)
-        assert entries[45].user.name == "minefrac1"
-        assert entries[45].sum_of_scores == pytest.approx(-1348.27, abs=0.1)
+        assert entries[12].user.name == "MWG"
+        assert entries[12].sum_of_scores == pytest.approx(215.99, abs=0.1)
+        assert entries[44].user.name == "InstitutPelFutur"
+        assert entries[44].sum_of_scores == pytest.approx(-2114.76, abs=0.1)
 
     def test_leaderboard_multiple_choice_bots(
         self,
@@ -133,10 +116,27 @@ class TestLeaderboard:
         assert entries[0].user.name == "metac-o1"
         assert entries[0].sum_of_scores == pytest.approx(964.41, abs=0.1)
         assert entries[1].user.name == "metac-Gemini-Exp-1206"
-        assert entries[13].user.name == "Grizeu_Bot"
-        assert entries[13].sum_of_scores == pytest.approx(189.96, abs=0.1)
-        assert entries[45].user.name == "ajf-bot"
-        assert entries[45].sum_of_scores == pytest.approx(-1342.38, abs=0.1)
+        assert entries[12].user.name == "Grizeu_Bot"
+        assert entries[12].sum_of_scores == pytest.approx(189.96, abs=0.1)
+        assert entries[43].user.name == "ajf-bot"
+        assert entries[43].sum_of_scores == pytest.approx(-1342.38, abs=0.1)
+
+    def test_leaderboard_numeric_bots(
+        self,
+        bot_tournament: SimulatedTournament,
+    ):
+        numeric_tournament = constrain_question_types(
+            bot_tournament, [QuestionType.NUMERIC]
+        )
+        leaderboard = get_leaderboard(numeric_tournament, ScoreType.SPOT_PEER)
+        entries = leaderboard.entries_via_sum_of_scores()
+        assert entries[0].user.name == "metac-o1-preview"
+        assert entries[0].sum_of_scores == pytest.approx(1683.54, abs=0.1)
+        assert entries[1].user.name == "mmBot"
+        assert entries[12].user.name == "metac-grok-2-1212"
+        assert entries[12].sum_of_scores == pytest.approx(153.21, abs=0.1)
+        assert entries[40].user.name == "minefrac1"
+        assert entries[40].sum_of_scores == pytest.approx(-1348.27, abs=0.1)
 
 
 class TestCombineTournaments:

@@ -26,7 +26,7 @@ def load_tournament(
     user_cache: dict[str, User] = {}
     dataframe = pd.read_csv(forecast_file_path, low_memory=False)
     logger.info(f"Loaded {len(dataframe)} forecast rows")
-    log_every_n = 1000
+    log_every_n = 5000
     for i, (_, row) in enumerate(dataframe.iterrows()):
         should_log_parsing = i % log_every_n == 0
         if should_log_parsing:
