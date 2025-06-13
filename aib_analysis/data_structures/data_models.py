@@ -173,6 +173,7 @@ class Question(BaseModel):
     open_lower_bound: bool | None
     weight: float
     post_id: int
+    created_at: datetime
     spot_scoring_time: datetime
 
     @property
@@ -255,6 +256,18 @@ class Question(BaseModel):
         )
         return hash(hash_tuple)
 
+    @classmethod
+    def question_comparison_table(cls, questions: list[Question]) -> str:
+        table = "| Parameter | " + " | ".join([f"Question {i+1}" for i in range(len(questions))]) + " |\n"
+        table += "|-----------|" + "|".join(["---" for _ in range(len(questions))]) + "|\n"
+        table += "| URL | " + " | ".join([f"{question.url}" for question in questions]) + " |\n"
+        fields = questions[0].model_dump().keys()
+        for field in fields:
+            table += f"| {field.replace('_', ' ').title()} | "
+            for question in questions:
+                table += f"{question.model_dump()[field]} | "
+            table += "\n"
+        return table
 
 class User(BaseModel):
     name: str

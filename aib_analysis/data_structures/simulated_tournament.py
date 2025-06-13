@@ -5,8 +5,16 @@ import logging
 from pydantic import BaseModel, PrivateAttr, model_validator
 from typing_extensions import Self
 
-from aib_analysis.data_structures.custom_types import AnnulledAmbiguousResolutionType
-from aib_analysis.data_structures.data_models import Forecast, Question, Score, ScoreType, User
+from aib_analysis.data_structures.custom_types import (
+    AnnulledAmbiguousResolutionType,
+)
+from aib_analysis.data_structures.data_models import (
+    Forecast,
+    Question,
+    Score,
+    ScoreType,
+    User,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +125,7 @@ class SimulatedTournament(BaseModel):
 
         logger.info("Finished initializing non-scoring caches")
 
-        log_every_n = 500
+        log_every_n = 1000
         all_scores: list[Score] = []
         for i, forecast in enumerate(self.spot_forecasts):
             should_log_scoring = i % log_every_n == 0
@@ -131,7 +139,7 @@ class SimulatedTournament(BaseModel):
             all_scores.extend(new_scores)
         self._scores_cache = {score.id: score for score in all_scores}
 
-        logger.info("Finished initializing scoring caches")
+        logger.info(f"Finished initializing scoring caches for {len(self.scores)} scores")
         self._check_no_duplicate_questions()
         return self
 
@@ -175,13 +183,25 @@ class SimulatedTournament(BaseModel):
         return scores
 
     def _check_no_duplicate_questions(self) -> None:
+        question_text_map: dict[str, list[Question]] = {}
+        for question in self.questions:
+            question_text_map.setdefault(question.question_text, []).append(question)
+
+        duplicate_error_messages = []
+        for question_text, questions in question_text_map.items():
+            if len(questions) > 1:
+                error_message = "# Duplicates for question text: " + question_text + "\n"
+                error_message += Question.question_comparison_table(questions)
+                duplicate_error_messages.append(error_message)
+
+        if len(duplicate_error_messages) > 0:
+            combined_error_message = "\n\n".join(duplicate_error_messages)
+            logger.warning(f"Duplicate question texts found in questions: \n{combined_error_message}")
+
         question_ids = [question.question_id for question in self.questions]
         if len(question_ids) != len(set(question_ids)):
             raise ValueError("Duplicate question IDs found in questions")
 
-        question_texts = [question.question_text for question in self.questions]
-        if len(question_texts) != len(set(question_texts)):
-            raise ValueError("Duplicate question texts found in questions")
-
         if len(self.questions) != len(set(self.questions)):
             raise ValueError("Duplicate questions found in questions")
+
