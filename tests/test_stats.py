@@ -1,4 +1,4 @@
-from aib_analysis.stats import ConfidenceIntervalCalculator, MeanHypothesisCalculator, ObservationStats
+from aib_analysis.math.stats import ConfidenceIntervalCalculator, MeanHypothesisCalculator, ObservationStats
 
 import pytest
 

@@ -156,20 +156,20 @@ def _aggregate_binary_forecasts(
     return [median, 1 - median]
 
 def _aggregate_mc_forecasts(forecasts: list[MCForecastType]) -> MCForecastType:
-    forecasts_array = np.array(forecasts)
-    mean_per_option = np.mean(forecasts_array, axis=0)
-    return mean_per_option.tolist()
     # forecasts_array = np.array(forecasts)
-    # median_per_option = np.nanmedian(forecasts_array, axis=0)
-    # normalized = median_per_option / np.sum(median_per_option)
-    # return normalized.tolist() # TODO: @Check: Is normalization of average better. The solution may be converting to and from log odds space and taking the median there
+    # mean_per_option = np.mean(forecasts_array, axis=0)
+    # return mean_per_option.tolist()
+    forecasts_array = np.array(forecasts)
+    median_per_option = np.nanmedian(forecasts_array, axis=0)
+    normalized = median_per_option / np.sum(median_per_option)
+    return normalized.tolist()
 
 def _aggregate_numeric_forecasts(
     forecasts: list[NumericForecastType],
 ) -> NumericForecastType:
     cdfs = forecasts
-    median_cdf: list[float] = np.median(
+    mean_cdf: list[float] = np.mean(
         np.array(cdfs), axis=0
     ).tolist()
-    return median_cdf
+    return mean_cdf
 

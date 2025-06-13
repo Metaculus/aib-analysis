@@ -5,7 +5,7 @@ import logging
 from pydantic import BaseModel, PrivateAttr, model_validator
 from typing_extensions import Self
 
-from aib_analysis.custom_types import AmbiguousResolutionType
+from aib_analysis.custom_types import AnnulledAmbiguousResolutionType
 from aib_analysis.data_models import Forecast, Question, Score, ScoreType, User
 
 logger = logging.getLogger(__name__)
@@ -125,14 +125,16 @@ class SimulatedTournament(BaseModel):
                 logger.info(
                     f"Caching scores for forecast {i} of {len(self.spot_forecasts)}"
                 )
-            if isinstance(forecast.question.resolution, AmbiguousResolutionType):
+            if isinstance(forecast.question.resolution, AnnulledAmbiguousResolutionType):
                 continue
             new_scores = self._calculate_spot_scores_for_forecast(forecast)
             all_scores.extend(new_scores)
         self._scores_cache = {score.id: score for score in all_scores}
 
         logger.info("Finished initializing scoring caches")
+        self._check_no_duplicate_questions()
         return self
+
 
     def _initialize_spot_forecast_cache(self) -> None:
         spot_forecasts: dict[tuple[str, int], Forecast] = {}
@@ -157,7 +159,7 @@ class SimulatedTournament(BaseModel):
             raise ValueError("Forecast to score must be in spot forecasts cache")
 
         resolution = forecast_to_score.question.resolution
-        if isinstance(resolution, AmbiguousResolutionType):
+        if isinstance(resolution, AnnulledAmbiguousResolutionType):
             return []
 
         spot_forecasts_from_others: list[Forecast] = self.question_to_spot_forecasts(
@@ -171,3 +173,15 @@ class SimulatedTournament(BaseModel):
         spot_baseline_score = forecast_to_score.get_spot_baseline_score(resolution)
         scores = [spot_peer_score, spot_baseline_score]
         return scores
+
+    def _check_no_duplicate_questions(self) -> None:
+        question_ids = [question.question_id for question in self.questions]
+        if len(question_ids) != len(set(question_ids)):
+            raise ValueError("Duplicate question IDs found in questions")
+
+        question_texts = [question.question_text for question in self.questions]
+        if len(question_texts) != len(set(question_texts)):
+            raise ValueError("Duplicate question texts found in questions")
+
+        if len(self.questions) != len(set(self.questions)):
+            raise ValueError("Duplicate questions found in questions")
