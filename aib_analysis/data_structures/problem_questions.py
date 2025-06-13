@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from aib_analysis.data_structures.data_models import Question
 from enum import Enum
 import json
+from typing import Literal
 
 """
 There are 3 questions of:
@@ -139,7 +140,7 @@ class ProblemType(Enum):
 
 class SolutionType(Enum):
     FORCE_MATCH = "force_match" # For "Between tournament" problem
-    REMOVE = "remove" # For "Between tournament" problem
+    SKIP_QUESTION = "skip_question" # For "Between tournament" problem
     TAKE_LATEST = "take_latest" # For "Within tournament" problem
     TAKE_INDEX = "take_index" # For "Within tournament" problem
 
@@ -150,13 +151,13 @@ class ProblemGroup(BaseModel):
     solution_type: SolutionType | None = None
     index: int | None = None
 
-    def solve_problem_group(self, questions_to_choose_from: list[Question]) -> Question | None:
+    def solve_problem_group(self, questions_to_choose_from: list[Question]) -> Question | Literal["skip_question"]:
         if self.solution_type is None:
             raise ValueError("Solution type is not set")
         elif self.solution_type == SolutionType.FORCE_MATCH:
             return self.questions[0]
-        elif self.solution_type == SolutionType.REMOVE:
-            return None
+        elif self.solution_type == SolutionType.SKIP_QUESTION:
+            return "skip_question"
         elif self.solution_type == SolutionType.TAKE_LATEST:
             sorted_questions = sorted(questions_to_choose_from, key=lambda x: x.created_at)
             return sorted_questions[-1]
@@ -178,6 +179,9 @@ class ProblemManager:
 
     @classmethod
     def find_matching_problem_group(cls, input_questions: list[Question]) -> ProblemGroup | None:
+        if len(input_questions) < 2:
+            raise ValueError("Need at least 2 questions to find a problem group")
+
         if cls._problem_groups is None:
             cls._problem_groups = cls._load_problem_groups()
         matches = []
@@ -200,6 +204,7 @@ class ProblemManager:
         cls._problem_groups.append(problem_group)
         with open(cls.PROBLEM_GROUP_FILE_PATH, "w") as f:
             json.dump([problem_group.model_dump() for problem_group in cls._problem_groups], f)
+
 
 poor_questions = [
     "How many Grammy awards will Taylor Swift win in 2025?",  # Pro/Bot question have different options (but the one that resolved was the same)

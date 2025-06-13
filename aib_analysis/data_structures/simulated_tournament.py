@@ -15,6 +15,7 @@ from aib_analysis.data_structures.data_models import (
     ScoreType,
     User,
 )
+from aib_analysis.data_structures.problem_questions import ProblemManager, ProblemGroup
 
 logger = logging.getLogger(__name__)
 
@@ -189,10 +190,11 @@ class SimulatedTournament(BaseModel):
 
         duplicate_error_messages = []
         for question_text, questions in question_text_map.items():
-            if len(questions) > 1:
-                error_message = "# Duplicates for question text: " + question_text + "\n"
-                error_message += Question.question_comparison_table(questions)
-                duplicate_error_messages.append(error_message)
+            if len(questions) == 1:
+                continue
+            error_message = "# Duplicates for question text: " + question_text + "\n"
+            error_message += Question.question_comparison_table(questions)
+            duplicate_error_messages.append(error_message)
 
         if len(duplicate_error_messages) > 0:
             combined_error_message = "\n\n".join(duplicate_error_messages)
