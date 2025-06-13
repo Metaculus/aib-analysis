@@ -22,11 +22,11 @@ logger = logging.getLogger(__name__)
 poor_questions = [
     "How many Grammy awards will Taylor Swift win in 2025?",  # Pro/Bot question have different options (but the one that resolved was the same)
     "Which party will win the 2nd highest number of seats in the 2025 German federal election?",  # Same as above
-    "What Premier League position will Nottingham Forest F.C. be in on March 8, 2025?", # The spot scoring time is different for bot/pro question (but only off by 2 days).
+    "What Premier League position will Nottingham Forest F.C. be in on March 8, 2025?",  # The spot scoring time is different for bot/pro question (but only off by 2 days).
 ]
 
 problem_questions = [
-    "How many arms sales globally will the US State Department approve in March 2025?", # The options for the pro vs bot questions are different, and different options resolved. Also the spot scoring time is off by 1.2 weeks.
+    "How many arms sales globally will the US State Department approve in March 2025?",  # The options for the pro vs bot questions are different, and different options resolved. Also the spot scoring time is off by 1.2 weeks.
     # https://www.metaculus.com/questions/34706/ vs https://www.metaculus.com/questions/34382/
 ]
 
@@ -64,11 +64,15 @@ def combine_on_question_title_intersection(
                     continue
                 else:
                     unique_question_titles.add(question_1_text)
-                logger.info(f"Found match for '{question_1_text}' vs '{question_2_text}'")
+                logger.info(
+                    f"Found match for '{question_1_text}' vs '{question_2_text}'"
+                )
 
                 if question_1.question_text in problem_questions:
                     # Skip questions that don't match in important ways.
-                    logger.warning(f"Skipping question {question_1_text} because it is in problem_questions. URL: {question_1.url} vs {question_2.url}")
+                    logger.warning(
+                        f"Skipping question {question_1_text} because it is in problem_questions. URL: {question_1.url} vs {question_2.url}"
+                    )
                     continue
 
                 if not question_1.question_text in poor_questions:
@@ -82,6 +86,7 @@ def combine_on_question_title_intersection(
                     tournament_2.question_to_forecasts(question_2.question_id)
                 )
 
+                # TODO: @Check Are all relationships between objects kept correct? Should I also deep copy users? Or can I remove deep copying? Probably make this into a class function for sake of sfetry for new objects added to heirarchy.
                 new_question = copy.deepcopy(question_1)
                 for forecast in new_forecasts:
                     copied_forecast: Forecast = copy.deepcopy(forecast)
@@ -116,6 +121,16 @@ def _assert_questions_match_in_important_ways(
     assert (
         question_1.spot_scoring_time == question_2.spot_scoring_time
     ), f"Question spot scoring times do not match for {question_1_text}. {question_1.spot_scoring_time} != {question_2.spot_scoring_time}. URL: {question_1.url} vs {question_2.url}"
+
+
+def constrain_question_types(
+    tournament: SimulatedTournament, question_types: list[QuestionType]
+) -> SimulatedTournament:
+    filtered_forecasts = []
+    for forecast in tournament.forecasts:
+        if forecast.question.type in question_types:
+            filtered_forecasts.append(forecast)
+    return SimulatedTournament(forecasts=filtered_forecasts)
 
 
 def create_team_from_leaderboard(
@@ -158,7 +173,9 @@ def calculate_calibration_curve(input_forecasts: list[Forecast]) -> CalibrationC
         resolution = f.question.resolution
         if resolution is None:
             continue
-        assert f.question.type == QuestionType.BINARY, "Calibration curve is only supported for binary questions"
+        assert (
+            f.question.type == QuestionType.BINARY
+        ), "Calibration curve is only supported for binary questions"
         assert f.prediction is not None, "Forecast prediction is None"
         assert isinstance(resolution, bool), f"Resolution is not a bool: {resolution}"
         predictions.append(f.prediction[0])
@@ -201,7 +218,11 @@ def calculate_calibration_curve(input_forecasts: list[Forecast]) -> CalibrationC
                 lower_bound=p_min,
                 upper_bound=p_max,
                 lower_confidence_interval=float(lower_confidence_interval),
-                average_resolution=float(average_resolution) if average_resolution is not None else None,
+                average_resolution=(
+                    float(average_resolution)
+                    if average_resolution is not None
+                    else None
+                ),
                 upper_confidence_interval=float(upper_confidence_interval),
                 perfect_calibration=float(perfect_calibration),
                 forecast_count=len(resolutions_for_bucket),

@@ -26,7 +26,7 @@ to install all required dependencies.
 ## Running the Analysis
 To run the analysis please execute:
 ```
-streamlit run aib_analysis/streamlit_frontened.py
+poetry run streamlit run aib_analysis/streamlit_frontend.py
 ```
 
 This will bring up the visuals for the analysis. Make sure you have chosen the right input data in this script.

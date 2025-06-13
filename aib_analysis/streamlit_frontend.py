@@ -19,6 +19,7 @@ from aib_analysis.process_tournament import (
     combine_on_question_title_intersection,
     create_team_from_leaderboard,
     get_leaderboard,
+    constrain_question_types,
 )
 from aib_analysis.simulated_tournament import SimulatedTournament
 from aib_analysis.stats import MeanHypothesisCalculator
@@ -46,6 +47,12 @@ def main():
     with tab2:
         bot_tournament = load_and_cache_tournament(bot_path, UserType.BOT)
         display_tournament(bot_tournament, "Bot")
+        binary_tournament = constrain_question_types(bot_tournament, [QuestionType.BINARY])
+        display_tournament(binary_tournament, "Bot (Binary)")
+        numeric_tournament = constrain_question_types(bot_tournament, [QuestionType.NUMERIC])
+        display_tournament(numeric_tournament, "Bot (Numeric)")
+        multiple_choice_tournament = constrain_question_types(bot_tournament, [QuestionType.MULTIPLE_CHOICE])
+        display_tournament(multiple_choice_tournament, "Bot (Multiple Choice)")
 
     with tab3:
         combined_tournament = combine_on_question_title_intersection(
