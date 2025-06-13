@@ -2,9 +2,9 @@ import logging
 
 import pytest
 
-from aib_analysis.custom_types import ScoreType, UserType
-from aib_analysis.load_tournament import load_tournament
+from aib_analysis.custom_types import QuestionType, ScoreType
 from aib_analysis.process_tournament import (
+    constrain_question_types,
     combine_on_question_title_intersection,
     get_leaderboard,
 )
@@ -12,18 +12,20 @@ from aib_analysis.simulated_tournament import SimulatedTournament
 from tests.mock_data_maker import (
     make_forecast,
     make_question_binary,
-    make_question_mc,
-    make_question_numeric,
     make_user,
 )
 
 logger = logging.getLogger(__name__)
 
+
 class TestLeaderboard:
 
-    @pytest.mark.parametrize("score_type", [ScoreType.SPOT_BASELINE, ScoreType.SPOT_PEER])
+    @pytest.mark.parametrize(
+        "score_type", [ScoreType.SPOT_BASELINE, ScoreType.SPOT_PEER]
+    )
     def test_simulated_tournament_leaderboard_ranking_good_forecast_higher(
-        self, score_type: ScoreType,
+        self,
+        score_type: ScoreType,
     ):
         question = make_question_binary()
         user_good = make_user("good")
@@ -48,9 +50,9 @@ class TestLeaderboard:
             assert entry_list[1].user.name == "medium"
             assert entry_list[2].user.name == "bad"
 
-
     def test_leaderboard_pros(
-        self, pro_tournament: SimulatedTournament,
+        self,
+        pro_tournament: SimulatedTournament,
     ):
         tournament = pro_tournament
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
@@ -66,7 +68,8 @@ class TestLeaderboard:
         assert entries[9].sum_of_scores == pytest.approx(-908.457, abs=0.1)
 
     def test_leaderboard_bots(
-        self, bot_tournament: SimulatedTournament,
+        self,
+        bot_tournament: SimulatedTournament,
     ):
         # TODO: @Check Why is this leaderboard not matching, but the pro leaderboard is?
         tournament = bot_tournament
@@ -83,6 +86,57 @@ class TestLeaderboard:
         assert entries[6].user.name == "GreeneiBot2"
         assert entries[7].user.name == "twsummerbot"
         assert entries[8].user.name == "cookics_bot_TEST"
+
+    def test_leaderboard_binary_bots(
+        self,
+        bot_tournament: SimulatedTournament,
+    ):
+        binary_tournament = constrain_question_types(
+            bot_tournament, [QuestionType.BINARY]
+        )
+        leaderboard = get_leaderboard(binary_tournament, ScoreType.SPOT_PEER)
+        entries = leaderboard.entries_via_sum_of_scores()
+        assert entries[0].user.name == "manticAI"
+        assert entries[0].sum_of_scores == pytest.approx(1691.05, abs=0.1)
+        assert entries[1].user.name == "pgodzinai"
+        assert entries[13].user.name == "MWG"
+        assert entries[13].sum_of_scores == pytest.approx(215.99, abs=0.1)
+        assert entries[45].user.name == "InstitutPelFutur"
+        assert entries[45].sum_of_scores == pytest.approx(-2114.76, abs=0.1)
+
+    def test_leaderboard_numeric_bots(
+        self,
+        bot_tournament: SimulatedTournament,
+    ):
+        numeric_tournament = constrain_question_types(
+            bot_tournament, [QuestionType.NUMERIC]
+        )
+        leaderboard = get_leaderboard(numeric_tournament, ScoreType.SPOT_PEER)
+        entries = leaderboard.entries_via_sum_of_scores()
+        assert entries[0].user.name == "meta-o1-preview"
+        assert entries[0].sum_of_scores == pytest.approx(1683.54, abs=0.1)
+        assert entries[1].user.name == "mmBot"
+        assert entries[13].user.name == "metac-grok-2-1212"
+        assert entries[13].sum_of_scores == pytest.approx(153.21, abs=0.1)
+        assert entries[45].user.name == "minefrac1"
+        assert entries[45].sum_of_scores == pytest.approx(-1348.27, abs=0.1)
+
+    def test_leaderboard_multiple_choice_bots(
+        self,
+        bot_tournament: SimulatedTournament,
+    ):
+        multiple_choice_tournament = constrain_question_types(
+            bot_tournament, [QuestionType.MULTIPLE_CHOICE]
+        )
+        leaderboard = get_leaderboard(multiple_choice_tournament, ScoreType.SPOT_PEER)
+        entries = leaderboard.entries_via_sum_of_scores()
+        assert entries[0].user.name == "metac-o1"
+        assert entries[0].sum_of_scores == pytest.approx(964.41, abs=0.1)
+        assert entries[1].user.name == "metac-Gemini-Exp-1206"
+        assert entries[13].user.name == "Grizeu_Bot"
+        assert entries[13].sum_of_scores == pytest.approx(189.96, abs=0.1)
+        assert entries[45].user.name == "ajf-bot"
+        assert entries[45].sum_of_scores == pytest.approx(-1342.38, abs=0.1)
 
 
 class TestCombineTournaments:
@@ -117,7 +171,11 @@ class TestCombineTournaments:
         assert combined.users[0].name == user1.name
         assert combined.users[1].name == user2.name
         assert len(combined.forecasts) == 2
-        question1_forecasts = [f for f in combined.forecasts if f.question.question_id == question1.question_id]
+        question1_forecasts = [
+            f
+            for f in combined.forecasts
+            if f.question.question_id == question1.question_id
+        ]
         assert len(question1_forecasts) == 2
 
     def test_combine_tournaments_on_question_intersection(
@@ -129,7 +187,11 @@ class TestCombineTournaments:
         bot_forecasts = bot_tournament.forecasts
         pro_users = pro_tournament.users
         bot_users = bot_tournament.users
-        combined_tournament = combine_on_question_title_intersection(pro_tournament, bot_tournament)
+        combined_tournament = combine_on_question_title_intersection(
+            pro_tournament, bot_tournament
+        )
         assert len(combined_tournament.questions) == 99
-        assert len(combined_tournament.forecasts) < len(pro_forecasts) + len(bot_forecasts)
+        assert len(combined_tournament.forecasts) < len(pro_forecasts) + len(
+            bot_forecasts
+        )
         assert len(combined_tournament.users) < len(pro_users) + len(bot_users)
