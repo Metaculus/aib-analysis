@@ -15,20 +15,11 @@ from aib_analysis.data_models import (
     ScoreType,
     User,
 )
+from aib_analysis.problem_questions import poor_questions, problem_questions
 from aib_analysis.simulated_tournament import SimulatedTournament
 
 logger = logging.getLogger(__name__)
 
-poor_questions = [
-    "How many Grammy awards will Taylor Swift win in 2025?",  # Pro/Bot question have different options (but the one that resolved was the same)
-    "Which party will win the 2nd highest number of seats in the 2025 German federal election?",  # Same as above
-    "What Premier League position will Nottingham Forest F.C. be in on March 8, 2025?",  # The spot scoring time is different for bot/pro question (but only off by 2 days).
-]
-
-problem_questions = [
-    "How many arms sales globally will the US State Department approve in March 2025?",  # The options for the pro vs bot questions are different, and different options resolved. Also the spot scoring time is off by 1.2 weeks.
-    # https://www.metaculus.com/questions/34706/ vs https://www.metaculus.com/questions/34382/
-]
 
 
 def get_leaderboard(
@@ -176,7 +167,7 @@ def calculate_calibration_curve(input_forecasts: list[Forecast]) -> CalibrationC
     weights: list[float] = []
     for f in input_forecasts:
         resolution = f.question.resolution
-        if resolution is None:
+        if f.question.is_annulled_or_ambiguous:
             continue
         assert (
             f.question.type == QuestionType.BINARY

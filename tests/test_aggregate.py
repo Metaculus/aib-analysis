@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from aib_analysis.aggregate import (
+from aib_analysis.math.aggregate import (
     AggregateUser,
     aggregate_forecasts,
     create_aggregated_user_at_spot_time,

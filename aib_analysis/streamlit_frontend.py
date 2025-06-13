@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -5,14 +6,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import typeguard
-import logging
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
 sys.path.append(top_level_dir)
 
 
-from aib_analysis.aggregate import create_aggregated_user_at_spot_time
+from aib_analysis.math.aggregate import create_aggregated_user_at_spot_time
 from aib_analysis.custom_types import QuestionType
 from aib_analysis.data_models import Forecast, Leaderboard, ScoreType, UserType
 from aib_analysis.load_tournament import load_tournament
@@ -24,7 +24,7 @@ from aib_analysis.process_tournament import (
     get_leaderboard,
 )
 from aib_analysis.simulated_tournament import SimulatedTournament
-from aib_analysis.stats import MeanHypothesisCalculator
+from aib_analysis.math.stats import MeanHypothesisCalculator
 from conftest import initialize_logging
 
 logger = logging.getLogger(__name__)
@@ -105,6 +105,8 @@ def display_tournament(tournament: SimulatedTournament, name: str):
         display_tournament_stats(tournament)
     with st.expander(f"{name} Tournament Forecasts"):
         display_forecasts(tournament)
+    with st.expander(f"{name} Questions"):
+        display_questions(tournament)
     # with st.expander(f"{name} Calibration Curve"):
     #     display_calibration_curve(tournament)
 
@@ -149,7 +151,8 @@ def display_tournament_stats(tournament: SimulatedTournament) -> None:
     num_baseline_scores_calculated = len(
         [s for s in tournament.scores if s.type == ScoreType.SPOT_BASELINE]
     )
-    num_annulled = len([f for f in forecasts if f.question.resolution is None])
+    num_annulled_questions = len([q for q in tournament.questions if q.is_annulled_or_ambiguous])
+    num_annulled_forecasts = len([f for f in forecasts if f.question.is_annulled_or_ambiguous])
 
     # Calculate averages
     forecasts_per_user = num_forecasts / num_users if num_users > 0 else 0
@@ -163,7 +166,8 @@ def display_tournament_stats(tournament: SimulatedTournament) -> None:
     st.write(f"Number of forecasts: {num_forecasts}")
     st.write(f"Number of users: {num_users}")
     st.write(f"Number of questions: {num_questions}")
-    st.write(f"Number of annulled questions: {num_annulled}")
+    st.write(f"Number of annulled or ambiguous questions: {num_annulled_questions}")
+    st.write(f"Number of annulled or ambiguous forecasts: {num_annulled_forecasts}")
     st.write(f"Number of scores calculated: {num_scores_calculated}")
     st.write(f"Number of peer scores calculated: {num_peer_scores_calculated}")
     st.write(f"Number of baseline scores calculated: {num_baseline_scores_calculated}")
@@ -246,6 +250,18 @@ def display_forecasts(tournament: SimulatedTournament):
         hide_index=True,
     )
 
+
+def display_questions(tournament: SimulatedTournament):
+    questions = tournament.questions
+    data = [
+        {
+            "url": question.url,
+            **question.model_dump()
+        }
+        for question in questions
+    ]
+    df = pd.DataFrame(data)
+    st.dataframe(df, use_container_width=True)
 
 def display_leaderboard(leaderboard: Leaderboard):
     confidence_level = 0.95

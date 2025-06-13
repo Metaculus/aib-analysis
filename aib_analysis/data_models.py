@@ -7,14 +7,15 @@ from pydantic import BaseModel, model_validator
 from typing_extensions import Self
 
 from aib_analysis.custom_types import (
+    AnnulledAmbiguousResolutionType,
     ForecastType,
     QuestionType,
     ResolutionType,
     ScoreType,
     UserType,
 )
-from aib_analysis.scoring import calculate_baseline_score, calculate_peer_score
-from aib_analysis.stats import ConfidenceIntervalCalculator, ConfidenceInterval
+from aib_analysis.math.scoring import calculate_baseline_score, calculate_peer_score
+from aib_analysis.math.stats import ConfidenceInterval, ConfidenceIntervalCalculator
 
 
 class Forecast(BaseModel):
@@ -150,7 +151,7 @@ class Score(BaseModel):
 
     @model_validator(mode="after")
     def check_forecast_resolution_not_none(self) -> Self:
-        if self.forecast.question.resolution is None:
+        if self.forecast.question.resolution is None or self.forecast.question.is_annulled_or_ambiguous:
             raise ValueError(
                 "Forecast's question resolution must not be None. You cannot assign a score to ambiguous/annulled resolution"
             )
@@ -173,6 +174,10 @@ class Question(BaseModel):
     weight: float
     post_id: int
     spot_scoring_time: datetime
+
+    @property
+    def is_annulled_or_ambiguous(self) -> bool:
+        return isinstance(self.resolution, AnnulledAmbiguousResolutionType)
 
     @model_validator(mode="after")
     def check_resolution_type_matches(self) -> Self:
@@ -203,6 +208,8 @@ class Question(BaseModel):
             raise ValueError(
                 "Multiple choice questions must have at least two options."
             )
+        if "PRACTICE" in self.question_text:
+            raise ValueError("Practice questions are not allowed.")
         return self
 
     @model_validator(mode="after")
