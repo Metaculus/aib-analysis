@@ -1,9 +1,9 @@
 import random
 from datetime import datetime
 
-from aib_analysis.custom_types import QuestionType, UserType
-from aib_analysis.data_models import Forecast, Question, User
-from aib_analysis.simulated_tournament import SimulatedTournament
+from aib_analysis.data_structures.custom_types import QuestionType, UserType
+from aib_analysis.data_structures.data_models import Forecast, Question, User
+from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
 from tests.test_scoring import generate_cdf, Percentile
 
 def make_user(name: str, user_type: UserType = UserType.PRO) -> User:

@@ -2,8 +2,8 @@ from datetime import datetime
 
 import pytest
 
-from aib_analysis.custom_types import QuestionType, ScoreType, UserType
-from aib_analysis.data_models import Leaderboard, LeaderboardEntry, Question
+from aib_analysis.data_structures.custom_types import QuestionType, ScoreType, UserType
+from aib_analysis.data_structures.data_models import Leaderboard, LeaderboardEntry, Question
 from tests.mock_data_maker import (
     make_forecast,
     make_question_binary,

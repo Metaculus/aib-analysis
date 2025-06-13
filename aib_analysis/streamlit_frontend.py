@@ -13,8 +13,8 @@ sys.path.append(top_level_dir)
 
 
 from aib_analysis.math.aggregate import create_aggregated_user_at_spot_time
-from aib_analysis.custom_types import QuestionType
-from aib_analysis.data_models import Forecast, Leaderboard, ScoreType, UserType
+from aib_analysis.data_structures.custom_types import QuestionType
+from aib_analysis.data_structures.data_models import Forecast, Leaderboard, ScoreType, UserType
 from aib_analysis.load_tournament import load_tournament
 from aib_analysis.process_tournament import (
     calculate_calibration_curve,
@@ -23,7 +23,7 @@ from aib_analysis.process_tournament import (
     create_team_from_leaderboard,
     get_leaderboard,
 )
-from aib_analysis.simulated_tournament import SimulatedTournament
+from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
 from aib_analysis.math.stats import MeanHypothesisCalculator
 from conftest import initialize_logging
 

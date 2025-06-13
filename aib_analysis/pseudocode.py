@@ -5,8 +5,8 @@ from typing import Callable, Literal
 
 from pydantic import BaseModel
 
-from aib_analysis.data_models import Forecast, Question, Score, User
-from aib_analysis.simulated_tournament import SimulatedTournament
+from aib_analysis.data_structures.data_models import Forecast, Question, Score, User
+from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
 
 # TODO: Since I'm already creating spot score calculations,
 #   I might as well just input forecasts rather than scores into the tournament

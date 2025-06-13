@@ -6,7 +6,7 @@ from datetime import datetime
 from pydantic import BaseModel, model_validator
 from typing_extensions import Self
 
-from aib_analysis.custom_types import (
+from aib_analysis.data_structures.custom_types import (
     AnnulledAmbiguousResolutionType,
     ForecastType,
     QuestionType,

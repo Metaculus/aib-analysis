@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from aib_analysis.data_models import (
+from aib_analysis.data_structures.data_models import (
     Forecast,
     ForecastType,
     Question,
@@ -12,7 +12,7 @@ from aib_analysis.data_models import (
     User,
     UserType,
 )
-from aib_analysis.simulated_tournament import SimulatedTournament
+from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
 
 logger = logging.getLogger(__name__)
 

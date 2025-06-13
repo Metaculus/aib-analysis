@@ -6,15 +6,15 @@ import typeguard
 from pydantic import BaseModel, model_validator
 from typing_extensions import Self
 
-from aib_analysis.custom_types import (
+from aib_analysis.data_structures.custom_types import (
     BinaryForecastType,
     MCForecastType,
     NumericForecastType,
     QuestionType,
     UserType,
 )
-from aib_analysis.data_models import Forecast, Question, User
-from aib_analysis.simulated_tournament import SimulatedTournament
+from aib_analysis.data_structures.data_models import Forecast, Question, User
+from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
 
 logger = logging.getLogger(__name__)
 
