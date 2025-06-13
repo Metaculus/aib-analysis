@@ -15,7 +15,6 @@ from aib_analysis.data_structures.data_models import (
     ScoreType,
     User,
 )
-from aib_analysis.data_structures.problem_questions import ProblemManager, ProblemGroup
 
 logger = logging.getLogger(__name__)
 

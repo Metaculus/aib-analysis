@@ -1,9 +1,8 @@
 from __future__ import annotations
+
 from pydantic import BaseModel
+
 from aib_analysis.data_structures.data_models import Question
-from enum import Enum
-import json
-from typing import Literal
 
 """
 There are 3 questions of:
@@ -58,6 +57,8 @@ Problem question candidates:
 # Don't log a warning if the ProblemQuestion is in manually listed and has the correct ID
 
 # TODO: 5-9 version matches pro question, 0-5 matches site question
+    # "How many arms sales globally will the US State Department approve in March 2025?",  # The options for the pro vs bot questions are different, and different options resolved. Also the spot scoring time is off by 1.2 weeks.
+    # https://www.metaculus.com/questions/34706/ vs https://www.metaculus.com/questions/34382/
 # Duplicates for question text: How many arms sales globally will the US State Department approve in March 2025?
 | Parameter | Question 1 | Question 2 |
 |-----------|---|---|
@@ -134,85 +135,73 @@ Problem question candidates:
 | Spot Scoring Time | 2025-03-18 20:00:00+00:00 | 2025-03-20 20:00:00+00:00 |
 """
 
-class ProblemType(Enum):
-    BETWEEN_TOURNAMENT = "between_tournament"
-    WITHIN_TOURNAMENT = "within_tournament"
 
-class SolutionType(Enum):
-    FORCE_MATCH = "force_match" # For "Between tournament" problem
-    SKIP_QUESTION = "skip_question" # For "Between tournament" problem
-    TAKE_LATEST = "take_latest" # For "Within tournament" problem
-    TAKE_INDEX = "take_index" # For "Within tournament" problem
-
-class ProblemGroup(BaseModel):
+class ProblemQuestion(BaseModel):
+    question_text: str
+    urls: list[str]
     notes: str
-    questions: list[Question]
-    problem_type: ProblemType
-    solution_type: SolutionType | None = None
-    index: int | None = None
 
-    def solve_problem_group(self, questions_to_choose_from: list[Question]) -> Question | Literal["skip_question"]:
-        if self.solution_type is None:
-            raise ValueError("Solution type is not set")
-        elif self.solution_type == SolutionType.FORCE_MATCH:
-            return self.questions[0]
-        elif self.solution_type == SolutionType.SKIP_QUESTION:
-            return "skip_question"
-        elif self.solution_type == SolutionType.TAKE_LATEST:
-            sorted_questions = sorted(questions_to_choose_from, key=lambda x: x.created_at)
-            return sorted_questions[-1]
-        elif self.solution_type == SolutionType.TAKE_INDEX:
-            assert self.index is not None, "Index is not set"
-            return questions_to_choose_from[self.index]
+    def question_matches(self, question: Question) -> bool:
+        post_id = str(question.post_id)
+        input_url = f"https://www.metaculus.com/questions/{post_id}/"
+
+        input_question_text = question.question_text
+        problem_question_text = self.question_text
+        text_matches = input_question_text.strip() == problem_question_text.strip()
+        url_matches = input_url in self.urls
+
+        if text_matches and url_matches:
+            return True
+        elif not text_matches and not url_matches:
+            return False
         else:
-            raise ValueError(f"Invalid solution type: {self.solution_type}")
+            raise ValueError(
+                f"Input Question {input_url} matches some parts of problem but not all | "
+                f"Input Question_text: {question.question_text} | "
+                f"Problem Question_text: {self.question_text} | "
+                f"Problem: {self.model_dump_json()}"
+            )
+
 
 class ProblemManager:
-    PROBLEM_GROUP_FILE_PATH = "problem_questions.json"
-    _problem_groups: list[ProblemGroup] | None = None
+
+    _prequalified_questions_when_matching_tournaments: list[ProblemQuestion] = [
+        ProblemQuestion(
+            question_text="How many Grammy awards will Taylor Swift win in 2025?",
+            urls=[
+                "https://www.metaculus.com/questions/31797/",
+                "https://www.metaculus.com/questions/31865/",
+            ],
+            notes="Pro/Bot question have different options (but the one that resolved was the same)",
+        ),
+        ProblemQuestion(
+            question_text="Which party will win the 2nd highest number of seats in the 2025 German federal election?",
+            urls=[
+                "https://www.metaculus.com/questions/35002/",
+                "https://www.metaculus.com/questions/34940/",
+            ],
+            notes="Pro/Bot question have different options (but the one that resolved was the same)",
+        ),
+        ProblemQuestion(
+            question_text="What Premier League position will Nottingham Forest F.C. be in on March 8, 2025?",
+            urls=[
+                "https://www.metaculus.com/questions/34389/",
+                "https://www.metaculus.com/questions/34281/",
+                "https://www.metaculus.com/questions/34667/"
+            ],
+            notes="The spot scoring time is different for bot/pro question (but only off by 2 days)",
+        ),
+    ]
 
     @classmethod
-    def _load_problem_groups(cls) -> list[ProblemGroup]:
-        with open(cls.PROBLEM_GROUP_FILE_PATH, "r") as f:
-            json_data = json.load(f)
-        return [ProblemGroup(**problem_group) for problem_group in json_data]
-
-    @classmethod
-    def find_matching_problem_group(cls, input_questions: list[Question]) -> ProblemGroup | None:
-        if len(input_questions) < 2:
-            raise ValueError("Need at least 2 questions to find a problem group")
-
-        if cls._problem_groups is None:
-            cls._problem_groups = cls._load_problem_groups()
-        matches = []
-        for problem_group in cls._problem_groups:
-            problem_group_question_titles = set([question.question_text for question in problem_group.questions])
-            input_question_titles = set([question.question_text for question in input_questions])
-            if problem_group_question_titles == input_question_titles:
-                assert set(problem_group.questions) == set(input_questions), "Question titles match, but questions do not"
-                matches.append(problem_group)
-        if len(matches) == 0:
-            return None
-        elif len(matches) == 1:
-            return matches[0]
-        else:
-            raise ValueError(f"Multiple problem groups found for {input_questions}")
-
-    @classmethod
-    def save_problem_group(cls, problem_group: ProblemGroup):
-        assert cls._problem_groups is not None, "Problem groups must be loaded first"
-        cls._problem_groups.append(problem_group)
-        with open(cls.PROBLEM_GROUP_FILE_PATH, "w") as f:
-            json.dump([problem_group.model_dump() for problem_group in cls._problem_groups], f)
-
-
-poor_questions = [
-    "How many Grammy awards will Taylor Swift win in 2025?",  # Pro/Bot question have different options (but the one that resolved was the same)
-    "Which party will win the 2nd highest number of seats in the 2025 German federal election?",  # Same as above
-    "What Premier League position will Nottingham Forest F.C. be in on March 8, 2025?",  # The spot scoring time is different for bot/pro question (but only off by 2 days).
-]
-
-problem_questions = [
-    # "How many arms sales globally will the US State Department approve in March 2025?",  # The options for the pro vs bot questions are different, and different options resolved. Also the spot scoring time is off by 1.2 weeks.
-    # https://www.metaculus.com/questions/34706/ vs https://www.metaculus.com/questions/34382/
-]
+    def is_prequalified_in_tournament_matching(cls, question_1: Question, question_2: Question) -> bool:
+        question_1_match = False
+        question_2_match = False
+        for q in ProblemManager._prequalified_questions_when_matching_tournaments:
+            if q.question_matches(question_1):
+                question_1_match = True
+            if q.question_matches(question_2):
+                question_2_match = True
+        if question_1_match != question_2_match:
+            raise ValueError(f"If question 1 is a problem question, then question 2 should be one as well. Question 1: {question_1.url}, Question 2: {question_2.url}")
+        return question_1_match or question_2_match

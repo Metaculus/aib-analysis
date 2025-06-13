@@ -178,7 +178,7 @@ class TestCombineTournaments:
         ]
         assert len(question1_forecasts) == 2
 
-    def test_combine_tournaments_on_question_intersection(
+    def test_combine_tournaments_pro_plus_bot(
         self,
         pro_tournament: SimulatedTournament,
         bot_tournament: SimulatedTournament,

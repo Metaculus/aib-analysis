@@ -15,15 +15,10 @@ from aib_analysis.data_structures.data_models import (
     ScoreType,
     User,
 )
-from aib_analysis.data_structures.problem_questions import (
-    poor_questions,
-    problem_questions,
-    ProblemGroup,
-    ProblemType,
-    SolutionType,
-)
-from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
 from aib_analysis.data_structures.problem_questions import ProblemManager
+from aib_analysis.data_structures.simulated_tournament import (
+    SimulatedTournament,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +46,17 @@ def combine_on_question_title_intersection(
         raise NotImplementedError(
             "Both tournaments have some of the same users. This is currently not supported."
         )
+
+    # Combine together if:
+    # - Question title matches
+    # - Has roughly the same close time
+    # - type
+
+    # TODO: Compare questions that match title, but do not match other things
+    # questions_dict: list = {}
+
+
+
     for question_1 in tournament_1.questions:
         for question_2 in tournament_2.questions:
             question_1_text = question_1.question_text.lower().strip()
@@ -65,29 +71,27 @@ def combine_on_question_title_intersection(
                     f"Found match for '{question_1_text}' vs '{question_2_text}'"
                 )
 
-                problem_group = ProblemManager.find_matching_problem_group([question_1, question_2])
-                if problem_group:
-                    solution = problem_group.solve_problem_group([question_1, question_2])
-                    if solution == "skip_question":
-                        logger.info(f"Skipping question {question_1_text} because it is in am unresolvable problem group")
-                        continue
-                else:
+                if not ProblemManager.is_prequalified_in_tournament_matching(question_1, question_2):
                     _assert_questions_match_in_important_ways(question_1, question_2)
 
-                new_forecasts = []
-                new_forecasts.extend(
+                forecasts_to_use: list[Forecast] = []
+                forecasts_to_use.extend(
                     tournament_1.question_to_forecasts(question_1.question_id)
                 )
-                new_forecasts.extend(
+                forecasts_to_use.extend(
                     tournament_2.question_to_forecasts(question_2.question_id)
                 )
 
                 # TODO: @Check Are all relationships between objects kept correct? Should I also deep copy users? Or can I remove deep copying? Probably make this into a class function for sake of sfetry for new objects added to heirarchy.
                 new_question = copy.deepcopy(question_1)
-                for forecast in new_forecasts:
-                    copied_forecast: Forecast = copy.deepcopy(forecast)
-                    copied_forecast.question = new_question
-                    combined_forecasts.append(copied_forecast)
+                for forecast in forecasts_to_use:
+                    new_forecast: Forecast = Forecast(
+                        question=new_question,
+                        user=forecast.user,
+                        prediction=forecast.prediction,
+                        prediction_time=forecast.prediction_time
+                    )
+                    combined_forecasts.append(new_forecast)
     tournament = SimulatedTournament(forecasts=combined_forecasts)
     return tournament
 
@@ -119,22 +123,12 @@ def _assert_questions_match_in_important_ways(
             question_1.spot_scoring_time == question_2.spot_scoring_time
         ), f"Question spot scoring times do not match for {question_1_text}. {question_1.spot_scoring_time} != {question_2.spot_scoring_time}"
     except AssertionError as e:
-        if (
-            ProblemManager.find_matching_problem_group([question_1, question_2])
-            is not None
-        ):
-            ProblemManager.save_problem_group(
-                ProblemGroup(
-                    notes=f"AssertionError: {e}",
-                    questions=[question_1, question_2],
-                    problem_type=ProblemType.BETWEEN_TOURNAMENT,
-                )
-            )
         question_comparison_table = (
             f"\n{Question.question_comparison_table([question_1, question_2])}"
         )
-        logger.error(f"AssertionError: {e}.\n{question_comparison_table}")
-        raise e
+        error_message = f"AssertionError: {e}.\n{question_comparison_table}"
+        logger.error(error_message)
+        raise ValueError(error_message)
 
 
 def constrain_question_types(

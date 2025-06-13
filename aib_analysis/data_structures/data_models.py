@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from datetime import datetime
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 from typing_extensions import Self
 
 from aib_analysis.data_structures.custom_types import (
@@ -14,8 +14,14 @@ from aib_analysis.data_structures.custom_types import (
     ScoreType,
     UserType,
 )
-from aib_analysis.math.scoring import calculate_baseline_score, calculate_peer_score
-from aib_analysis.math.stats import ConfidenceInterval, ConfidenceIntervalCalculator
+from aib_analysis.math.scoring import (
+    calculate_baseline_score,
+    calculate_peer_score,
+)
+from aib_analysis.math.stats import (
+    ConfidenceInterval,
+    ConfidenceIntervalCalculator,
+)
 
 
 class Forecast(BaseModel):
@@ -24,6 +30,8 @@ class Forecast(BaseModel):
     prediction: ForecastType
     prediction_time: datetime
     _id: str | None = None
+    model_config = ConfigDict(frozen=True)
+
 
     @property
     def id(self) -> str:
@@ -45,7 +53,7 @@ class Forecast(BaseModel):
             resolution=resolution,
             question_weight=q.weight,
             q_type=q.type.value,
-            options=q.options,
+            options=list(q.options) if q.options is not None else None,
             range_min=q.range_min,
             range_max=q.range_max,
             open_upper_bound=q.open_upper_bound,
@@ -75,7 +83,7 @@ class Forecast(BaseModel):
             resolution=resolution,
             question_weight=q.weight,
             q_type=q.type.value,
-            options=q.options,
+            options=list(q.options) if q.options is not None else None,
             range_min=q.range_min,
             range_max=q.range_max,
         )
@@ -144,6 +152,8 @@ class Score(BaseModel):
     type: ScoreType
     forecast: Forecast
     users_used_in_scoring: list[User] | None  # Empty if baseline
+    model_config = ConfigDict(frozen=True)
+
 
     @property
     def id(self) -> str:
@@ -161,12 +171,12 @@ class Score(BaseModel):
         return f"({self.score:.3f}) {self.forecast.question.url}"
 
 
-class Question(BaseModel):
+class Question(BaseModel, frozen=True):
     question_id: int
     type: QuestionType
     question_text: str
     resolution: ResolutionType
-    options: list[str] | None
+    options: tuple[str, ...] | None
     range_max: float | None
     range_min: float | None
     open_upper_bound: bool | None
@@ -175,6 +185,8 @@ class Question(BaseModel):
     post_id: int
     created_at: datetime
     spot_scoring_time: datetime
+    model_config = ConfigDict(frozen=True)
+
 
     @property
     def is_annulled_or_ambiguous(self) -> bool:
@@ -236,26 +248,6 @@ class Question(BaseModel):
     def url(self) -> str:
         return f"https://www.metaculus.com/questions/{self.post_id}/"
 
-    def __hash__(self) -> int:
-        # Convert options list to tuple for hashing if it exists
-        options_tuple = tuple(self.options) if self.options is not None else None
-        # Create a tuple of all fields that should be used for hashing
-        hash_tuple = (
-            self.question_id,
-            self.type,
-            self.question_text,
-            self.resolution,
-            options_tuple,
-            self.range_max,
-            self.range_min,
-            self.open_upper_bound,
-            self.open_lower_bound,
-            self.weight,
-            self.post_id,
-            self.spot_scoring_time,
-        )
-        return hash(hash_tuple)
-
     @classmethod
     def question_comparison_table(cls, questions: list[Question]) -> str:
         table = "| Parameter | " + " | ".join([f"Question {i+1}" for i in range(len(questions))]) + " |\n"
@@ -273,6 +265,7 @@ class User(BaseModel):
     name: str
     type: UserType
     aggregated_users: list[User]
+    model_config = ConfigDict(frozen=True)
 
     @property
     def is_metac_bot(self) -> bool:
@@ -282,6 +275,8 @@ class User(BaseModel):
 class Leaderboard(BaseModel):
     entries: list[LeaderboardEntry]
     type: ScoreType
+    model_config = ConfigDict(frozen=True)
+
 
     @model_validator(mode="after")
     def check_all_entries_same_score_type(self: Self) -> Self:
@@ -314,6 +309,8 @@ class Leaderboard(BaseModel):
 
 class LeaderboardEntry(BaseModel):
     scores: list[Score]
+    model_config = ConfigDict(frozen=True)
+
 
     @model_validator(mode="after")
     def check_single_user(self: Self) -> Self:

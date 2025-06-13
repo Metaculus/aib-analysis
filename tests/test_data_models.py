@@ -73,6 +73,7 @@ def test_question_validation_errors():
             open_lower_bound=None,
             weight=1.0,
             spot_scoring_time=datetime(2025, 1, 1),
+            created_at=datetime(2030, 5, 20, 0, 46, 31),
         )
     # Invalid resolution for multiple choice
     with pytest.raises(ValueError):
@@ -82,13 +83,14 @@ def test_question_validation_errors():
             type=QuestionType.MULTIPLE_CHOICE,
             question_text="Test MC",
             resolution=123,
-            options=["A", "B"],
+            options=("A", "B"),
             range_max=None,
             range_min=None,
             open_upper_bound=None,
             open_lower_bound=None,
             weight=1.0,
             spot_scoring_time=datetime(2025, 1, 1),
+            created_at=datetime(2030, 5, 20, 0, 46, 31),
         )
     # Invalid resolution for numeric
     with pytest.raises(ValueError):
@@ -105,6 +107,7 @@ def test_question_validation_errors():
             open_lower_bound=False,
             weight=1.0,
             spot_scoring_time=datetime(2025, 1, 1),
+            created_at=datetime(2030, 5, 20, 0, 46, 31),
         )
     # Invalid weight
     with pytest.raises(ValueError):
@@ -121,6 +124,7 @@ def test_question_validation_errors():
             open_lower_bound=None,
             weight=1.5,
             spot_scoring_time=datetime(2025, 1, 1),
+            created_at=datetime(2030, 5, 20, 0, 46, 31),
         )
     # Empty question text
     with pytest.raises(ValueError):
@@ -137,6 +141,7 @@ def test_question_validation_errors():
             open_lower_bound=None,
             weight=1.0,
             spot_scoring_time=datetime(2025, 1, 1),
+            created_at=datetime(2030, 5, 20, 0, 46, 31),
         )
     # MC with less than two options
     with pytest.raises(ValueError):
@@ -146,13 +151,14 @@ def test_question_validation_errors():
             type=QuestionType.MULTIPLE_CHOICE,
             question_text="Test MC options",
             resolution="A",
-            options=["A"],
+            options=("A",),
             range_max=None,
             range_min=None,
             open_upper_bound=None,
             open_lower_bound=None,
             weight=1.0,
             spot_scoring_time=datetime(2025, 1, 1),
+            created_at=datetime(2030, 5, 20, 0, 46, 31),
         )
     # Numeric missing bounds
     with pytest.raises(ValueError):
@@ -169,4 +175,5 @@ def test_question_validation_errors():
             open_lower_bound=None,
             weight=1.0,
             spot_scoring_time=datetime(2025, 1, 1),
+            created_at=datetime(2030, 5, 20, 0, 46, 31),
         )

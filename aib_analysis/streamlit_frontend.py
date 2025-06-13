@@ -51,12 +51,12 @@ def main():
     with tab2:
         bot_tournament = load_and_cache_tournament(bot_path, UserType.BOT)
         display_tournament(bot_tournament, "Bot")
-        binary_tournament = constrain_question_types(bot_tournament, [QuestionType.BINARY])
-        display_tournament(binary_tournament, "Bot (Binary)")
-        multiple_choice_tournament = constrain_question_types(bot_tournament, [QuestionType.MULTIPLE_CHOICE])
-        display_tournament(multiple_choice_tournament, "Bot (Multiple Choice)")
-        numeric_tournament = constrain_question_types(bot_tournament, [QuestionType.NUMERIC])
-        display_tournament(numeric_tournament, "Bot (Numeric)")
+        # binary_tournament = constrain_question_types(bot_tournament, [QuestionType.BINARY])
+        # display_tournament(binary_tournament, "Bot (Binary)")
+        # multiple_choice_tournament = constrain_question_types(bot_tournament, [QuestionType.MULTIPLE_CHOICE])
+        # display_tournament(multiple_choice_tournament, "Bot (Multiple Choice)")
+        # numeric_tournament = constrain_question_types(bot_tournament, [QuestionType.NUMERIC])
+        # display_tournament(numeric_tournament, "Bot (Numeric)")
 
     with tab3:
         combined_tournament = combine_on_question_title_intersection(

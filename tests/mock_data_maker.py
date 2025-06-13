@@ -7,7 +7,7 @@ from aib_analysis.data_structures.simulated_tournament import SimulatedTournamen
 from tests.test_scoring import generate_cdf, Percentile
 
 def make_user(name: str, user_type: UserType = UserType.PRO) -> User:
-    return User(name=name, type=user_type, is_aggregate=False, aggregated_users=[])
+    return User(name=name, type=user_type, aggregated_users=[])
 
 def make_question_binary(question_text: str = "Will it rain tomorrow?") -> Question:
     return Question(
@@ -23,6 +23,7 @@ def make_question_binary(question_text: str = "Will it rain tomorrow?") -> Quest
         open_lower_bound=None,
         weight=1.0,
         spot_scoring_time=datetime(2030, 5, 30, 0, 46, 31),
+        created_at=datetime(2030, 5, 20, 0, 46, 31),
     )
 
 def make_question_mc() -> Question:
@@ -32,13 +33,14 @@ def make_question_mc() -> Question:
         type=QuestionType.MULTIPLE_CHOICE,
         question_text="Which color?",
         resolution="Red",
-        options=["Red", "Blue", "Green"],
+        options=("Red", "Blue", "Green"),
         range_max=None,
         range_min=None,
         open_upper_bound=None,
         open_lower_bound=None,
         weight=1.0,
         spot_scoring_time=datetime(2025, 5, 30, 0, 46, 31),
+        created_at=datetime(2030, 5, 20, 0, 46, 31),
     )
 
 def make_question_numeric() -> Question:
@@ -55,6 +57,7 @@ def make_question_numeric() -> Question:
         open_lower_bound=False,
         weight=1.0,
         spot_scoring_time=datetime(2025, 5, 30, 0, 46, 31),
+        created_at=datetime(2030, 5, 20, 0, 46, 31),
     )
 
 def make_forecast(question: Question, user: User, prediction: list[float], forecast_time: datetime = datetime(2025, 5, 30, 0, 46, 31)) -> Forecast:
