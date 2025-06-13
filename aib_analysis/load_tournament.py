@@ -72,6 +72,7 @@ def _parse_forecast_row(
             range_min=_parse_lower_bound(row),
             open_upper_bound=_parse_open_upper_bound(row),
             open_lower_bound=_parse_open_lower_bound(row),
+            created_at=pd.to_datetime(row["created_at"]),
         )
         question_cache[question_id] = question
     if username in user_cache:

@@ -91,28 +91,32 @@ def _assert_questions_match_in_important_ways(
     question_1: Question, question_2: Question
 ) -> None:
     question_1_text = question_1.question_text
-    assert (
-        question_1.type == question_2.type
-    ), f"Question types do not match for {question_1_text}. {question_1.type} != {question_2.type}. URL: {question_1.url} vs {question_2.url}"
-    assert (
-        question_1.range_max == question_2.range_max
-    ), f"Question range max does not match for {question_1_text}. {question_1.range_max} != {question_2.range_max}. URL: {question_1.url} vs {question_2.url}"
-    assert (
-        question_1.range_min == question_2.range_min
-    ), f"Question range min does not match for {question_1_text}. {question_1.range_min} != {question_2.range_min}. URL: {question_1.url} vs {question_2.url}"
-    assert (
-        question_1.open_upper_bound == question_2.open_upper_bound
-    ), f"Question open upper bound does not match for {question_1_text}. {question_1.open_upper_bound} != {question_2.open_upper_bound}. URL: {question_1.url} vs {question_2.url}"
-    assert (
-        question_1.open_lower_bound == question_2.open_lower_bound
-    ), f"Question open lower bound does not match for {question_1_text}. {question_1.open_lower_bound} != {question_2.open_lower_bound}. URL: {question_1.url} vs {question_2.url}"
-    assert (
-        question_1.options == question_2.options
-    ), f"Question options do not match for {question_1_text}. {question_1.options} != {question_2.options}. URL: {question_1.url} vs {question_2.url}"
-    assert (
-        question_1.spot_scoring_time == question_2.spot_scoring_time
-    ), f"Question spot scoring times do not match for {question_1_text}. {question_1.spot_scoring_time} != {question_2.spot_scoring_time}. URL: {question_1.url} vs {question_2.url}"
-
+    question_comparison_table = f"\n{Question.question_comparison_table([question_1, question_2])}"
+    try:
+        assert (
+            question_1.type == question_2.type
+        ), f"Question types do not match for {question_1_text}. {question_1.type} != {question_2.type}. {question_comparison_table}"
+        assert (
+            question_1.range_max == question_2.range_max
+        ), f"Question range max does not match for {question_1_text}. {question_1.range_max} != {question_2.range_max}. {question_comparison_table}"
+        assert (
+            question_1.range_min == question_2.range_min
+        ), f"Question range min does not match for {question_1_text}. {question_1.range_min} != {question_2.range_min}. {question_comparison_table}"
+        assert (
+            question_1.open_upper_bound == question_2.open_upper_bound
+        ), f"Question open upper bound does not match for {question_1_text}. {question_1.open_upper_bound} != {question_2.open_upper_bound}. {question_comparison_table}"
+        assert (
+            question_1.open_lower_bound == question_2.open_lower_bound
+        ), f"Question open lower bound does not match for {question_1_text}. {question_1.open_lower_bound} != {question_2.open_lower_bound}. {question_comparison_table}"
+        assert (
+            question_1.options == question_2.options
+        ), f"Question options do not match for {question_1_text}. {question_1.options} != {question_2.options}. {question_comparison_table}"
+        assert (
+            question_1.spot_scoring_time == question_2.spot_scoring_time
+        ), f"Question spot scoring times do not match for {question_1_text}. {question_1.spot_scoring_time} != {question_2.spot_scoring_time}. {question_comparison_table}"
+    except AssertionError as e:
+        logger.error(f"AssertionError: {e}.\n{question_comparison_table}")
+        raise e
 
 def constrain_question_types(
     tournament: SimulatedTournament, question_types: list[QuestionType]
