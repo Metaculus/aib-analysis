@@ -7,9 +7,9 @@ import os
 import dotenv
 import pytest
 
-from aib_analysis.custom_types import UserType
+from aib_analysis.data_structures.custom_types import UserType
 from aib_analysis.load_tournament import load_tournament
-from aib_analysis.simulated_tournament import SimulatedTournament
+from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
 
 logger = logging.getLogger(__name__)
 

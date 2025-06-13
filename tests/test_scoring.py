@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
-from aib_analysis.data_models import ForecastType
+from aib_analysis.data_structures.data_models import ForecastType
 from aib_analysis.math.scoring import calculate_baseline_score, calculate_peer_score
 
 # TODO:

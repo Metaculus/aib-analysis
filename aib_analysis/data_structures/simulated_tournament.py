@@ -5,8 +5,8 @@ import logging
 from pydantic import BaseModel, PrivateAttr, model_validator
 from typing_extensions import Self
 
-from aib_analysis.custom_types import AnnulledAmbiguousResolutionType
-from aib_analysis.data_models import Forecast, Question, Score, ScoreType, User
+from aib_analysis.data_structures.custom_types import AnnulledAmbiguousResolutionType
+from aib_analysis.data_structures.data_models import Forecast, Question, Score, ScoreType, User
 
 logger = logging.getLogger(__name__)
 

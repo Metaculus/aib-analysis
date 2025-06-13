@@ -6,8 +6,8 @@ import numpy as np
 from pydantic import BaseModel
 from scipy.stats import binom
 
-from aib_analysis.custom_types import QuestionType
-from aib_analysis.data_models import (
+from aib_analysis.data_structures.custom_types import QuestionType
+from aib_analysis.data_structures.data_models import (
     Forecast,
     Leaderboard,
     LeaderboardEntry,
@@ -15,8 +15,8 @@ from aib_analysis.data_models import (
     ScoreType,
     User,
 )
-from aib_analysis.problem_questions import poor_questions, problem_questions
-from aib_analysis.simulated_tournament import SimulatedTournament
+from aib_analysis.data_structures.problem_questions import poor_questions, problem_questions
+from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
 
 logger = logging.getLogger(__name__)
 

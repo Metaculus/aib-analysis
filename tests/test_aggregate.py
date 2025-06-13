@@ -7,9 +7,9 @@ from aib_analysis.math.aggregate import (
     aggregate_forecasts,
     create_aggregated_user_at_spot_time,
 )
-from aib_analysis.custom_types import UserType
-from aib_analysis.data_models import User
-from aib_analysis.simulated_tournament import SimulatedTournament
+from aib_analysis.data_structures.custom_types import UserType
+from aib_analysis.data_structures.data_models import User
+from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
 from tests.mock_data_maker import (
     make_forecast,
     make_question_binary,
