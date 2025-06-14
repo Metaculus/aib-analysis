@@ -52,11 +52,11 @@ def main():
     ])
 
     with tab1:
-        pro_tournament = load_and_cache_tournament(pro_path, UserType.PRO)
+        pro_tournament = load_and_cache_tournament(pro_path, UserType.PRO, "Pro Tournament")
         display_tournament(pro_tournament, "Pro")
 
     with tab2:
-        bot_tournament = load_and_cache_tournament(bot_path, UserType.BOT)
+        bot_tournament = load_and_cache_tournament(bot_path, UserType.BOT, "Bot Tournament")
         display_tournament(bot_tournament, "Bot")
         # binary_tournament = constrain_question_types(bot_tournament, [QuestionType.BINARY])
         # display_tournament(binary_tournament, "Bot (Binary)")
@@ -94,8 +94,8 @@ def main():
 
 
 @st.cache_data(show_spinner="Loading tournaments...")
-def load_and_cache_tournament(path: str, user_type: UserType) -> SimulatedTournament:
-    return load_tournament(path, user_type)
+def load_and_cache_tournament(path: str, user_type: UserType, tournament_name: str) -> SimulatedTournament:
+    return load_tournament(path, user_type, tournament_name)
 
 
 def display_tournament(tournament: SimulatedTournament, name: str):
@@ -267,6 +267,7 @@ def display_questions(tournament: SimulatedTournament):
         }
         for question in questions
     ]
+    st.write(f"**Number of questions**: {len(questions)}")
     df = pd.DataFrame(data)
     st.dataframe(df, use_container_width=True)
 
@@ -288,7 +289,7 @@ def _display_leaderboard_table(leaderboard: Leaderboard, confidence_level: float
             upper_bound = confidence_interval.upper_bound
             lower_bound = confidence_interval.lower_bound
         except Exception as e:
-            logger.error(f"Failed to get confidence interval for entry {entry.user.name}: {e}")
+            logger.debug(f"Failed to get confidence interval for entry {entry.user.name}: {e}")
             upper_bound = None
             lower_bound = None
         data.append(
@@ -334,7 +335,7 @@ def _display_average_scores_plot(
             upper_bound = confidence_interval.upper_bound
             lower_bound = confidence_interval.lower_bound
         except Exception as e:
-            logger.warning(f"Failed to get confidence interval for entry {entry.user.name}: {e}")
+            logger.debug(f"Failed to get confidence interval for entry {entry.user.name}: {e}")
             upper_bound = 0
             lower_bound = 0
 

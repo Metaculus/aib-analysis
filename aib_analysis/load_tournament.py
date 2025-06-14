@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def load_tournament(
-    forecast_file_path: str, user_type: UserType
+    forecast_file_path: str, user_type: UserType, tournament_name: str | None = None
 ) -> SimulatedTournament:
     logger.info(f"Start loading tournament from {forecast_file_path}")
     forecasts = []
@@ -37,6 +37,8 @@ def load_tournament(
         forecasts.append(forecast)
     logger.info(f"Finished parsing {len(forecasts)} forecast rows")
     tournament = SimulatedTournament(forecasts=forecasts)
+    if tournament_name is not None:
+        tournament.name = tournament_name
     logger.info(f"Finished inializing tournament from forecasts")
     return tournament
 
