@@ -29,7 +29,10 @@ def get_leaderboard(
     entries = []
     for user in tournament.users:
         scores_of_type = tournament.user_to_scores(user.name, score_type)
-        entries.append(LeaderboardEntry(scores=scores_of_type))
+        if scores_of_type:
+            entries.append(LeaderboardEntry(scores=scores_of_type))
+        else:
+            logger.warning(f"No scores of type {score_type} for user {user.name} when creating leaderboard")
     return Leaderboard(entries=entries, type=score_type)
 
 

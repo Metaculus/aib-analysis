@@ -227,8 +227,8 @@ class Question(BaseModel, frozen=True):
             raise ValueError(
                 "Multiple choice questions must have at least two options."
             )
-        if "PRACTICE" in self.question_text:
-            raise ValueError("Practice questions are not allowed.")
+        # if "PRACTICE" in self.question_text:
+        #     raise ValueError("Practice questions are not allowed.")
         return self
 
     @model_validator(mode="after")
