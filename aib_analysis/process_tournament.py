@@ -53,21 +53,25 @@ def combine_tournaments(
         tournamnet_matching_hash = question.get_hash_for_tournament_matching()
         matching_hash_mapping.setdefault(tournamnet_matching_hash, []).append(question)
 
-    _log_title_mapping_inconsistencies(tournament_1, tournament_2)
+    log_title_mapping_inconsistencies(tournament_1, tournament_2)
 
     combined_forecasts: list[Forecast] = []
-    for questions in matching_hash_mapping.values():
-        if len(questions) < 2:
+    hash_matches = list(matching_hash_mapping.values())
+    prequalified_matches = ProblemManager.find_prequalified_matches_for_tournament_matching(combined_questions)
+    all_matches = hash_matches + prequalified_matches
+
+    for question_match in all_matches:
+        if len(question_match) < 2:
             continue
         new_forecasts = _squash_questions_and_get_their_forecasts(
-            questions, tournament_1, tournament_2
+            question_match, tournament_1, tournament_2
         )
         combined_forecasts.extend(new_forecasts)
 
     return SimulatedTournament(forecasts=combined_forecasts)
 
 
-def _log_title_mapping_inconsistencies(
+def log_title_mapping_inconsistencies(
     tournament_1: SimulatedTournament,
     tournament_2: SimulatedTournament,
 ) -> None:
@@ -79,6 +83,14 @@ def _log_title_mapping_inconsistencies(
 
     for _, title_matched_questions in question_text_mapping.items():
         if len(title_matched_questions) < 2:
+            continue
+
+        if ProblemManager.dont_log_in_tournament_matching(
+            title_matched_questions
+        ):
+            logger.info(
+                f"Prequalified Mismatch for tournament matching: {[q.url for q in title_matched_questions]}"
+            )
             continue
 
         hashes = [q.get_hash_for_tournament_matching() for q in title_matched_questions]
@@ -102,6 +114,9 @@ def _log_title_mapping_inconsistencies(
                 f"{question_comparison_table}"
             )
         else:
+            if ProblemManager.dont_log_in_duplicate_detection_within_tournament(title_matched_questions):
+                logger.info(f"Prequalified duplicate within tournament: {[q.url for q in title_matched_questions]}")
+                continue
             urls = [q.url for q in title_matched_questions]
             logger.warning(
                 f"During combining touranments, found duplicate question title in same tournament: {urls}"
@@ -113,7 +128,7 @@ def _squash_questions_and_get_their_forecasts(
     tournament_1: SimulatedTournament,
     tournament_2: SimulatedTournament,
 ) -> list[Forecast]:
-    question_t1, question_t2 = _validate_questions_match(
+    question_t1, question_t2 = _validate_and_pair_tournament_questions(
         questions, tournament_1, tournament_2
     )
 
@@ -139,7 +154,7 @@ def _squash_questions_and_get_their_forecasts(
     return combined_forecasts
 
 
-def _validate_questions_match(
+def _validate_and_pair_tournament_questions(
     questions: list[Question],
     tournament_1: SimulatedTournament,
     tournament_2: SimulatedTournament,
@@ -156,11 +171,8 @@ def _validate_questions_match(
         raise ValueError(f"Question {question_from_t1.url} not found in tournament_1")
     if not question_from_t2 in tournament_2.questions:
         raise ValueError(f"Question {question_from_t2.url} not found in tournament_2")
-
-    hash_1 = question_from_t1.get_hash_for_tournament_matching()
-    hash_2 = question_from_t2.get_hash_for_tournament_matching()
-    assert hash_1 == hash_2, f"Question hashes do not match for {question_from_t1.url} and {question_from_t2.url}. {hash_1} != {hash_2}"
     return question_from_t1, question_from_t2
+
 
 def constrain_question_types(
     tournament: SimulatedTournament, question_types: list[QuestionType]
