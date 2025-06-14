@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from pydantic import BaseModel, ConfigDict, model_validator
 from typing_extensions import Self
@@ -187,6 +187,7 @@ class Question(BaseModel, frozen=True):
     post_id: int
     created_at: datetime
     spot_scoring_time: datetime
+    notes: str | None = None
     model_config = ConfigDict(frozen=True)
 
 
@@ -264,22 +265,11 @@ class Question(BaseModel, frozen=True):
         return table
 
 
-    @classmethod
-    def questions_equivalent_between_tournaments(cls, question_1: Question, question_2: Question) -> bool:
-        questions_equivalent = True
-        if question_1.get_tournament_matching_hash() != question_2.get_tournament_matching_hash():
-            questions_equivalent = False
-        time_diff = abs(question_1.spot_scoring_time - question_2.spot_scoring_time)
-        if time_diff > timedelta(hours=1) and questions_equivalent:
-            logger.warning(
-                f"Questions are equivalent for tournaments but spot scoring times differ by {time_diff}: "
-                f"Q1: {question_1.spot_scoring_time}, Q2: {question_2.spot_scoring_time}"
-            )
-        return questions_equivalent
-
     def get_tournament_matching_hash(self) -> str:
-        spot_scoring_days = (self.spot_scoring_time - datetime.min).days
-        spot_scoring_window = spot_scoring_days // 3
+        # Give flexibility to slightly off spot scoring times
+        utc_spot_scoring_time = self.spot_scoring_time.astimezone(timezone.utc)
+        spot_scoring_days = (utc_spot_scoring_time - datetime(2020,1,1, tzinfo=timezone.utc)).days
+        spot_scoring_window = spot_scoring_days // 2 # Round to 2 day window
 
         hash_fields = (
             self.question_text.lower().strip(),
@@ -290,7 +280,7 @@ class Question(BaseModel, frozen=True):
             self.range_min,
             self.open_upper_bound,
             self.open_lower_bound,
-            spot_scoring_window
+            spot_scoring_window,
         )
         return str(hash(hash_fields))
 
