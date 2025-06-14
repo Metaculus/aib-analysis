@@ -193,7 +193,7 @@ class SimulatedTournament(BaseModel):
             assert len(questions) > 0
             if len(questions) == 1:
                 continue
-            if ProblemManager.is_prequalified_duplicate_within_tournament(questions):
+            if ProblemManager.dont_log_in_duplicate_detection_within_tournament(questions):
                 logger.info(f"Duplicate question is prequalified for q1 bot tournament: {[q.url for q in questions]}")
                 continue
             error_message = "# Duplicates for question text: " + question_text + "\n"

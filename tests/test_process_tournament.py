@@ -192,7 +192,7 @@ class TestCombineTournaments:
         combined_tournament = combine_tournaments(
             pro_tournament, bot_tournament
         )
-        assert len(combined_tournament.questions) == 99
+        assert len(combined_tournament.questions) == 98
         assert len(combined_tournament.forecasts) < len(pro_forecasts) + len(
             bot_forecasts
         )

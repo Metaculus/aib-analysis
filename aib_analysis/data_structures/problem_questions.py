@@ -48,94 +48,6 @@ Problem question candidates:
 """
 
 
-"""
-# TODO: Always keep the one that matches pro/quarterly cup more
-# TODO: Always keep the non annulled question
-# TODO: Always keep the later version (spot score? creation time?)
-# TODO: Remove one if they are exactly the same (no differences)
-# Do the above if 'smart-deduplicate' is true
-# Don't log a warning if the ProblemQuestion is in manually listed and has the correct ID
-
-# TODO: 5-9 version matches pro question, 0-5 matches site question
-    # "How many arms sales globally will the US State Department approve in March 2025?",  # The options for the pro vs bot questions are different, and different options resolved. Also the spot scoring time is off by 1.2 weeks.
-    # https://www.metaculus.com/questions/34706/ vs https://www.metaculus.com/questions/34382/
-# Duplicates for question text: How many arms sales globally will the US State Department approve in March 2025?
-| Parameter | Question 1 | Question 2 |
-|-----------|---|---|
-| URL | https://www.metaculus.com/questions/34260/ | https://www.metaculus.com/questions/34706/ |
-| Question Id | 33757 | 34220 |
-| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
-| Question Text | How many arms sales globally will the US State Department approve in March 2025? | How many arms sales globally will the US State Department approve in March 2025? |
-| Resolution | 5-9 | 0-5 |
-| Options | ['0-4', '5-9', '>9'] | ['0-5', '6-10', '>10'] |
-| Range Max | None | None |
-| Range Min | None | None |
-| Open Upper Bound | None | None |
-| Open Lower Bound | None | None |
-| Weight | 1.0 | 1.0 |
-| Post Id | 34260 | 34706 |
-| Created At | 2025-01-25 06:31:51.259600+00:00 | 2025-02-01 05:24:04.045627+00:00 |
-| Spot Scoring Time | 2025-01-29 07:00:00+00:00 | 2025-02-09 00:44:00+00:00 |
-
-# TODO: Use second one (b/c matches quarterly cup)
-# Duplicates for question text: What Premier League position will Nottingham Forest F.C. be in on March 8, 2025?
-| Parameter | Question 1 | Question 2 |
-|-----------|---|---|
-| URL | https://www.metaculus.com/questions/34281/ | https://www.metaculus.com/questions/34667/ |
-| Question Id | 33778 | 34181 |
-| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
-| Question Text | What Premier League position will Nottingham Forest F.C. be in on March 8, 2025? | What Premier League position will Nottingham Forest F.C. be in on March 8, 2025? |
-| Resolution | 3rd | 3rd |
-| Options | ['1st', '2nd', '3rd', '4th', '≥5th'] | ['1st', '2nd', '3rd', '4th', '≥5th'] |
-| Range Max | None | None |
-| Range Min | None | None |
-| Open Upper Bound | None | None |
-| Open Lower Bound | None | None |
-| Weight | 1.0 | 0.5 |
-| Post Id | 34281 | 34667 |
-| Created At | 2025-01-25 06:31:52.795962+00:00 | 2025-02-01 05:24:00.456127+00:00 |
-| Spot Scoring Time | 2025-01-31 02:00:00+00:00 | 2025-02-02 17:00:00+00:00 |
-
-# TODO: Take second (b/c later and not annulled)
-# Duplicates for question text: Which party will win the most seats in Curaçao in the March 2025 general election?
-| Parameter | Question 1 | Question 2 |
-|-----------|---|---|
-| URL | https://www.metaculus.com/questions/35892/ | https://www.metaculus.com/questions/35994/ |
-| Question Id | 35326 | 35426 |
-| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
-| Question Text | Which party will win the most seats in Curaçao in the March 2025 general election? | Which party will win the most seats in Curaçao in the March 2025 general election? |
-| Resolution | None | Movement for the Future of Curaçao |
-| Options | ['Movement for the Future of Curaçao', 'Real Alternative Party', 'Another outcome'] | ['Movement for the Future of Curaçao', 'Real Alternative Party', 'Another outcome'] |
-| Range Max | None | None |
-| Range Min | None | None |
-| Open Upper Bound | None | None |
-| Open Lower Bound | None | None |
-| Weight | 1.0 | 1.0 |
-| Post Id | 35892 | 35994 |
-| Created At | 2025-03-08 04:57:09.780762+00:00 | 2025-03-11 14:35:21.855687+00:00 |
-| Spot Scoring Time | 2025-03-10 12:00:00+00:00 | 2025-03-12 12:00:00+00:00 |
-
-# TODO: Keep the second one (b/c later and not annulled)
-# Duplicates for question text: Which podcast will be ranked higher on Spotify on March 31, 2025: Call Her Daddy or Candace?
-| Parameter | Question 1 | Question 2 |
-|-----------|---|---|
-| URL | https://www.metaculus.com/questions/36161/ | https://www.metaculus.com/questions/36264/ |
-| Question Id | 35598 | 35705 |
-| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
-| Question Text | Which podcast will be ranked higher on Spotify on March 31, 2025: Call Her Daddy or Candace? | Which podcast will be ranked higher on Spotify on March 31, 2025: Call Her Daddy or Candace? |
-| Resolution | None | Candace |
-| Options | ['The New York Times Daily', 'The Tucker Carlson Show'] | ['Call Her Daddy', 'Candace'] |
-| Range Max | None | None |
-| Range Min | None | None |
-| Open Upper Bound | None | None |
-| Open Lower Bound | None | None |
-| Weight | 1.0 | 1.0 |
-| Post Id | 36161 | 36264 |
-| Created At | 2025-03-15 15:49:27.084578+00:00 | 2025-03-20 19:35:15.771896+00:00 |
-| Spot Scoring Time | 2025-03-18 20:00:00+00:00 | 2025-03-20 20:00:00+00:00 |
-"""
-
-
 class ProblemQuestion(BaseModel):
     question_text: str
     urls: list[str]
@@ -165,9 +77,62 @@ class ProblemQuestion(BaseModel):
 
 
 class ProblemManager:
+    @classmethod
+    def dont_log_in_tournament_matching(cls, questions: list[Question]) -> bool:
+        return cls._is_in_problem_question_list(
+            questions, cls._q1_bot_v_pro_matching_inconsistencies
+        )
 
+    @classmethod
+    def dont_log_in_duplicate_detection_within_tournament(
+        cls, questions: list[Question]
+    ) -> bool:
+        return cls._is_in_problem_question_list(
+            questions, cls._q1_bot__in_tournament_title_duplicates
+        )
 
-    _q1_bot_tournament_duplicates: list[ProblemQuestion] = [
+    @classmethod
+    def find_prequalified_matches_for_tournament_matching(
+        cls, questions: list[Question]
+    ) -> list[list[Question]]:
+        question_title_map: dict[str, list[Question]] = {}
+        for question in questions:
+            question_title_map.setdefault(question.question_text, []).append(question)
+
+        matches = []
+        for question_group in question_title_map.values():
+            if len(question_group) < 2:
+                continue
+            if cls._is_in_problem_question_list(
+                question_group, cls._q1_bot_v_pro_inconsistencies_to_force_match
+            ):
+                matches.append(question_group)
+        return matches
+
+    @classmethod
+    def should_force_match_between_tournaments(cls, questions: list[Question]) -> bool:
+        return cls._is_in_problem_question_list(
+            questions, cls._q1_bot_v_pro_inconsistencies_to_force_match
+        )
+
+    @classmethod
+    def _is_in_problem_question_list(
+        cls, questions: list[Question], problem_question_list: list[ProblemQuestion]
+    ) -> bool:
+        for q in problem_question_list:
+            matches = [q.question_matches(question) for question in questions]
+            if all(matches):
+                return True
+            elif any(matches):
+                raise ValueError(
+                    f"One of the questions matches the problem question, but not all of them. Problem question: {q.question_text}, Questions: {questions}"
+                )
+            else:
+                continue
+        return False
+
+    # These are questions with duplicate titles in the q1 tournament
+    _q1_bot__in_tournament_title_duplicates: list[ProblemQuestion] = [
         ProblemQuestion(
             question_text="How many arms sales globally will the US State Department approve in March 2025?",
             urls=[
@@ -184,7 +149,7 @@ class ProblemManager:
                 "https://www.metaculus.com/questions/34667/",
             ],
             notes="Different weights (1.0 vs 0.5) and spot scoring times (off by ~2 days). Accidental rerelease",
-            proposed_action="Remove this", # TODO: Remove @Check
+            proposed_action="Remove this",  # TODO: Remove @Check
         ),
         ProblemQuestion(
             question_text="Which party will win the most seats in Curaçao in the March 2025 general election?",
@@ -206,17 +171,8 @@ class ProblemManager:
         ),
     ]
 
-
-    _q1_bot_v_pro_matching_inconsistencies: list[ProblemQuestion] = [
-        ProblemQuestion(
-            question_text="For Q1 2025, how many banks will be listed on the FDIC's Failed Bank List?",
-            urls=[
-                "https://www.metaculus.com/questions/31736/",
-                "https://www.metaculus.com/questions/31730/",
-            ],
-            notes="Different resolutions (1 vs 0)",
-            proposed_action="Remove from comparison", # TODO: Remove @Check
-        ),
+    # These are questions that are close enough to each other to match, but do have differences (like different options)
+    _q1_bot_v_pro_inconsistencies_to_force_match: list[ProblemQuestion] = [
         ProblemQuestion(
             question_text="How many Grammy awards will Taylor Swift win in 2025?",
             urls=[
@@ -225,26 +181,6 @@ class ProblemManager:
             ],
             notes="Different options: first has '3 or more', second has 'Greater than 2'",
             proposed_action="Keep since resolution is same",
-        ),
-        ProblemQuestion(
-            question_text="How many arms sales globally will the US State Department approve in March 2025?",
-            urls=[
-                "https://www.metaculus.com/questions/34382/",
-                "https://www.metaculus.com/questions/34260/",
-                "https://www.metaculus.com/questions/34706/",
-            ],
-            notes="Three versions with different options and resolutions. First two have same options ('0-4', '5-9', '>9') and resolution (5-9), third has different options ('0-5', '6-10', '>10') and resolution (0-5).  Third has spot scoring time off by 9 days. First is pro tournament, second 2 bot tournament",
-            proposed_action="The first two will be correctly matched for pro v bot tournament and the 3rd automatically excluded", # TODO: Match this with CP comparison, and the in-tournament duplicates above
-        ),
-        ProblemQuestion(
-            question_text="What Premier League position will Nottingham Forest F.C. be in on March 8, 2025?",
-            urls=[
-                "https://www.metaculus.com/questions/34389/",
-                "https://www.metaculus.com/questions/34281/",
-                "https://www.metaculus.com/questions/34667/",
-            ],
-            notes="Three versions. different weights (1.0 for first 2 vs 0.5 for third) and spot scoring times (third one is 2 days after first 2 which are same). Tournaments are Pro, Bot, Bot",
-            proposed_action="The first two will be correctly matched for pro v bot tournament and the 3rd automatically excluded", # TODO: Match this with the in-tournament duplicates above
         ),
         ProblemQuestion(
             question_text="Which party will win the 2nd highest number of seats in the 2025 German federal election?",
@@ -258,31 +194,50 @@ class ProblemManager:
     ]
 
 
-    @classmethod
-    def is_prequalified_in_tournament_matching(cls, question_1: Question, question_2: Question) -> bool:
-        question_1_match = False
-        question_2_match = False
-        for q in ProblemManager._q1_bot_v_pro_matching_inconsistencies:
-            if q.question_matches(question_1):
-                question_1_match = True
-            if q.question_matches(question_2):
-                question_2_match = True
-        if question_1_match != question_2_match:
-            raise ValueError(f"If question 1 is a problem question, then question 2 should be one as well. Question 1: {question_1.url}, Question 2: {question_2.url}")
-        return question_1_match or question_2_match
+    _q1_bot_v_pro_to_remove_from_comparison: list[ProblemQuestion] = [
+        ProblemQuestion(
+            question_text="For Q1 2025, how many banks will be listed on the FDIC's Failed Bank List?",
+            urls=[
+                "https://www.metaculus.com/questions/31736/",
+                "https://www.metaculus.com/questions/31730/",
+            ],
+            notes="Different resolutions (1 vs 0)",
+            proposed_action="Remove from comparison",
+        ),
+    ]
 
+    _q1_bot_v_pro_negligable_inconsistencies: list[ProblemQuestion] = [
+        ProblemQuestion(
+            question_text="How many arms sales globally will the US State Department approve in March 2025?",
+            urls=[
+                "https://www.metaculus.com/questions/34382/",
+                "https://www.metaculus.com/questions/34260/",
+                "https://www.metaculus.com/questions/34706/",
+            ],
+            notes="Three versions with different options and resolutions. First two have same options ('0-4', '5-9', '>9') and resolution (5-9), third has different options ('0-5', '6-10', '>10') and resolution (0-5).  Third has spot scoring time off by 9 days. First is pro tournament, second 2 bot tournament",
+            proposed_action="Leave as is. The first two will be correctly matched for pro v bot tournament and the 3rd automatically excluded",
+            # TODO: Match this with CP comparison, and the in-tournament duplicates above
+        ),
+        ProblemQuestion(
+            question_text="What Premier League position will Nottingham Forest F.C. be in on March 8, 2025?",
+            urls=[
+                "https://www.metaculus.com/questions/34389/",
+                "https://www.metaculus.com/questions/34281/",
+                "https://www.metaculus.com/questions/34667/",
+            ],
+            notes="Three versions. different weights (1.0 for first 2 vs 0.5 for third) and spot scoring times (third one is 2 days after first 2 which are same). Tournaments are Pro, Bot, Bot",
+            proposed_action="Leave as is. The first two will be correctly matched for pro v bot tournament and the 3rd automatically excluded",
+            # TODO: Match this with the in-tournament duplicates above
+        ),
+    ]
 
-    @classmethod
-    def is_prequalified_duplicate_within_tournament(cls, questions: list[Question]) -> bool:
-        for q in cls._q1_bot_tournament_duplicates:
-            matches = [q.question_matches(question) for question in questions]
-            if all(matches):
-                return True
-            elif any(matches):
-                raise ValueError(f"One of the questions matches the problem question, but not all of them. Problem question: {q.question_text}, Questions: {questions}")
-            else:
-                continue
-        return False
+    # This is the full list of questions who have inconsistencies (e.g. options, resolutions, etc) between q1 pro tournament and q1 bot tournament
+    _q1_bot_v_pro_matching_inconsistencies: list[ProblemQuestion] = [
+        *_q1_bot_v_pro_inconsistencies_to_force_match,
+        *_q1_bot_v_pro_to_remove_from_comparison,
+        *_q1_bot_v_pro_negligable_inconsistencies,
+    ]
+
 
 """
 ##################### Q1 Duplicate Question - Bot Tournament #####################
@@ -366,7 +321,6 @@ class ProblemManager:
 | Notes | None | None |
 
 """
-
 
 
 """
