@@ -189,9 +189,13 @@ class ProblemManager:
                 "https://www.metaculus.com/questions/34281/",
                 "https://www.metaculus.com/questions/34667/"
             ],
-            notes="The spot scoring time is different for bot/pro question (but only off by 2 days)",
+            notes=(
+                "The spot scoring time is different for one of the bot/pro questions "
+                "(but only off by 2 days). There are 2 bots and 2 pros"
+            )
         ),
     ]
+
 
     @classmethod
     def is_prequalified_in_tournament_matching(cls, question_1: Question, question_2: Question) -> bool:

@@ -36,8 +36,6 @@ def get_leaderboard(
 def combine_on_question_title_intersection(
     tournament_1: SimulatedTournament, tournament_2: SimulatedTournament
 ) -> SimulatedTournament:
-    combined_forecasts: list[Forecast] = []
-    unique_question_titles = set()
     if (
         set([user.name for user in tournament_1.users])
         & set([user.name for user in tournament_2.users])
@@ -47,53 +45,67 @@ def combine_on_question_title_intersection(
             "Both tournaments have some of the same users. This is currently not supported."
         )
 
-    # Combine together if:
-    # - Question title matches
-    # - Has roughly the same close time
-    # - type
+    combined_questions: list[Question] = tournament_1.questions + tournament_2.questions
+    question_text_mapping: dict[str, list[Question]] = {}
+    matching_hash_mapping: dict[str, list[Question]] = {}
+    for question in combined_questions:
+        cleaned_question_text = question.question_text.lower().strip()
+        tournamnet_matching_hash = question.get_tournament_matching_hash()
+        question_text_mapping.setdefault(cleaned_question_text, []).append(question)
+        matching_hash_mapping.setdefault(tournamnet_matching_hash, []).append(question)
 
-    # TODO: Compare questions that match title, but do not match other things
-    # questions_dict: list = {}
+    combined_forecasts: list[Forecast] = []
+    for questions in matching_hash_mapping.values():
+        if len(questions) < 2:
+            continue
+        question_t1, question_t2 = _validate_questions_match(
+            questions, tournament_1, tournament_2
+        )
+
+        logger.info(f"Found match for '{question_t1.url}' vs '{question_t2.url}'")
+
+        t1_forecasts = tournament_1.question_to_forecasts(question_t1.question_id)
+        t2_forecasts = tournament_2.question_to_forecasts(question_t2.question_id)
+        forecasts_to_use: list[Forecast] = t1_forecasts + t2_forecasts
+
+        # TODO: @Check Are all relationships between objects kept correct? Should I also deep copy users? Or can I remove deep copying? Probably make this into a class function for sake of sfetry for new objects added to heirarchy.
+        new_question = question_t1.model_copy(
+            update={
+                "notes": f"Combined {question_t1.url} (QID:{question_t1.question_id}) and {question_t2.url} (QID:{question_t2.question_id})\nQ1 Notes: {question_t1.notes}\nQ2 Notes: {question_t2.notes}"
+            }
+        )
+        for forecast in forecasts_to_use:
+            new_forecast: Forecast = forecast.model_copy(
+                update={"question": new_question}
+            )
+            assert (
+                new_forecast.question == new_question
+            ), f"Forecast question does not match new question: {new_forecast.question.url} != {new_question.url}"
+            combined_forecasts.append(new_forecast)
+
+    return SimulatedTournament(forecasts=combined_forecasts)
 
 
+def _validate_questions_match(
+    questions: list[Question],
+    tournament_1: SimulatedTournament,
+    tournament_2: SimulatedTournament,
+) -> tuple[Question, Question]:
+    if len(questions) > 2:
+        urls = [question.url for question in questions]
+        raise ValueError(
+            f"Found {len(questions)} questions with the same tournament matching hash. {urls}"
+        )
+    assert len(questions) == 2
+    question_1, question_2 = questions
 
-    for question_1 in tournament_1.questions:
-        for question_2 in tournament_2.questions:
-            question_1_text = question_1.question_text.lower().strip()
-            question_2_text = question_2.question_text.lower().strip()
+    if not question_1 in tournament_1.questions:
+        raise ValueError(f"Question {question_1.url} not found in tournament_1")
+    if not question_2 in tournament_2.questions:
+        raise ValueError(f"Question {question_2.url} not found in tournament_2")
 
-            if question_1_text == question_2_text:
-                if question_1_text in unique_question_titles:
-                    continue
-                else:
-                    unique_question_titles.add(question_1_text)
-                logger.info(
-                    f"Found match for '{question_1_text}' vs '{question_2_text}'"
-                )
-
-                if not ProblemManager.is_prequalified_in_tournament_matching(question_1, question_2):
-                    _assert_questions_match_in_important_ways(question_1, question_2)
-
-                forecasts_to_use: list[Forecast] = []
-                forecasts_to_use.extend(
-                    tournament_1.question_to_forecasts(question_1.question_id)
-                )
-                forecasts_to_use.extend(
-                    tournament_2.question_to_forecasts(question_2.question_id)
-                )
-
-                # TODO: @Check Are all relationships between objects kept correct? Should I also deep copy users? Or can I remove deep copying? Probably make this into a class function for sake of sfetry for new objects added to heirarchy.
-                new_question = copy.deepcopy(question_1)
-                for forecast in forecasts_to_use:
-                    new_forecast: Forecast = Forecast(
-                        question=new_question,
-                        user=forecast.user,
-                        prediction=forecast.prediction,
-                        prediction_time=forecast.prediction_time
-                    )
-                    combined_forecasts.append(new_forecast)
-    tournament = SimulatedTournament(forecasts=combined_forecasts)
-    return tournament
+    _assert_questions_match_in_important_ways(question_1, question_2)
+    return question_1, question_2
 
 
 def _assert_questions_match_in_important_ways(
