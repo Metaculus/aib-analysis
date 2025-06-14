@@ -140,6 +140,7 @@ class ProblemQuestion(BaseModel):
     question_text: str
     urls: list[str]
     notes: str
+    proposed_action: str | None = None
 
     def question_matches(self, question: Question) -> bool:
         post_id = str(question.post_id)
@@ -203,7 +204,8 @@ class ProblemManager:
                 "https://www.metaculus.com/questions/34260/",
                 "https://www.metaculus.com/questions/34706/",
             ],
-            notes="Different options and resolutions: first has ('0-4', '5-9', '>9') resolved to 5-9, second has ('0-5', '6-10', '>10') resolved to 0-5",
+            notes="Different options and resolutions: first has ('0-4', '5-9', '>9') resolved to 5-9, second has ('0-5', '6-10', '>10') resolved to 0-5. They were launched a week apart (so tests updating)",
+            proposed_action="Keep this, since it tests bot's ability to update",
         ),
         ProblemQuestion(
             question_text="What Premier League position will Nottingham Forest F.C. be in on March 8, 2025?",
@@ -211,7 +213,8 @@ class ProblemManager:
                 "https://www.metaculus.com/questions/34281/",
                 "https://www.metaculus.com/questions/34667/",
             ],
-            notes="Same options and resolution (3rd), but different weights (1.0 vs 0.5) and spot scoring times (off by ~2 days)",
+            notes="Same options and resolution (3rd), but different weights (1.0 vs 0.5) and spot scoring times (off by ~2 days). Accidental rerelease",
+            proposed_action="Remove this",
         ),
         ProblemQuestion(
             question_text="Which party will win the most seats in Curaçao in the March 2025 general election?",
@@ -219,7 +222,8 @@ class ProblemManager:
                 "https://www.metaculus.com/questions/35892/",
                 "https://www.metaculus.com/questions/35994/",
             ],
-            notes="Same options but different resolutions: first unresolved, second resolved to 'Movement for the Future of Curaçao'. Spot scoring time 2 days off",
+            notes="Same options but different resolutions: first unresolved, second resolved to 'Movement for the Future of Curaçao'. Spot scoring time 2 days off. First was annulled",
+            proposed_action="Leave this. The first one was annulled",
         ),
         ProblemQuestion(
             question_text="Which podcast will be ranked higher on Spotify on March 31, 2025: Call Her Daddy or Candace?",
@@ -228,6 +232,7 @@ class ProblemManager:
                 "https://www.metaculus.com/questions/36264/",
             ],
             notes="Completely different options: first has ('The New York Times Daily', 'The Tucker Carlson Show') resolved to None, second has ('Call Her Daddy', 'Candace') and resolved to 'Candace'. Spot scoring time 2 days off",
+            proposed_action="Leave this. The first one was annulled",
         ),
     ]
 
@@ -246,7 +251,17 @@ class ProblemManager:
         return question_1_match or question_2_match
 
 
-
+    @classmethod
+    def is_prequalified_duplicate_within_tournament(cls, questions: list[Question]) -> bool:
+        for q in cls._q1_bot_tournament_duplicates:
+            matches = [q.question_matches(question) for question in questions]
+            if all(matches):
+                return True
+            elif any(matches):
+                raise ValueError(f"One of the questions matches the problem question, but not all of them. Problem question: {q.question_text}, Questions: {questions}")
+            else:
+                continue
+        return False
 
 """
 ##################### Q1 Duplicate Question - Bot Tournament #####################
@@ -327,6 +342,6 @@ class ProblemManager:
 | Post Id | 36161 | 36264 |
 | Created At | 2025-03-15 15:49:27.084578+00:00 | 2025-03-20 19:35:15.771896+00:00 |
 | Spot Scoring Time | 2025-03-18 20:00:00+00:00 | 2025-03-20 20:00:00+00:00 |
-| Notes | None | None | 
+| Notes | None | None |
 
 """

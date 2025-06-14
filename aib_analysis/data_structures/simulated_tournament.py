@@ -15,6 +15,7 @@ from aib_analysis.data_structures.data_models import (
     ScoreType,
     User,
 )
+from aib_analysis.data_structures.problem_questions import ProblemManager
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +190,11 @@ class SimulatedTournament(BaseModel):
 
         duplicate_error_messages = []
         for question_text, questions in question_text_map.items():
+            assert len(questions) > 0
             if len(questions) == 1:
+                continue
+            if ProblemManager.is_prequalified_duplicate_within_tournament(questions):
+                logger.info(f"Duplicate question is prequalified for q1 bot tournament: {[q.url for q in questions]}")
                 continue
             error_message = "# Duplicates for question text: " + question_text + "\n"
             error_message += Question.question_comparison_table(questions)
