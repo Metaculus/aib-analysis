@@ -196,6 +196,41 @@ class ProblemManager:
         ),
     ]
 
+    _q1_bot_tournament_duplicates: list[ProblemQuestion] = [
+        ProblemQuestion(
+            question_text="How many arms sales globally will the US State Department approve in March 2025?",
+            urls=[
+                "https://www.metaculus.com/questions/34260/",
+                "https://www.metaculus.com/questions/34706/",
+            ],
+            notes="Different options and resolutions: first has ('0-4', '5-9', '>9') resolved to 5-9, second has ('0-5', '6-10', '>10') resolved to 0-5",
+        ),
+        ProblemQuestion(
+            question_text="What Premier League position will Nottingham Forest F.C. be in on March 8, 2025?",
+            urls=[
+                "https://www.metaculus.com/questions/34281/",
+                "https://www.metaculus.com/questions/34667/",
+            ],
+            notes="Same options and resolution (3rd), but different weights (1.0 vs 0.5) and spot scoring times (off by ~2 days)",
+        ),
+        ProblemQuestion(
+            question_text="Which party will win the most seats in Curaçao in the March 2025 general election?",
+            urls=[
+                "https://www.metaculus.com/questions/35892/",
+                "https://www.metaculus.com/questions/35994/",
+            ],
+            notes="Same options but different resolutions: first unresolved, second resolved to 'Movement for the Future of Curaçao'. Spot scoring time 2 days off",
+        ),
+        ProblemQuestion(
+            question_text="Which podcast will be ranked higher on Spotify on March 31, 2025: Call Her Daddy or Candace?",
+            urls=[
+                "https://www.metaculus.com/questions/36161/",
+                "https://www.metaculus.com/questions/36264/",
+            ],
+            notes="Completely different options: first has ('The New York Times Daily', 'The Tucker Carlson Show') resolved to None, second has ('Call Her Daddy', 'Candace') and resolved to 'Candace'. Spot scoring time 2 days off",
+        ),
+    ]
+
 
     @classmethod
     def is_prequalified_in_tournament_matching(cls, question_1: Question, question_2: Question) -> bool:
@@ -209,3 +244,89 @@ class ProblemManager:
         if question_1_match != question_2_match:
             raise ValueError(f"If question 1 is a problem question, then question 2 should be one as well. Question 1: {question_1.url}, Question 2: {question_2.url}")
         return question_1_match or question_2_match
+
+
+
+
+"""
+##################### Q1 Duplicate Question - Bot Tournament #####################
+# Duplicates for question text: How many arms sales globally will the US State Department approve in March 2025?
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/34260/ | https://www.metaculus.com/questions/34706/ |
+| Question Id | 33757 | 34220 |
+| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
+| Question Text | How many arms sales globally will the US State Department approve in March 2025? | How many arms sales globally will the US State Department approve in March 2025? |
+| Resolution | 5-9 | 0-5 |
+| Options | ('0-4', '5-9', '>9') | ('0-5', '6-10', '>10') |
+| Range Max | None | None |
+| Range Min | None | None |
+| Open Upper Bound | None | None |
+| Open Lower Bound | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 34260 | 34706 |
+| Created At | 2025-01-25 06:31:51.259600+00:00 | 2025-02-01 05:24:04.045627+00:00 |
+| Spot Scoring Time | 2025-01-29 07:00:00+00:00 | 2025-02-09 00:44:00+00:00 |
+| Notes | None | None |
+
+
+# Duplicates for question text: What Premier League position will Nottingham Forest F.C. be in on March 8, 2025?
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/34281/ | https://www.metaculus.com/questions/34667/ |
+| Question Id | 33778 | 34181 |
+| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
+| Question Text | What Premier League position will Nottingham Forest F.C. be in on March 8, 2025? | What Premier League position will Nottingham Forest F.C. be in on March 8, 2025? |
+| Resolution | 3rd | 3rd |
+| Options | ('1st', '2nd', '3rd', '4th', '≥5th') | ('1st', '2nd', '3rd', '4th', '≥5th') |
+| Range Max | None | None |
+| Range Min | None | None |
+| Open Upper Bound | None | None |
+| Open Lower Bound | None | None |
+| Weight | 1.0 | 0.5 |
+| Post Id | 34281 | 34667 |
+| Created At | 2025-01-25 06:31:52.795962+00:00 | 2025-02-01 05:24:00.456127+00:00 |
+| Spot Scoring Time | 2025-01-31 02:00:00+00:00 | 2025-02-02 17:00:00+00:00 |
+| Notes | None | None |
+
+
+# Duplicates for question text: Which party will win the most seats in Curaçao in the March 2025 general election?
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/35892/ | https://www.metaculus.com/questions/35994/ |
+| Question Id | 35326 | 35426 |
+| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
+| Question Text | Which party will win the most seats in Curaçao in the March 2025 general election? | Which party will win the most seats in Curaçao in the March 2025 general election? |
+| Resolution | None | Movement for the Future of Curaçao |
+| Options | ('Movement for the Future of Curaçao', 'Real Alternative Party', 'Another outcome') | ('Movement for the Future of Curaçao', 'Real Alternative Party', 'Another outcome') |
+| Range Max | None | None |
+| Range Min | None | None |
+| Open Upper Bound | None | None |
+| Open Lower Bound | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 35892 | 35994 |
+| Created At | 2025-03-08 04:57:09.780762+00:00 | 2025-03-11 14:35:21.855687+00:00 |
+| Spot Scoring Time | 2025-03-10 12:00:00+00:00 | 2025-03-12 12:00:00+00:00 |
+| Notes | None | None |
+
+
+# Duplicates for question text: Which podcast will be ranked higher on Spotify on March 31, 2025: Call Her Daddy or Candace?
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/36161/ | https://www.metaculus.com/questions/36264/ |
+| Question Id | 35598 | 35705 |
+| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
+| Question Text | Which podcast will be ranked higher on Spotify on March 31, 2025: Call Her Daddy or Candace? | Which podcast will be ranked higher on Spotify on March 31, 2025: Call Her Daddy or Candace? |
+| Resolution | None | Candace |
+| Options | ('The New York Times Daily', 'The Tucker Carlson Show') | ('Call Her Daddy', 'Candace') |
+| Range Max | None | None |
+| Range Min | None | None |
+| Open Upper Bound | None | None |
+| Open Lower Bound | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 36161 | 36264 |
+| Created At | 2025-03-15 15:49:27.084578+00:00 | 2025-03-20 19:35:15.771896+00:00 |
+| Spot Scoring Time | 2025-03-18 20:00:00+00:00 | 2025-03-20 20:00:00+00:00 |
+| Notes | None | None | 
+
+"""
