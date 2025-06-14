@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class SimulatedTournament(BaseModel):
+    name: str = "Unnamed"
     forecasts: list[Forecast]
 
     @property
@@ -112,7 +113,7 @@ class SimulatedTournament(BaseModel):
 
     @model_validator(mode="after")
     def initialize_tournament(self) -> Self:
-        logger.info("Initializing caches")
+        logger.info(f"Initializing tournament {self.name}")
         self._initialize_spot_forecast_cache()
 
         self._user_cache = {
@@ -123,7 +124,6 @@ class SimulatedTournament(BaseModel):
             for forecast in self.forecasts
         }
 
-        logger.info("Finished initializing non-scoring caches")
 
         log_every_n = 1000
         all_scores: list[Score] = []

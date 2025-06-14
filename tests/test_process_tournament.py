@@ -3,12 +3,14 @@ import logging
 import pytest
 
 from aib_analysis.data_structures.custom_types import QuestionType, ScoreType
+from aib_analysis.data_structures.simulated_tournament import (
+    SimulatedTournament,
+)
 from aib_analysis.process_tournament import (
+    combine_tournaments,
     constrain_question_types,
-    combine_on_question_title_intersection,
     get_leaderboard,
 )
-from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
 from tests.mock_data_maker import (
     make_forecast,
     make_question_binary,
@@ -162,7 +164,7 @@ class TestCombineTournaments:
         tournament2 = SimulatedTournament(forecasts=[forecast2_1, forecast2_3])
 
         # Combine tournaments
-        combined = combine_on_question_title_intersection(tournament1, tournament2)
+        combined = combine_tournaments(tournament1, tournament2)
 
         # Only question1 should be in the combined tournament
         assert len(combined.questions) == 1
@@ -187,7 +189,7 @@ class TestCombineTournaments:
         bot_forecasts = bot_tournament.forecasts
         pro_users = pro_tournament.users
         bot_users = bot_tournament.users
-        combined_tournament = combine_on_question_title_intersection(
+        combined_tournament = combine_tournaments(
             pro_tournament, bot_tournament
         )
         assert len(combined_tournament.questions) == 99

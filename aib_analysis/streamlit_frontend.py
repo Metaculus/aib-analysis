@@ -12,19 +12,26 @@ top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
 sys.path.append(top_level_dir)
 
 
-from aib_analysis.math.aggregate import create_aggregated_user_at_spot_time
 from aib_analysis.data_structures.custom_types import QuestionType
-from aib_analysis.data_structures.data_models import Forecast, Leaderboard, ScoreType, UserType
+from aib_analysis.data_structures.data_models import (
+    Forecast,
+    Leaderboard,
+    ScoreType,
+    UserType,
+)
+from aib_analysis.data_structures.simulated_tournament import (
+    SimulatedTournament,
+)
 from aib_analysis.load_tournament import load_tournament
+from aib_analysis.math.aggregate import create_aggregated_user_at_spot_time
+from aib_analysis.math.stats import MeanHypothesisCalculator
 from aib_analysis.process_tournament import (
     calculate_calibration_curve,
-    combine_on_question_title_intersection,
+    combine_tournaments,
     constrain_question_types,
     create_team_from_leaderboard,
     get_leaderboard,
 )
-from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
-from aib_analysis.math.stats import MeanHypothesisCalculator
 from conftest import initialize_logging
 
 logger = logging.getLogger(__name__)
@@ -59,7 +66,7 @@ def main():
         # display_tournament(numeric_tournament, "Bot (Numeric)")
 
     with tab3:
-        combined_tournament = combine_on_question_title_intersection(
+        combined_tournament = combine_tournaments(
             pro_tournament, bot_tournament
         )
         display_tournament(combined_tournament, "Pro + Bot (No Teams)")
@@ -327,7 +334,7 @@ def _display_average_scores_plot(
             upper_bound = confidence_interval.upper_bound
             lower_bound = confidence_interval.lower_bound
         except Exception as e:
-            logger.error(f"Failed to get confidence interval for entry {entry.user.name}: {e}")
+            logger.warning(f"Failed to get confidence interval for entry {entry.user.name}: {e}")
             upper_bound = 0
             lower_bound = 0
 
@@ -405,7 +412,7 @@ def create_pro_bot_aggregate_tournament(
 
     pro_agg_tournament = SimulatedTournament(forecasts=pro_forecasts)
     bot_agg_tournament = SimulatedTournament(forecasts=bot_forecasts)
-    return combine_on_question_title_intersection(
+    return combine_tournaments(
         pro_agg_tournament, bot_agg_tournament
     )
 

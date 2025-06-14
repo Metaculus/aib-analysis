@@ -26,6 +26,7 @@ from aib_analysis.math.stats import (
 
 logger = logging.getLogger(__name__)
 
+
 class Forecast(BaseModel):
     question: Question
     user: User
@@ -33,7 +34,6 @@ class Forecast(BaseModel):
     prediction_time: datetime
     _id: str | None = None
     model_config = ConfigDict(frozen=True)
-
 
     @property
     def id(self) -> str:
@@ -119,7 +119,9 @@ class Forecast(BaseModel):
                         "Prediction must be a list of floats (length >= 2) for multiple choice questions."
                     )
                 if abs(sum(self.prediction) - 1) > 1e-6:
-                    raise ValueError("Prediction must sum to 1 for multiple choice questions.")
+                    raise ValueError(
+                        "Prediction must sum to 1 for multiple choice questions."
+                    )
             elif q_type == QuestionType.NUMERIC:
                 if not (
                     isinstance(self.prediction, list)
@@ -132,9 +134,10 @@ class Forecast(BaseModel):
         if self.prediction is not None:
             for p in self.prediction:
                 if not (0 <= p <= 1):
-                    raise ValueError(f"Prediction must be between 0 and 1, got {p}. Full prediction: {self.prediction}")
+                    raise ValueError(
+                        f"Prediction must be between 0 and 1, got {p}. Full prediction: {self.prediction}"
+                    )
         return self
-
 
     def __hash__(self) -> int:
         # Convert options list to tuple for hashing if it exists
@@ -148,7 +151,6 @@ class Forecast(BaseModel):
         return hash(hash_tuple)
 
 
-
 class Score(BaseModel):
     score: float
     type: ScoreType
@@ -156,14 +158,16 @@ class Score(BaseModel):
     users_used_in_scoring: list[User] | None  # Empty if baseline
     model_config = ConfigDict(frozen=True)
 
-
     @property
     def id(self) -> str:
         return f"{self.forecast.id}_{self.type.value}"
 
     @model_validator(mode="after")
     def check_forecast_resolution_not_none(self) -> Self:
-        if self.forecast.question.resolution is None or self.forecast.question.is_annulled_or_ambiguous:
+        if (
+            self.forecast.question.resolution is None
+            or self.forecast.question.is_annulled_or_ambiguous
+        ):
             raise ValueError(
                 "Forecast's question resolution must not be None. You cannot assign a score to ambiguous/annulled resolution"
             )
@@ -189,7 +193,6 @@ class Question(BaseModel, frozen=True):
     spot_scoring_time: datetime
     notes: str | None = None
     model_config = ConfigDict(frozen=True)
-
 
     @property
     def is_annulled_or_ambiguous(self) -> bool:
@@ -252,24 +255,51 @@ class Question(BaseModel, frozen=True):
         return f"https://www.metaculus.com/questions/{self.post_id}/"
 
     @classmethod
-    def question_comparison_table(cls, questions: list[Question]) -> str:
-        table = "| Parameter | " + " | ".join([f"Question {i+1}" for i in range(len(questions))]) + " |\n"
-        table += "|-----------|" + "|".join(["---" for _ in range(len(questions))]) + "|\n"
-        table += "| URL | " + " | ".join([f"{question.url}" for question in questions]) + " |\n"
+    def question_comparison_table(
+        cls,
+        questions: list[Question],
+        tournament_1: list[Question] | None = None,
+        tournament_2: list[Question] | None = None,
+    ) -> str:
+        table = (
+            "| Parameter | "
+            + " | ".join([f"Question {i+1}" for i in range(len(questions))])
+            + " |\n"
+        )
+        table += (
+            "|-----------|" + "|".join(["---" for _ in range(len(questions))]) + "|\n"
+        )
+        table += (
+            "| URL | "
+            + " | ".join([f"{question.url}" for question in questions])
+            + " |\n"
+        )
         fields = questions[0].model_dump().keys()
         for field in fields:
             table += f"| {field.replace('_', ' ').title()} | "
             for question in questions:
                 table += f"{question.model_dump()[field]} | "
             table += "\n"
+        if tournament_1 and tournament_2:
+            table += (
+                "| Tournament 1 | "
+                + " | ".join([f"{q in tournament_1}" for q in questions])
+                + " |\n"
+            )
+            table += (
+                "| Tournament 2 | "
+                + " | ".join([f"{q in tournament_2}" for q in questions])
+                + " |\n"
+            )
         return table
 
-
-    def get_tournament_matching_hash(self) -> str:
+    def get_hash_for_tournament_matching(self) -> str:
         # Give flexibility to slightly off spot scoring times
         utc_spot_scoring_time = self.spot_scoring_time.astimezone(timezone.utc)
-        spot_scoring_days = (utc_spot_scoring_time - datetime(2020,1,1, tzinfo=timezone.utc)).days
-        spot_scoring_window = spot_scoring_days // 2 # Round to 2 day window
+        spot_scoring_days = (
+            utc_spot_scoring_time - datetime(2020, 1, 1, tzinfo=timezone.utc)
+        ).days
+        spot_scoring_window = spot_scoring_days // 2  # Round to 2 day window
 
         hash_fields = (
             self.question_text.lower().strip(),
@@ -283,6 +313,7 @@ class Question(BaseModel, frozen=True):
             spot_scoring_window,
         )
         return str(hash(hash_fields))
+
 
 class User(BaseModel):
     name: str
@@ -299,7 +330,6 @@ class Leaderboard(BaseModel):
     entries: list[LeaderboardEntry]
     type: ScoreType
     model_config = ConfigDict(frozen=True)
-
 
     @model_validator(mode="after")
     def check_all_entries_same_score_type(self: Self) -> Self:
@@ -333,7 +363,6 @@ class Leaderboard(BaseModel):
 class LeaderboardEntry(BaseModel):
     scores: list[Score]
     model_config = ConfigDict(frozen=True)
-
 
     @model_validator(mode="after")
     def check_single_user(self: Self) -> Self:
@@ -380,6 +409,10 @@ class LeaderboardEntry(BaseModel):
     def randomly_sample_scores(self, n: int) -> list[Score]:
         return random.sample(self.scores, n)
 
-    def get_confidence_interval(self, confidence_level: float = 0.95) -> ConfidenceInterval:
+    def get_confidence_interval(
+        self, confidence_level: float = 0.95
+    ) -> ConfidenceInterval:
         score_observations = [score.score for score in self.scores]
-        return ConfidenceIntervalCalculator.confidence_interval_from_observations(score_observations, confidence_level)
+        return ConfidenceIntervalCalculator.confidence_interval_from_observations(
+            score_observations, confidence_level
+        )
