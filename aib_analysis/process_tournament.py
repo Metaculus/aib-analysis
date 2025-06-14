@@ -33,9 +33,11 @@ def get_leaderboard(
     return Leaderboard(entries=entries, type=score_type)
 
 
-def combine_on_question_title_intersection(
+def combine_tournaments(
     tournament_1: SimulatedTournament, tournament_2: SimulatedTournament
 ) -> SimulatedTournament:
+    logger.info(f"Combining tournaments {tournament_1.name} and {tournament_2.name}")
+
     if (
         set([user.name for user in tournament_1.users])
         & set([user.name for user in tournament_2.users])
@@ -46,44 +48,95 @@ def combine_on_question_title_intersection(
         )
 
     combined_questions: list[Question] = tournament_1.questions + tournament_2.questions
-    question_text_mapping: dict[str, list[Question]] = {}
     matching_hash_mapping: dict[str, list[Question]] = {}
     for question in combined_questions:
-        cleaned_question_text = question.question_text.lower().strip()
-        tournamnet_matching_hash = question.get_tournament_matching_hash()
-        question_text_mapping.setdefault(cleaned_question_text, []).append(question)
+        tournamnet_matching_hash = question.get_hash_for_tournament_matching()
         matching_hash_mapping.setdefault(tournamnet_matching_hash, []).append(question)
+
+    _log_title_mapping_inconsistencies(tournament_1, tournament_2)
 
     combined_forecasts: list[Forecast] = []
     for questions in matching_hash_mapping.values():
         if len(questions) < 2:
             continue
-        question_t1, question_t2 = _validate_questions_match(
+        new_forecasts = _squash_questions_and_get_their_forecasts(
             questions, tournament_1, tournament_2
         )
-
-        logger.info(f"Found match for '{question_t1.url}' vs '{question_t2.url}'")
-
-        t1_forecasts = tournament_1.question_to_forecasts(question_t1.question_id)
-        t2_forecasts = tournament_2.question_to_forecasts(question_t2.question_id)
-        forecasts_to_use: list[Forecast] = t1_forecasts + t2_forecasts
-
-        # TODO: @Check Are all relationships between objects kept correct? Should I also deep copy users? Or can I remove deep copying? Probably make this into a class function for sake of sfetry for new objects added to heirarchy.
-        new_question = question_t1.model_copy(
-            update={
-                "notes": f"Combined {question_t1.url} (QID:{question_t1.question_id}) and {question_t2.url} (QID:{question_t2.question_id})\nQ1 Notes: {question_t1.notes}\nQ2 Notes: {question_t2.notes}"
-            }
-        )
-        for forecast in forecasts_to_use:
-            new_forecast: Forecast = forecast.model_copy(
-                update={"question": new_question}
-            )
-            assert (
-                new_forecast.question == new_question
-            ), f"Forecast question does not match new question: {new_forecast.question.url} != {new_question.url}"
-            combined_forecasts.append(new_forecast)
+        combined_forecasts.extend(new_forecasts)
 
     return SimulatedTournament(forecasts=combined_forecasts)
+
+
+def _log_title_mapping_inconsistencies(
+    tournament_1: SimulatedTournament,
+    tournament_2: SimulatedTournament,
+) -> None:
+    question_text_mapping: dict[str, list[Question]] = {}
+    combined_questions: list[Question] = tournament_1.questions + tournament_2.questions
+    for question in combined_questions:
+        cleaned_question_text = question.question_text.lower().strip()
+        question_text_mapping.setdefault(cleaned_question_text, []).append(question)
+
+    for _, title_matched_questions in question_text_mapping.items():
+        if len(title_matched_questions) < 2:
+            continue
+
+        hashes = [q.get_hash_for_tournament_matching() for q in title_matched_questions]
+        if all(hash == hashes[0] for hash in hashes):
+            continue
+
+        some_questions_in_t1 = any(
+            q in tournament_1.questions for q in title_matched_questions
+        )
+        some_questions_in_t2 = any(
+            q in tournament_2.questions for q in title_matched_questions
+        )
+
+        if some_questions_in_t1 and some_questions_in_t2:
+            question_comparison_table = Question.question_comparison_table(
+                title_matched_questions, tournament_1.questions, tournament_2.questions
+            )
+            logger.warning(
+                f"Text-matched questions have different tournament-matching hashes "
+                "(NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):\n"
+                f"{question_comparison_table}"
+            )
+        else:
+            urls = [q.url for q in title_matched_questions]
+            logger.warning(
+                f"During combining touranments, found duplicate question title in same tournament: {urls}"
+            )
+
+
+def _squash_questions_and_get_their_forecasts(
+    questions: list[Question],
+    tournament_1: SimulatedTournament,
+    tournament_2: SimulatedTournament,
+) -> list[Forecast]:
+    question_t1, question_t2 = _validate_questions_match(
+        questions, tournament_1, tournament_2
+    )
+
+    logger.debug(f"Squashing questions '{question_t1.url}' and '{question_t2.url}'")
+
+    t1_forecasts = tournament_1.question_to_forecasts(question_t1.question_id)
+    t2_forecasts = tournament_2.question_to_forecasts(question_t2.question_id)
+    forecasts_to_use: list[Forecast] = t1_forecasts + t2_forecasts
+
+    # TODO: @Check Are all relationships between objects kept correct? Should I also deep copy users? Or can I remove deep copying? Probably make this into a class function for sake of sfetry for new objects added to heirarchy.
+    squashed_question = question_t1.model_copy(
+        update={
+            "notes": f"Combined {question_t1.url} (QID:{question_t1.question_id}) and {question_t2.url} (QID:{question_t2.question_id})\nQ1 Notes: {question_t1.notes}\nQ2 Notes: {question_t2.notes}"
+        }
+    )
+    combined_forecasts: list[Forecast] = []
+    for forecast in forecasts_to_use:
+        new_forecast: Forecast = forecast.model_copy(
+            update={"question": squashed_question}
+        )
+        assert new_forecast.question == squashed_question
+        combined_forecasts.append(new_forecast)
+    return combined_forecasts
 
 
 def _validate_questions_match(
@@ -97,51 +150,17 @@ def _validate_questions_match(
             f"Found {len(questions)} questions with the same tournament matching hash. {urls}"
         )
     assert len(questions) == 2
-    question_1, question_2 = questions
+    question_from_t1, question_from_t2 = questions
 
-    if not question_1 in tournament_1.questions:
-        raise ValueError(f"Question {question_1.url} not found in tournament_1")
-    if not question_2 in tournament_2.questions:
-        raise ValueError(f"Question {question_2.url} not found in tournament_2")
+    if not question_from_t1 in tournament_1.questions:
+        raise ValueError(f"Question {question_from_t1.url} not found in tournament_1")
+    if not question_from_t2 in tournament_2.questions:
+        raise ValueError(f"Question {question_from_t2.url} not found in tournament_2")
 
-    _assert_questions_match_in_important_ways(question_1, question_2)
-    return question_1, question_2
-
-
-def _assert_questions_match_in_important_ways(
-    question_1: Question, question_2: Question
-) -> None:
-    question_1_text = question_1.question_text
-    try:
-        assert (
-            question_1.type == question_2.type
-        ), f"Question types do not match for {question_1_text}. {question_1.type} != {question_2.type}"
-        assert (
-            question_1.range_max == question_2.range_max
-        ), f"Question range max does not match for {question_1_text}. {question_1.range_max} != {question_2.range_max}"
-        assert (
-            question_1.range_min == question_2.range_min
-        ), f"Question range min does not match for {question_1_text}. {question_1.range_min} != {question_2.range_min}"
-        assert (
-            question_1.open_upper_bound == question_2.open_upper_bound
-        ), f"Question open upper bound does not match for {question_1_text}. {question_1.open_upper_bound} != {question_2.open_upper_bound}"
-        assert (
-            question_1.open_lower_bound == question_2.open_lower_bound
-        ), f"Question open lower bound does not match for {question_1_text}. {question_1.open_lower_bound} != {question_2.open_lower_bound}"
-        assert (
-            question_1.options == question_2.options
-        ), f"Question options do not match for {question_1_text}. {question_1.options} != {question_2.options}"
-        assert (
-            question_1.spot_scoring_time == question_2.spot_scoring_time
-        ), f"Question spot scoring times do not match for {question_1_text}. {question_1.spot_scoring_time} != {question_2.spot_scoring_time}"
-    except AssertionError as e:
-        question_comparison_table = (
-            f"\n{Question.question_comparison_table([question_1, question_2])}"
-        )
-        error_message = f"AssertionError: {e}.\n{question_comparison_table}"
-        logger.error(error_message)
-        raise ValueError(error_message)
-
+    hash_1 = question_from_t1.get_hash_for_tournament_matching()
+    hash_2 = question_from_t2.get_hash_for_tournament_matching()
+    assert hash_1 == hash_2, f"Question hashes do not match for {question_from_t1.url} and {question_from_t2.url}. {hash_1} != {hash_2}"
+    return question_from_t1, question_from_t2
 
 def constrain_question_types(
     tournament: SimulatedTournament, question_types: list[QuestionType]
