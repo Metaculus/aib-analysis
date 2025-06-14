@@ -97,7 +97,7 @@ def _log_title_mapping_inconsistencies(
                 title_matched_questions, tournament_1.questions, tournament_2.questions
             )
             logger.warning(
-                f"Text-matched questions have different tournament-matching hashes "
+                f"\n# Text-matched questions have different tournament-matching hashes "
                 "(NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):\n"
                 f"{question_comparison_table}"
             )
