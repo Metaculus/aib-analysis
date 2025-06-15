@@ -5,7 +5,6 @@ import sys
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-import typeguard
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
@@ -29,7 +28,7 @@ from aib_analysis.process_tournament import (
     calculate_calibration_curve,
     combine_tournaments,
     constrain_question_types,
-    create_team_from_leaderboard,
+    create_team_tournament,
     get_leaderboard,
 )
 from conftest import initialize_logging
@@ -42,63 +41,107 @@ def main():
     st.title("AI Benchmarking Analysis")
     pro_path = "input_data/pro_forecasts_q1.csv"
     bot_path = "input_data/bot_forecasts_q1.csv"
+    quarterly_cup_path = "logs/quarterly_cup_spot_forecasts_q1.csv"
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Pro Tournament",
-        "Bot Tournament",
-        "Combined Tournament",
-        "Pro vs Bot Teams",
-        "Hypothesis Test"
-    ])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
+        [
+            "Pro Tournament",
+            "Bot Tournament",
+            "Pros w/ Bots",
+            "Pro vs Bot Teams",
+            "Hypothesis Test",
+            "Quarterly Cup",
+            "Cup w/ Bots",
+            "Cup vs Bot Teams",
+        ]
+    )
 
     with tab1:
-        pro_tournament = load_and_cache_tournament(pro_path, UserType.PRO, "Pro Tournament")
+        pro_tournament = load_and_cache_tournament(
+            pro_path, UserType.PRO, "Pro Tournament"
+        )
         display_tournament(pro_tournament, "Pro")
 
     with tab2:
-        bot_tournament = load_and_cache_tournament(bot_path, UserType.BOT, "Bot Tournament")
-        display_tournament(bot_tournament, "Bot")
-        # binary_tournament = constrain_question_types(bot_tournament, [QuestionType.BINARY])
-        # display_tournament(binary_tournament, "Bot (Binary)")
-        # multiple_choice_tournament = constrain_question_types(bot_tournament, [QuestionType.MULTIPLE_CHOICE])
-        # display_tournament(multiple_choice_tournament, "Bot (Multiple Choice)")
-        # numeric_tournament = constrain_question_types(bot_tournament, [QuestionType.NUMERIC])
-        # display_tournament(numeric_tournament, "Bot (Numeric)")
+        bot_tournament = load_and_cache_tournament(
+            bot_path, UserType.BOT, "Bot Tournament"
+        )
+        display_tournament(bot_tournament, "Bot", divide_into_types=True)
 
     with tab3:
-        combined_tournament = combine_tournaments(
-            pro_tournament, bot_tournament
+        pro_with_bot_tourn = combine_tournaments(pro_tournament, bot_tournament)
+        display_tournament(
+            pro_with_bot_tourn, "Pros w/ Bots (No Teams)", divide_into_types=True
         )
-        display_tournament(combined_tournament, "Pro + Bot (No Teams)")
-        binary_combined_tournament = constrain_question_types(combined_tournament, [QuestionType.BINARY])
-        display_tournament(binary_combined_tournament, "Pro + Bot (No Teams) (Binary)")
-        multiple_choice_combined_tournament = constrain_question_types(combined_tournament, [QuestionType.MULTIPLE_CHOICE])
-        display_tournament(multiple_choice_combined_tournament, "Pro + Bot (No Teams) (Multiple Choice)")
-        numeric_combined_tournament = constrain_question_types(combined_tournament, [QuestionType.NUMERIC])
-        display_tournament(numeric_combined_tournament, "Pro + Bot (No Teams) (Numeric)")
 
+    bot_team_size = 10
     with tab4:
-        pro_bot_aggregate_tournament = create_pro_bot_aggregate_tournament(
-            pro_tournament, bot_tournament
+        pro_bot_aggregate_tournament = create_team_tournament(
+            pro_tournament,
+            bot_tournament,
+            t1_size=None,
+            t2_size=bot_team_size,
+            aggregate_name_1="Pro Team",
+            aggregate_name_2="Bot Team",
         )
-        display_tournament(pro_bot_aggregate_tournament, "Pro vs Bot (Teams)")
-        binary_pro_bot_team_tournament = constrain_question_types(pro_bot_aggregate_tournament, [QuestionType.BINARY])
-        display_tournament(binary_pro_bot_team_tournament, "Pro vs Bot (Teams) (Binary)")
-        multiple_choice_pro_bot_team_tournament = constrain_question_types(pro_bot_aggregate_tournament, [QuestionType.MULTIPLE_CHOICE])
-        display_tournament(multiple_choice_pro_bot_team_tournament, "Pro vs Bot (Teams) (Multiple Choice)")
-        numeric_pro_bot_team_tournament = constrain_question_types(pro_bot_aggregate_tournament, [QuestionType.NUMERIC])
-        display_tournament(numeric_pro_bot_team_tournament, "Pro vs Bot (Teams) (Numeric)")
+        display_tournament(
+            pro_bot_aggregate_tournament, "Pro vs Bot (Teams)", divide_into_types=True
+        )
 
     with tab5:
         display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament)
 
+    with tab6:
+        cup_tournament = load_and_cache_tournament(
+            quarterly_cup_path, UserType.BOT, "Quarterly Cup"
+        )
+        display_tournament(cup_tournament, "Quarterly Cup", divide_into_types=True)
+
+    with tab7:
+        cup_with_bots = combine_tournaments(cup_tournament, bot_tournament)
+        display_tournament(cup_with_bots, "Cup w/ Bots")
+
+    with tab8:
+        cup_with_bots = create_team_tournament(
+            cup_tournament,
+            bot_tournament,
+            t1_size=None,
+            t2_size=bot_team_size,
+            aggregate_name_1="Cup Team",
+            aggregate_name_2="Bot Team",
+        )
+        display_tournament(cup_with_bots, "Cup vs Bot Teams")
+
 
 @st.cache_data(show_spinner="Loading tournaments...")
-def load_and_cache_tournament(path: str, user_type: UserType, tournament_name: str) -> SimulatedTournament:
+def load_and_cache_tournament(
+    path: str, user_type: UserType, tournament_name: str
+) -> SimulatedTournament:
     return load_tournament(path, user_type, tournament_name)
 
 
-def display_tournament(tournament: SimulatedTournament, name: str):
+def display_tournament(
+    tournament: SimulatedTournament, name: str, divide_into_types: bool = False
+):
+    _display_tournament(tournament, name)
+    if divide_into_types:
+        binary_combined_tournament = constrain_question_types(
+            tournament, [QuestionType.BINARY]
+        )
+        _display_tournament(binary_combined_tournament, f"{name} (Binary)")
+        multiple_choice_combined_tournament = constrain_question_types(
+            tournament, [QuestionType.MULTIPLE_CHOICE]
+        )
+        _display_tournament(
+            multiple_choice_combined_tournament, f"{name} (Multiple Choice)"
+        )
+        numeric_combined_tournament = constrain_question_types(
+            tournament, [QuestionType.NUMERIC]
+        )
+        _display_tournament(numeric_combined_tournament, f"{name} (Numeric)")
+
+
+def _display_tournament(tournament: SimulatedTournament, name: str):
     st.subheader(f"{name} Tournament")
 
     # Display tournament statistics
@@ -117,21 +160,30 @@ def display_tournament(tournament: SimulatedTournament, name: str):
     # with st.expander(f"{name} Calibration Curve"):
     #     display_calibration_curve(tournament)
 
-def display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament: SimulatedTournament) -> None:
+
+def display_bot_v_pro_hypothesis_test(
+    pro_bot_aggregate_tournament: SimulatedTournament,
+) -> None:
     hypothesis_mean = 0
     confidence_level = 0.95
     leaderboard = get_leaderboard(pro_bot_aggregate_tournament, ScoreType.SPOT_PEER)
     st.subheader(f"Pro vs Bot (Team) Hypothesis Test")
     with st.expander("Pro vs Bot (Team) Hypothesis Test"):
         st.write(f"## The Test")
-        st.write("The below runs 2 tests: 1) tests if the each team's average spot peer score is not equal to zero and 2) if it is greater than zero. If its not equal to zero, then we can conclude that there is a statistically significant difference between bots and pros performance. If its greater than zero, then we can conclude that one group is doing better than another.")
+        st.write(
+            "The below runs 2 tests: 1) tests if the each team's average spot peer score is not equal to zero and 2) if it is greater than zero. If its not equal to zero, then we can conclude that there is a statistically significant difference between bots and pros performance. If its greater than zero, then we can conclude that one group is doing better than another."
+        )
         for entry in leaderboard.entries_via_sum_of_scores():
             observations = [s.score for s in entry.scores]
-            equal_to_hypothesis_test = MeanHypothesisCalculator.test_if_mean_is_equal_to_than_hypothesis_mean(
-                observations, hypothesis_mean, confidence_level
+            equal_to_hypothesis_test = (
+                MeanHypothesisCalculator.test_if_mean_is_equal_to_than_hypothesis_mean(
+                    observations, hypothesis_mean, confidence_level
+                )
             )
-            greater_than_hypothesis_test = MeanHypothesisCalculator.test_if_mean_is_greater_than_hypothesis_mean(
-                observations, hypothesis_mean, confidence_level
+            greater_than_hypothesis_test = (
+                MeanHypothesisCalculator.test_if_mean_is_greater_than_hypothesis_mean(
+                    observations, hypothesis_mean, confidence_level
+                )
             )
             st.write(f"## {entry.user.name}")
             st.write(f"### Equal to {hypothesis_mean}")
@@ -140,6 +192,7 @@ def display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament: SimulatedTou
             st.write(f"### Greater than {hypothesis_mean}")
             st.write(f"**P-value**: {greater_than_hypothesis_test.p_value:.5f}")
             st.write(greater_than_hypothesis_test.written_conclusion)
+
 
 def display_tournament_stats(tournament: SimulatedTournament) -> None:
     forecasts = tournament.forecasts
@@ -158,8 +211,11 @@ def display_tournament_stats(tournament: SimulatedTournament) -> None:
     num_baseline_scores_calculated = len(
         [s for s in tournament.scores if s.type == ScoreType.SPOT_BASELINE]
     )
-    num_annulled_questions = len([q for q in tournament.questions if q.is_annulled_or_ambiguous])
-    num_annulled_forecasts = len([f for f in forecasts if f.question.is_annulled_or_ambiguous])
+    annulled_questions = [q for q in tournament.questions if q.is_annulled_or_ambiguous]
+    num_annulled_questions = len(annulled_questions)
+    num_annulled_forecasts = len(
+        [f for f in forecasts if f.question.is_annulled_or_ambiguous]
+    )
 
     # Calculate averages
     forecasts_per_user = num_forecasts / num_users if num_users > 0 else 0
@@ -173,8 +229,9 @@ def display_tournament_stats(tournament: SimulatedTournament) -> None:
     st.write(f"Number of forecasts: {num_forecasts}")
     st.write(f"Number of users: {num_users}")
     st.write(f"Number of questions: {num_questions}")
-    st.write(f"Number of annulled or ambiguous questions: {num_annulled_questions}")
-    st.write(f"Number of annulled or ambiguous forecasts: {num_annulled_forecasts}")
+    st.write(
+        f"Number of annulled or ambiguous questions: {num_annulled_questions} (affected forecasts {num_annulled_forecasts})"
+    )
     st.write(f"Number of scores calculated: {num_scores_calculated}")
     st.write(f"Number of peer scores calculated: {num_peer_scores_calculated}")
     st.write(f"Number of baseline scores calculated: {num_baseline_scores_calculated}")
@@ -226,6 +283,10 @@ def display_tournament_stats(tournament: SimulatedTournament) -> None:
         st.write(f"- {question_type}: {count} questions")
     st.write(f"**Percent Binary that resolved yes**: {percent_resolved_yes:.2f}%")
 
+    st.write("### Annulled or Ambiguous Questions")
+    for question in annulled_questions:
+        st.write(f"- {question.question_text} [link]({question.url})")
+
 
 def display_forecasts(tournament: SimulatedTournament):
     forecasts = tournament.forecasts
@@ -260,16 +321,11 @@ def display_forecasts(tournament: SimulatedTournament):
 
 def display_questions(tournament: SimulatedTournament):
     questions = tournament.questions
-    data = [
-        {
-            "url": question.url,
-            **question.model_dump()
-        }
-        for question in questions
-    ]
+    data = [{"url": question.url, **question.model_dump()} for question in questions]
     st.write(f"**Number of questions**: {len(questions)}")
     df = pd.DataFrame(data)
     st.dataframe(df, use_container_width=True)
+
 
 def display_leaderboard(leaderboard: Leaderboard):
     confidence_level = 0.95
@@ -289,7 +345,9 @@ def _display_leaderboard_table(leaderboard: Leaderboard, confidence_level: float
             upper_bound = confidence_interval.upper_bound
             lower_bound = confidence_interval.lower_bound
         except Exception as e:
-            logger.debug(f"Failed to get confidence interval for entry {entry.user.name}: {e}")
+            logger.debug(
+                f"Failed to get confidence interval for entry {entry.user.name}: {e}"
+            )
             upper_bound = None
             lower_bound = None
         data.append(
@@ -335,7 +393,9 @@ def _display_average_scores_plot(
             upper_bound = confidence_interval.upper_bound
             lower_bound = confidence_interval.lower_bound
         except Exception as e:
-            logger.debug(f"Failed to get confidence interval for entry {entry.user.name}: {e}")
+            logger.debug(
+                f"Failed to get confidence interval for entry {entry.user.name}: {e}"
+            )
             upper_bound = 0
             lower_bound = 0
 
@@ -374,7 +434,7 @@ def _display_average_scores_plot(
                 colorscale="Viridis",
             ),
             hovertemplate="User: %{x}<br>Score: %{y:.3f}<br>Questions: %{customdata}<extra></extra>",
-            customdata=df["num_questions"]
+            customdata=df["num_questions"],
         )
     )
 
@@ -390,52 +450,30 @@ def _display_average_scores_plot(
     st.plotly_chart(fig, use_container_width=True)
 
 
-def create_pro_bot_aggregate_tournament(
-    pro_tournament: SimulatedTournament, bot_tournament: SimulatedTournament
-) -> SimulatedTournament:
-    pro_users = pro_tournament.users
-    top_10_bot_users = create_team_from_leaderboard(
-        bot_tournament, 10, ScoreType.SPOT_PEER, "sum"
-    )
-    pro_aggregate = create_aggregated_user_at_spot_time(
-        pro_users, pro_tournament, "Pro Team"
-    )
-    bot_aggregate = create_aggregated_user_at_spot_time(
-        top_10_bot_users, bot_tournament, "Bot Team"
-    )
 
-    pro_forecasts = typeguard.check_type(
-        pro_aggregate.aggregate_forecasts, list[Forecast]
-    )
-    bot_forecasts = typeguard.check_type(
-        bot_aggregate.aggregate_forecasts, list[Forecast]
-    )
-
-    pro_agg_tournament = SimulatedTournament(forecasts=pro_forecasts)
-    bot_agg_tournament = SimulatedTournament(forecasts=bot_forecasts)
-    return combine_tournaments(
-        pro_agg_tournament, bot_agg_tournament
-    )
 
 
 def _hex_to_rgba(hex_color: str, alpha: float) -> str:
     """Convert hex color (e.g. #1f77b4) to rgba string with given alpha."""
-    hex_color = hex_color.lstrip('#')
+    hex_color = hex_color.lstrip("#")
     if len(hex_color) == 6:
-        r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-        return f'rgba({r},{g},{b},{alpha})'
+        r, g, b = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+        return f"rgba({r},{g},{b},{alpha})"
     raise ValueError(f"Invalid hex color: {hex_color}")
 
 
 def display_calibration_curve(tournament: SimulatedTournament) -> None:
     # Get all binary forecasts with resolutions
     binary_forecasts = [
-        f for f in tournament.forecasts
+        f
+        for f in tournament.forecasts
         if f.question.type == QuestionType.BINARY and f.question.resolution is not None
     ]
 
     if not binary_forecasts:
-        st.warning("No binary forecasts with resolutions available for calibration curve.")
+        st.warning(
+            "No binary forecasts with resolutions available for calibration curve."
+        )
         return
 
     fig = go.Figure()
@@ -445,15 +483,23 @@ def display_calibration_curve(tournament: SimulatedTournament) -> None:
         go.Scatter(
             x=[0, 1],
             y=[0, 1],
-            mode='lines',
-            line=dict(dash='dash', color='gray'),
-            name='Perfect Calibration'
+            mode="lines",
+            line=dict(dash="dash", color="gray"),
+            name="Perfect Calibration",
         )
     )
 
     color_sequence = [
-        '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+        "#17becf",
     ]
     user_colors = {}
     for idx, user in enumerate(tournament.users):
@@ -477,35 +523,35 @@ def display_calibration_curve(tournament: SimulatedTournament) -> None:
             go.Scatter(
                 x=bin_centers + bin_centers[::-1],
                 y=upper_ci + lower_ci[::-1],
-                fill='toself',
+                fill="toself",
                 fillcolor=fill_color,
-                line=dict(color='rgba(255,255,255,0)'),
-                hoverinfo='skip',
+                line=dict(color="rgba(255,255,255,0)"),
+                hoverinfo="skip",
                 showlegend=True,
-                name=f"{user.name} CI"
+                name=f"{user.name} CI",
             )
         )
         fig.add_trace(
             go.Scatter(
                 x=bin_centers,
                 y=avg_resolutions,
-                mode='lines+markers',
+                mode="lines+markers",
                 name=f"{user.name} ({len(user_forecasts)} forecasts)",
                 line=dict(width=2, color=color),
                 marker=dict(size=8, color=color),
                 hovertemplate="Probability: %{x:.2f}<br>Resolution Rate: %{y:.2f}<br>Forecasts in Bin: %{customdata}<extra></extra>",
-                customdata=bin_counts
+                customdata=bin_counts,
             )
         )
 
     fig.update_layout(
-        title='Calibration Curves by User',
-        xaxis_title='Assigned Probability',
+        title="Calibration Curves by User",
+        xaxis_title="Assigned Probability",
         yaxis_title='Fraction that Resolved "Yes"',
         xaxis=dict(range=[0, 1]),
         yaxis=dict(range=[0, 1]),
         showlegend=True,
-        height=600
+        height=600,
     )
 
     st.plotly_chart(fig, use_container_width=True)

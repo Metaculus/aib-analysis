@@ -5,6 +5,7 @@ from typing import Literal
 import numpy as np
 from pydantic import BaseModel
 from scipy.stats import binom
+import typeguard
 
 from aib_analysis.data_structures.custom_types import QuestionType
 from aib_analysis.data_structures.data_models import (
@@ -19,6 +20,7 @@ from aib_analysis.data_structures.problem_questions import ProblemManager
 from aib_analysis.data_structures.simulated_tournament import (
     SimulatedTournament,
 )
+from aib_analysis.math.aggregate import create_aggregated_user_at_spot_time
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +64,9 @@ def combine_tournaments(
     hash_matches = list(matching_hash_mapping.values())
     prequalified_matches = ProblemManager.find_prequalified_matches_for_tournament_matching(combined_questions)
     all_matches = hash_matches + prequalified_matches
+
+    if len(all_matches) == 0:
+        raise ValueError("No matches found between tournaments")
 
     for question_match in all_matches:
         if len(question_match) < 2:
@@ -190,21 +195,56 @@ def constrain_question_types(
 
 def create_team_from_leaderboard(
     tournament: SimulatedTournament,
-    team_size: int,
-    score_type: ScoreType,
-    approach: Literal["sum", "average", "average_lower_t"],
+    team_size: int | None,
 ) -> list[User]:
-    leaderboard = get_leaderboard(tournament, score_type)
-    if approach == "sum":
-        entries = leaderboard.entries_via_sum_of_scores()
-    elif approach == "average":
-        entries = leaderboard.entries_via_average_score()
-    else:
-        raise ValueError(f"Approach not supported: {approach}")
+    if team_size is None:
+        return tournament.users
+    if team_size > len(tournament.users):
+        team_size = len(tournament.users)
+        logger.warning(f"Team size is larger than the number of users in the tournament: {team_size} > {len(tournament.users)}. Using all users.")
+    if team_size < 1:
+        raise ValueError(f"Team size is less than 1: {team_size}")
+
+    leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
+    entries = leaderboard.entries_via_sum_of_scores()
+
     top_entries = entries[:team_size]
     users = [entry.user for entry in top_entries]
     return users
 
+
+def create_team_tournament(
+    tournament_1: SimulatedTournament,
+    tournament_2: SimulatedTournament,
+    t1_size: int | None,
+    t2_size: int | None,
+    aggregate_name_1: str,
+    aggregate_name_2: str,
+) -> SimulatedTournament:
+    team_1 = create_team_from_leaderboard(
+        tournament_1, t1_size
+    )
+    team_2 = create_team_from_leaderboard(
+        tournament_2, t2_size
+    )
+
+    t1_aggregate = create_aggregated_user_at_spot_time(
+        team_1, tournament_1, aggregate_name_1
+    )
+    t2_aggregate = create_aggregated_user_at_spot_time(
+        team_2, tournament_2, aggregate_name_2
+    )
+
+    t1_forecasts = typeguard.check_type(
+        t1_aggregate.aggregate_forecasts, list[Forecast]
+    )
+    t2_forecasts = typeguard.check_type(
+        t2_aggregate.aggregate_forecasts, list[Forecast]
+    )
+
+    t1_agg_tournament = SimulatedTournament(forecasts=t1_forecasts)
+    t2_agg_tournament = SimulatedTournament(forecasts=t2_forecasts)
+    return combine_tournaments(t1_agg_tournament, t2_agg_tournament)
 
 class Bin(BaseModel):
     lower_bound: float
