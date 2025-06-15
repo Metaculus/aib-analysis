@@ -150,6 +150,8 @@ class SimulatedTournament(BaseModel):
 
         logger.info(f"Finished initializing scoring caches for {len(self.scores)} scores")
         self._check_no_duplicate_questions()
+        self._check_spot_scores()
+        self._check_heuristics()
         return self
 
 
@@ -191,6 +193,23 @@ class SimulatedTournament(BaseModel):
         scores = [spot_peer_score, spot_baseline_score]
         return scores
 
+    def _check_spot_scores(self) -> None:
+        # Group scores by question_id, user_name, and score_type
+        score_groups: dict[tuple[int, str, ScoreType], list[Score]] = {}
+        for score in self.scores:
+            if not score.type.is_spot_score():
+                continue
+            key = (score.forecast.question.question_id, score.forecast.user.name, score.type)
+            score_groups.setdefault(key, []).append(score)
+
+        # Check each group has exactly one score
+        for (question_id, user_name, score_type), scores in score_groups.items():
+            if len(scores) != 1:
+                raise ValueError(
+                    f"Expected exactly one {score_type} score for question {question_id} and user {user_name}, "
+                    f"but found {len(scores)} scores"
+                )
+
     def _check_no_duplicate_questions(self) -> None:
         question_text_map: dict[str, list[Question]] = {}
         for question in self.questions:
@@ -219,3 +238,33 @@ class SimulatedTournament(BaseModel):
         if len(self.questions) != len(set(self.questions)):
             raise ValueError("Duplicate questions found in questions")
 
+    def _check_heuristics(self) -> None:
+        self._less_than_half_users_forecasted()
+        self._weights_are_too_low()
+
+    def _less_than_half_users_forecasted(self) -> None:
+        total_users = len(self.users)
+        min_expected_forecasts = total_users / 2
+
+        questions_with_too_few_forecasts: list[Question] = []
+        for question in self.questions:
+            forecasts_for_question = self.question_to_spot_forecasts(question.question_id)
+
+            if len(forecasts_for_question) < min_expected_forecasts:
+                logger.warning(
+                    f"Question {question.question_id} ({question.url}) has only "
+                    f"{len(forecasts_for_question)} forecasts out of {total_users} participants"
+                )
+                questions_with_too_few_forecasts.append(question)
+
+        if len(questions_with_too_few_forecasts) > 0:
+            logger.warning(f"Found {len(questions_with_too_few_forecasts)} questions with too few forecasts")
+
+    def _weights_are_too_low(self) -> None:
+        min_weight = 0.3
+        for question in self.questions:
+            if question.weight < min_weight:
+                logger.warning(
+                    f"Question {question.question_id} ({question.url}) has a weight of {question.weight}, "
+                    f"which is less than the minimum expected weight of {min_weight}"
+                )
