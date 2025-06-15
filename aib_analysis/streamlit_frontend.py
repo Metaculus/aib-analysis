@@ -60,17 +60,17 @@ def main():
         pro_tournament = load_and_cache_tournament(
             pro_path, UserType.PRO, "Pro Tournament"
         )
-        display_tournament(pro_tournament, "Pro")
+        display_tournament_and_variations(pro_tournament, "Pro")
 
     with tab2:
         bot_tournament = load_and_cache_tournament(
             bot_path, UserType.BOT, "Bot Tournament"
         )
-        display_tournament(bot_tournament, "Bot", divide_into_types=True)
+        display_tournament_and_variations(bot_tournament, "Bot", divide_into_types=True)
 
     with tab3:
         pro_with_bot_tourn = combine_tournaments(pro_tournament, bot_tournament)
-        display_tournament(
+        display_tournament_and_variations(
             pro_with_bot_tourn, "Pros w/ Bots (No Teams)", divide_into_types=True
         )
 
@@ -84,7 +84,7 @@ def main():
             aggregate_name_1="Pro Team",
             aggregate_name_2="Bot Team",
         )
-        display_tournament(
+        display_tournament_and_variations(
             pro_bot_aggregate_tournament, "Pro vs Bot (Teams)", divide_into_types=True
         )
 
@@ -95,11 +95,11 @@ def main():
         cup_tournament = load_and_cache_tournament(
             quarterly_cup_path, UserType.BOT, "Quarterly Cup"
         )
-        display_tournament(cup_tournament, "Quarterly Cup", divide_into_types=True)
+        display_tournament_and_variations(cup_tournament, "Spot Score Quarterly Cup")
 
     with tab7:
         cup_with_bots = combine_tournaments(cup_tournament, bot_tournament)
-        display_tournament(cup_with_bots, "Cup w/ Bots")
+        display_tournament_and_variations(cup_with_bots, "Cup w/ Bots")
 
     with tab8:
         cup_with_bots = create_team_tournament(
@@ -110,7 +110,7 @@ def main():
             aggregate_name_1="Cup Team",
             aggregate_name_2="Bot Team",
         )
-        display_tournament(cup_with_bots, "Cup vs Bot Teams")
+        display_tournament_and_variations(cup_with_bots, "Cup vs Bot Teams")
 
 
 @st.cache_data(show_spinner="Loading tournaments...")
@@ -120,28 +120,28 @@ def load_and_cache_tournament(
     return load_tournament(path, user_type, tournament_name)
 
 
-def display_tournament(
+def display_tournament_and_variations(
     tournament: SimulatedTournament, name: str, divide_into_types: bool = False
 ):
-    _display_tournament(tournament, name)
+    _display_individual_tournament(tournament, name)
     if divide_into_types:
         binary_combined_tournament = constrain_question_types(
             tournament, [QuestionType.BINARY]
         )
-        _display_tournament(binary_combined_tournament, f"{name} (Binary)")
+        _display_individual_tournament(binary_combined_tournament, f"{name} (Binary)")
         multiple_choice_combined_tournament = constrain_question_types(
             tournament, [QuestionType.MULTIPLE_CHOICE]
         )
-        _display_tournament(
+        _display_individual_tournament(
             multiple_choice_combined_tournament, f"{name} (Multiple Choice)"
         )
         numeric_combined_tournament = constrain_question_types(
             tournament, [QuestionType.NUMERIC]
         )
-        _display_tournament(numeric_combined_tournament, f"{name} (Numeric)")
+        _display_individual_tournament(numeric_combined_tournament, f"{name} (Numeric)")
 
 
-def _display_tournament(tournament: SimulatedTournament, name: str):
+def _display_individual_tournament(tournament: SimulatedTournament, name: str):
     st.subheader(f"{name} Tournament")
 
     # Display tournament statistics
@@ -151,9 +151,9 @@ def _display_tournament(tournament: SimulatedTournament, name: str):
     with st.expander(f"{name} Baseline Leaderboard"):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_BASELINE)
         display_leaderboard(leaderboard)
-    with st.expander(f"{name} Tournament Statistics"):
+    with st.expander(f"{name} Statistics"):
         display_tournament_stats(tournament)
-    with st.expander(f"{name} Tournament Forecasts"):
+    with st.expander(f"{name} Forecasts"):
         display_forecasts(tournament)
     with st.expander(f"{name} Questions"):
         display_questions(tournament)
@@ -298,6 +298,7 @@ def display_forecasts(tournament: SimulatedTournament):
         {
             "user": f.user.name,
             "user_type": f.user.type.value,
+            "question_url": f.question.url,
             "question": f.question.question_text,
             "question_type": f.question.type.value,
             "prediction": f.prediction,
@@ -310,6 +311,7 @@ def display_forecasts(tournament: SimulatedTournament):
         }
         for f in forecasts
     ]
+    st.write(f"**Number of forecasts**: {len(forecasts)}")
     df = pd.DataFrame(data)
     # Truncate to first 100 rows for performance, allow filtering
     st.dataframe(
@@ -321,7 +323,12 @@ def display_forecasts(tournament: SimulatedTournament):
 
 def display_questions(tournament: SimulatedTournament):
     questions = tournament.questions
-    data = [{"url": question.url, **question.model_dump()} for question in questions]
+    data = []
+    for question in questions:
+        forecasts = tournament.question_to_forecasts(question.question_id)
+        number_of_forecasts = len(forecasts)
+        number_of_forecasters = len(set([f.user.name for f in forecasts]))
+        data.append({"url": question.url, "number_of_forecasts": number_of_forecasts, "number_of_forecasters": number_of_forecasters, **question.model_dump()})
     st.write(f"**Number of questions**: {len(questions)}")
     df = pd.DataFrame(data)
     st.dataframe(df, use_container_width=True)

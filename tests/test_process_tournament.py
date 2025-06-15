@@ -339,3 +339,21 @@ class TestCreateTeam:
             create_team_tournament(
                 tournament1, tournament2, 1, 1, "Team1", "Team2"
             )
+
+
+    def test_combine_pro_and_bot_tournament(self, bot_tournament: SimulatedTournament, pro_tournament: SimulatedTournament):
+        bot_team_size = 10
+        pro_bot_aggregate_tournament = create_team_tournament(
+            pro_tournament,
+            bot_tournament,
+            t1_size=None,
+            t2_size=bot_team_size,
+            aggregate_name_1="Pro Team",
+            aggregate_name_2="Bot Team",
+        )
+        assert len(pro_bot_aggregate_tournament.users) == 2
+        assert len(pro_bot_aggregate_tournament.questions) == 98
+        leaderboard = get_leaderboard(pro_bot_aggregate_tournament, ScoreType.SPOT_PEER)
+        entries = leaderboard.entries_via_sum_of_scores()
+        assert entries[0].user.name == "Pro Team"
+        assert entries[1].user.name == "Bot Team"
