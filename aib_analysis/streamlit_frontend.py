@@ -38,11 +38,14 @@ logger = logging.getLogger(__name__)
 
 def main():
     initialize_logging()
-    st.title("AI Benchmarking Analysis")
     pro_path = "input_data/pro_forecasts_q1.csv"
     bot_path = "input_data/bot_forecasts_q1.csv"
-    quarterly_cup_path = "logs/quarterly_cup_spot_forecasts_q1.csv"
+    quarterly_cup_path = "local/quarterly_cup_spot_forecasts_q1.csv"
     quarterly_cup_data_is_present = os.path.exists(quarterly_cup_path)
+    st.title("AI Benchmarking Analysis")
+    if not quarterly_cup_data_is_present:
+        st.warning("NOTE: Quarterly Cup data is not available in this environment. Some tabs will be disabled.")
+
     tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
         [
             "Pro Tournament",
@@ -92,8 +95,6 @@ def main():
         display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament)
 
     if not quarterly_cup_data_is_present:
-        st.warning("Quarterly Cup data is not present")
-        st.stop()
         return
 
     with tab6:
