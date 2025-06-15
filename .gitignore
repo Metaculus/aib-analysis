@@ -5,3 +5,4 @@ __pycache__
 latest.log
 logs/
 sandbox.py
+local/
