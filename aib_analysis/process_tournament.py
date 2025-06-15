@@ -1,11 +1,9 @@
-import copy
 import logging
-from typing import Literal
 
 import numpy as np
+import typeguard
 from pydantic import BaseModel
 from scipy.stats import binom
-import typeguard
 
 from aib_analysis.data_structures.custom_types import QuestionType
 from aib_analysis.data_structures.data_models import (
@@ -53,6 +51,13 @@ def combine_tournaments(
         )
 
     combined_questions: list[Question] = tournament_1.questions + tournament_2.questions
+
+    # Check if any question titles overlap between tournaments
+    t1_titles = {q.question_text.lower().strip() for q in tournament_1.questions}
+    t2_titles = {q.question_text.lower().strip() for q in tournament_2.questions}
+    if not t1_titles & t2_titles:
+        raise ValueError("No overlapping question titles found between tournaments")
+
     matching_hash_mapping: dict[str, list[Question]] = {}
     for question in combined_questions:
         tournamnet_matching_hash = question.get_hash_for_tournament_matching()
@@ -329,3 +334,11 @@ def calculate_calibration_curve(input_forecasts: list[Forecast]) -> CalibrationC
         )
 
     return CalibrationCurve(curve=calibration_curve_bins)
+
+
+def find_question_titles_unique_to_first_tournament(
+    tournament_1: SimulatedTournament,
+    tournament_2: SimulatedTournament,
+) -> list[Question]:
+    question_titles_2 = set([q.question_text for q in tournament_2.questions])
+    return [q for q in tournament_1.questions if q.question_text not in question_titles_2]

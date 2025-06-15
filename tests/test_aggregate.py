@@ -51,7 +51,7 @@ def test_multiple_choice_aggregate() -> None:
     assert prediction
     assert len(prediction) == 3
     # assert prediction[0] == pytest.approx(0.4333333333) # No longer applies since the average is not eing taken
-    assert sum(prediction) == 1.0
+    assert sum(prediction) == pytest.approx(1.0)
 
 
 def test_prediction_time_after_aggregation_time() -> None:

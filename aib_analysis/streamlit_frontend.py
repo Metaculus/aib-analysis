@@ -13,8 +13,8 @@ sys.path.append(top_level_dir)
 
 from aib_analysis.data_structures.custom_types import QuestionType
 from aib_analysis.data_structures.data_models import (
-    Forecast,
     Leaderboard,
+    Question,
     ScoreType,
     UserType,
 )
@@ -30,6 +30,7 @@ from aib_analysis.process_tournament import (
     constrain_question_types,
     create_team_tournament,
     get_leaderboard,
+    find_question_titles_unique_to_first_tournament,
 )
 from conftest import initialize_logging
 
@@ -42,6 +43,9 @@ def main():
     bot_path = "input_data/bot_forecasts_q1.csv"
     quarterly_cup_path = "local/quarterly_cup_spot_forecasts_q1.csv"
     quarterly_cup_data_is_present = os.path.exists(quarterly_cup_path)
+    bot_team_size = 10
+
+
     st.title("AI Benchmarking Analysis")
     if not quarterly_cup_data_is_present:
         st.warning("NOTE: Quarterly Cup data is not available in this environment. Some tabs will be disabled.")
@@ -77,7 +81,6 @@ def main():
             pro_with_bot_tourn, "Pros w/ Bots (No Teams)", divide_into_types=True
         )
 
-    bot_team_size = 10
     with tab4:
         pro_bot_aggregate_tournament = create_team_tournament(
             pro_tournament,
@@ -90,6 +93,9 @@ def main():
         display_tournament_and_variations(
             pro_bot_aggregate_tournament, "Pro vs Bot (Teams)", divide_into_types=True
         )
+        with st.expander("Questions titles in Pro Tournament but not in Bot Tournament"):
+            unique_questions = find_question_titles_unique_to_first_tournament(pro_tournament, bot_tournament)
+            display_questions(unique_questions, pro_tournament)
 
     with tab5:
         display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament)
@@ -117,6 +123,9 @@ def main():
             aggregate_name_2="Bot Team",
         )
         display_tournament_and_variations(cup_with_bots, "Cup vs Bot Teams")
+        with st.expander("Questions titles in Cup but not in Bot Tournament"):
+            unique_questions = find_question_titles_unique_to_first_tournament(cup_tournament, bot_tournament)
+            display_questions(unique_questions, cup_tournament)
 
 
 @st.cache_data(show_spinner="Loading tournaments...")
@@ -162,7 +171,7 @@ def _display_individual_tournament(tournament: SimulatedTournament, name: str):
     with st.expander(f"{name} Forecasts"):
         display_forecasts(tournament)
     with st.expander(f"{name} Questions"):
-        display_questions(tournament)
+        display_questions(tournament.questions, tournament)
     # with st.expander(f"{name} Calibration Curve"):
     #     display_calibration_curve(tournament)
 
@@ -306,14 +315,17 @@ def display_forecasts(tournament: SimulatedTournament):
             "user_type": f.user.type.value,
             "question_url": f.question.url,
             "question": f.question.question_text,
+            "question_id": f.question.question_id,
             "question_type": f.question.type.value,
-            "prediction": f.prediction,
             "prediction_time": f.prediction_time,
+            "prediction": f.prediction,
             "resolution": f.question.resolution,
             "weight": f.question.weight,
             "options": f.question.options,
             "range_max": f.question.range_max,
             "range_min": f.question.range_min,
+            "open_lower_bound": f.question.open_lower_bound,
+            "open_upper_bound": f.question.open_upper_bound,
         }
         for f in forecasts
     ]
@@ -327,14 +339,17 @@ def display_forecasts(tournament: SimulatedTournament):
     )
 
 
-def display_questions(tournament: SimulatedTournament):
-    questions = tournament.questions
+def display_questions(questions: list[Question],tournament: SimulatedTournament | None = None):
     data = []
     for question in questions:
-        forecasts = tournament.question_to_forecasts(question.question_id)
-        number_of_forecasts = len(forecasts)
-        number_of_forecasters = len(set([f.user.name for f in forecasts]))
-        data.append({"url": question.url, "number_of_forecasts": number_of_forecasts, "number_of_forecasters": number_of_forecasters, **question.model_dump()})
+        datum = {"url": question.url, **question.model_dump()}
+        if tournament is not None:
+            forecasts = tournament.question_to_forecasts(question.question_id)
+            number_of_forecasts = len(forecasts)
+            number_of_forecasters = len(set([f.user.name for f in forecasts]))
+            datum["number_of_forecasts"] = number_of_forecasts
+            datum["number_of_forecasters"] = number_of_forecasters
+        data.append(datum)
     st.write(f"**Number of questions**: {len(questions)}")
     df = pd.DataFrame(data)
     st.dataframe(df, use_container_width=True)
