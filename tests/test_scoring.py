@@ -703,6 +703,22 @@ def test_peer_score_weighted(
 
 
 
+def test_anulled_question():
+    with pytest.raises(ValueError):
+        calculate_peer_score(
+            forecast=[0.5],
+            forecast_for_other_users=[[0.5],[0.2]],
+            resolution=None,
+            q_type="binary",
+        )
+
+    with pytest.raises(ValueError):
+        calculate_baseline_score(
+            forecast=[0.5],
+            resolution=None,
+            q_type="binary",
+        )
+
 
 # TODO: Test the below for peer scores
 # Best score for MC and binary is 996
