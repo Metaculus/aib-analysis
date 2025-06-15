@@ -79,6 +79,14 @@ class SimulatedTournament(BaseModel):
             if forecast.question.question_id == question_id
         ]
 
+    def question_and_user_to_forecasts(self, question_id: int, user_name: str) -> list[Forecast]:
+        return [
+            forecast
+            for forecast in self.forecasts
+            if forecast.question.question_id == question_id
+            and forecast.user.name == user_name
+        ]
+
     def user_to_scores(
         self, user_name: str, score_type: ScoreType | None = None
     ) -> list[Score]:
