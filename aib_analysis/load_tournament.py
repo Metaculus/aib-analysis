@@ -39,7 +39,7 @@ def load_tournament(
     tournament = SimulatedTournament(forecasts=forecasts)
     if tournament_name is not None:
         tournament.name = tournament_name
-    logger.info(f"Finished inializing tournament from forecasts")
+    logger.info(f"Finished inializing tournament '{tournament.name}' from forecasts")
     return tournament
 
 
