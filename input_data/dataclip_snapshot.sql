@@ -226,3 +226,35 @@ WHERE
     --  AND (q.resolution >= 0 OR q.resolution IS NULL)
 ORDER BY
     q.id, u.id;
+
+
+
+
+-- Q4 CP Forecasts
+WITH forecasts AS (
+   SELECT forecast_values, means, centers, method, start_time, end_time, question_id
+   FROM questions_aggregateforecast cp
+   WHERE method = 'recency_weighted'
+)
+SELECT
+   qp.post_id,
+   cp.question_id,
+   cp.forecast_values,
+   cp.means,
+   cp.centers,
+   cp.method,
+   cp.start_time ,
+   cp.end_time,
+   q.title,
+   q.options,
+   q.range_min,
+   q.range_max,
+   q.zero_point,
+   q.type
+FROM forecasts cp
+INNER JOIN questions_question_post qp
+   ON cp.question_id = qp.id
+INNER JOIN questions_question q
+   ON cp.question_id = q.id
+WHERE qp.post_id IN (1621, 4779, 5587, 24806, 28972, 28974, 28925, 28925, 28925, 28925, 28925, 13924, 20694, 26616, 25749, 26304, 28854, 28841, 28657, 28650, 28658, 29086, 29140, 29027, 29090, 28742, 17373, 29222, 28395, 29242, 29077, 29077, 29077, 29028, 29028, 29028, 28783, 28546, 8001, 29145, 29221, 28704, 5201, 3458, 6806, 11122, 17104, 29507, 29507, 29141, 22017, 22017, 28706, 17100, 2788, 19824, 7792, 29609, 27881, 27881, 27881, 27881, 28834, 29524, 29524, 29524, 29524, 29524, 29524, 29608, 29608, 29608, 29608, 29608, 19724, 29807, 29807, 29807, 29807, 11589, 1624, 25801, 20694, 20557, 27141, 27881, 27881, 27881, 27881, 15537, 20172, 26884, 21167, 29900, 29841, 29816, 29903, 29902, 29901, 29847, 29847, 29847, 29847, 29847, 29847, 23018, 17102, 22046, 29709, 5313, 1568, 12217, 30213, 30297, 30251, 30252, 30295, 27868, 29956, 30472, 30472, 20776, 30516, 30476, 30475, 30475, 30475, 30434, 30434, 30434, 8533, 30517, 30477, 30477, 30477, 30709, 30709, 30709, 30708, 30651, 16014, 4862, 30809, 30922, 30870, 30870, 30870, 28860, 28860, 28860, 28860, 30925, 30925, 30925)
+--WHERE qp.post_id = 29507

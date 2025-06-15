@@ -9,11 +9,14 @@ from aib_analysis.data_structures.simulated_tournament import (
 from aib_analysis.process_tournament import (
     combine_tournaments,
     constrain_question_types,
+    create_team_from_leaderboard,
+    create_team_tournament,
     get_leaderboard,
 )
 from tests.mock_data_maker import (
     make_forecast,
     make_question_binary,
+    make_tournament,
     make_user,
 )
 
@@ -197,3 +200,142 @@ class TestCombineTournaments:
             bot_forecasts
         )
         assert len(combined_tournament.users) < len(pro_users) + len(bot_users)
+
+
+class TestCreateTeam:
+    def test_create_team_from_leaderboard_none_size(self) -> None:
+        tournament = make_tournament()
+        team = create_team_from_leaderboard(
+            tournament, None
+        )
+        assert len(team) == len(tournament.users)
+        assert all(user in tournament.users for user in team)
+
+    def test_create_team_from_leaderboard_sum_approach(self) -> None:
+        question = make_question_binary()
+        user_good = make_user("good")
+        user_medium = make_user("medium")
+        user_bad = make_user("bad")
+
+        # True resolution, so [0.9] is a good forecast, [0.1] is a bad forecast
+        forecast_good = make_forecast(question, user_good, [0.9])
+        forecast_medium = make_forecast(question, user_medium, [0.5])
+        forecast_bad = make_forecast(question, user_bad, [0.1])
+
+        tournament = SimulatedTournament(
+            forecasts=[forecast_medium, forecast_good, forecast_bad]
+        )
+
+        team = create_team_from_leaderboard(
+            tournament, 2
+        )
+        assert len(team) == 2
+        assert team[0].name == "good"
+        assert team[1].name == "medium"
+
+    def test_create_team_tournament(self) -> None:
+        # Create two tournaments with different users and questions
+        question1 = make_question_binary("Q1")
+        question2 = make_question_binary("Q2")
+
+        user1 = make_user("user1")
+        user2 = make_user("user2")
+        user3 = make_user("user3")
+        user4 = make_user("user4")
+
+        # Tournament 1 forecasts
+        forecast1_1 = make_forecast(question1, user1, [0.8])
+        forecast1_2 = make_forecast(question1, user2, [0.7])
+
+        # Tournament 2 forecasts
+        forecast2_1 = make_forecast(question1, user3, [0.6])
+        forecast2_2 = make_forecast(question2, user4, [0.5])
+
+        tournament1 = SimulatedTournament(forecasts=[forecast1_1, forecast1_2])
+        tournament2 = SimulatedTournament(forecasts=[forecast2_1, forecast2_2])
+
+        # Create team tournament with top 1 from each tournament
+        team_tournament = create_team_tournament(
+            tournament1, tournament2, 1, 1, "Team1", "Team2"
+        )
+
+        # Verify the combined tournament
+        assert len(team_tournament.users) == 2
+        assert any(user.name == "Team1" for user in team_tournament.users)
+        assert any(user.name == "Team2" for user in team_tournament.users)
+
+        # Verify forecasts were combined
+        assert len(team_tournament.forecasts) == 2  # One forecast per team for the common question
+        assert all(forecast.question.question_id == question1.question_id for forecast in team_tournament.forecasts)
+
+        # Verify the aggregated users
+        team1_user = next(user for user in team_tournament.users if user.name == "Team1")
+        team2_user = next(user for user in team_tournament.users if user.name == "Team2")
+
+        assert len(team1_user.aggregated_users) == 1
+        assert len(team2_user.aggregated_users) == 1
+        assert team1_user.aggregated_users[0].name == "user1"  # Best performer in tournament1
+        assert team2_user.aggregated_users[0].name == "user3"  # Only user in tournament2
+
+    def test_create_team_tournament_all_users(self) -> None:
+        tournament1 = make_tournament()
+        tournament2 = make_tournament()
+
+        # Create team tournament with all users from each tournament
+        team_tournament = create_team_tournament(
+            tournament1, tournament2, None, None, "Team1", "Team2"
+        )
+
+        # Verify the combined tournament
+        assert len(team_tournament.users) == 2
+        assert any(user.name == "Team1" for user in team_tournament.users)
+        assert any(user.name == "Team2" for user in team_tournament.users)
+
+        # Verify the aggregated users
+        team1_user = next(user for user in team_tournament.users if user.name == "Team1")
+        team2_user = next(user for user in team_tournament.users if user.name == "Team2")
+
+        assert len(team1_user.aggregated_users) == len(tournament1.users)
+        assert len(team2_user.aggregated_users) == len(tournament2.users)
+        assert all(user in team1_user.aggregated_users for user in tournament1.users)
+        assert all(user in team2_user.aggregated_users for user in tournament2.users)
+
+    def test_create_team_from_leaderboard_empty_tournament(self) -> None:
+        empty_tournament = SimulatedTournament(forecasts=[])
+        with pytest.raises(ValueError):
+            create_team_from_leaderboard(
+                empty_tournament, 5
+            )
+
+
+    def test_create_team_from_leaderboard_team_size_larger_than_users(self) -> None:
+        tournament = make_tournament()
+        team = create_team_from_leaderboard(
+            tournament, len(tournament.users) + 5
+        )
+        assert len(team) == len(tournament.users)
+        assert all(user in tournament.users for user in team)
+
+    def test_create_team_from_leaderboard_zero_team_size(self) -> None:
+        tournament = make_tournament()
+        with pytest.raises(ValueError):
+            create_team_from_leaderboard(
+                tournament, 0
+            )
+
+
+    def test_create_team_tournament_no_common_questions(self) -> None:
+        # Create two tournaments with completely different questions
+        question1 = make_question_binary("Q1")
+        question2 = make_question_binary("Q2")
+
+        user1 = make_user("user1")
+        user2 = make_user("user2")
+
+        tournament1 = SimulatedTournament(forecasts=[make_forecast(question1, user1, [0.8])])
+        tournament2 = SimulatedTournament(forecasts=[make_forecast(question2, user2, [0.7])])
+
+        with pytest.raises(ValueError):
+            create_team_tournament(
+                tournament1, tournament2, 1, 1, "Team1", "Team2"
+            )
