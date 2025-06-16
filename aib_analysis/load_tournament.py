@@ -74,7 +74,9 @@ def _parse_forecast_row(
             range_min=_parse_lower_bound(row),
             open_upper_bound=_parse_open_upper_bound(row),
             open_lower_bound=_parse_open_lower_bound(row),
+            zero_point=_parse_zero_point(row),
             created_at=pd.to_datetime(row["created_at"]),
+            project=row["project_title"],
         )
         question_cache[question_id] = question
     if username in user_cache:
@@ -179,6 +181,13 @@ def _parse_lower_bound(forecast_row: dict) -> float | None:
         raise ValueError(f"Invalid lower bound: {lower}")
     return None
 
+def _parse_zero_point(forecast_row: dict) -> float | None:
+    if forecast_row["type"] == "numeric":
+        zero_point = forecast_row.get("zero_point")
+        if zero_point is not None and pd.notnull(zero_point) and zero_point != "":
+            return float(zero_point)
+        raise ValueError(f"Invalid zero point: {zero_point}")
+    return None
 
 def _parse_open_upper_bound(forecast_row: dict) -> bool | None:
     if forecast_row["type"] == "numeric":

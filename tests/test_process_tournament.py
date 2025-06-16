@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+
 from aib_analysis.data_structures.custom_types import (
     ForecastType,
     QuestionType,
@@ -12,7 +13,7 @@ from aib_analysis.data_structures.simulated_tournament import (
 from aib_analysis.process_tournament import (
     combine_tournaments,
     constrain_question_types,
-    create_team_from_leaderboard,
+    create_team,
     create_team_tournament,
     get_leaderboard,
 )
@@ -206,7 +207,7 @@ class TestCombineTournaments:
 class TestCreateTeam:
     def test_create_team_from_leaderboard_none_size(self) -> None:
         tournament = make_tournament()
-        team = create_team_from_leaderboard(tournament, None)
+        team = create_team(tournament, None)
         assert len(team) == len(tournament.users)
         assert all(user in tournament.users for user in team)
 
@@ -225,7 +226,7 @@ class TestCreateTeam:
             forecasts=[forecast_medium, forecast_good, forecast_bad]
         )
 
-        team = create_team_from_leaderboard(tournament, 2)
+        team = create_team(tournament, 2)
         assert len(team) == 2
         assert team[0].name == "good"
         assert team[1].name == "medium"
@@ -317,18 +318,18 @@ class TestCreateTeam:
     def test_create_team_from_leaderboard_empty_tournament(self) -> None:
         empty_tournament = SimulatedTournament(forecasts=[])
         with pytest.raises(ValueError):
-            create_team_from_leaderboard(empty_tournament, 5)
+            create_team(empty_tournament, 5)
 
     def test_create_team_from_leaderboard_team_size_larger_than_users(self) -> None:
         tournament = make_tournament()
-        team = create_team_from_leaderboard(tournament, len(tournament.users) + 5)
+        team = create_team(tournament, len(tournament.users) + 5)
         assert len(team) == len(tournament.users)
         assert all(user in tournament.users for user in team)
 
     def test_create_team_from_leaderboard_zero_team_size(self) -> None:
         tournament = make_tournament()
         with pytest.raises(ValueError):
-            create_team_from_leaderboard(tournament, 0)
+            create_team(tournament, 0)
 
     def test_create_team_tournament_no_common_questions(self) -> None:
         # Create two tournaments with completely different questions
@@ -399,3 +400,31 @@ class TestCreateTeam:
             assert actual_option_prediction == pytest.approx(
                 site_option_prediction, abs=0.03
             ), f"Question {question_id_to_test} forecast {forecast.prediction} does not match expected {expected_predictions}"
+
+
+def test_constrain_question_types():
+    tournament = make_tournament()
+    binary_tournament = constrain_question_types(tournament, [QuestionType.BINARY])
+    assert all(forecast.question.type == QuestionType.BINARY for forecast in binary_tournament.forecasts)
+    assert all(question.type == QuestionType.BINARY for question in binary_tournament.questions)
+    assert len(binary_tournament.forecasts) < len(tournament.forecasts)
+
+    numeric_tournament = constrain_question_types(tournament, [QuestionType.NUMERIC])
+    assert all(forecast.question.type == QuestionType.NUMERIC for forecast in numeric_tournament.forecasts)
+    assert all(question.type == QuestionType.NUMERIC for question in numeric_tournament.questions)
+    assert len(numeric_tournament.forecasts) < len(tournament.forecasts)
+
+    multiple_choice_tournament = constrain_question_types(tournament, [QuestionType.MULTIPLE_CHOICE])
+    assert all(forecast.question.type == QuestionType.MULTIPLE_CHOICE for forecast in multiple_choice_tournament.forecasts)
+    assert all(question.type == QuestionType.MULTIPLE_CHOICE for question in multiple_choice_tournament.questions)
+    assert len(multiple_choice_tournament.forecasts) < len(tournament.forecasts)
+
+    binary_and_numeric_tournament = constrain_question_types(tournament, [QuestionType.BINARY, QuestionType.NUMERIC])
+    assert all(forecast.question.type == QuestionType.BINARY or forecast.question.type == QuestionType.NUMERIC for forecast in binary_and_numeric_tournament.forecasts)
+    assert all(question.type == QuestionType.BINARY or question.type == QuestionType.NUMERIC for question in binary_and_numeric_tournament.questions)
+    assert len(binary_and_numeric_tournament.forecasts) < len(tournament.forecasts)
+
+    binary_and_multiple_choice_tournament = constrain_question_types(tournament, [QuestionType.BINARY, QuestionType.MULTIPLE_CHOICE])
+    assert all(forecast.question.type == QuestionType.BINARY or forecast.question.type == QuestionType.MULTIPLE_CHOICE for forecast in binary_and_multiple_choice_tournament.forecasts)
+    assert all(question.type == QuestionType.BINARY or question.type == QuestionType.MULTIPLE_CHOICE for question in binary_and_multiple_choice_tournament.questions)
+    assert len(binary_and_multiple_choice_tournament.forecasts) < len(tournament.forecasts)

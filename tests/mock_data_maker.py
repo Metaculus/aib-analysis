@@ -6,8 +6,10 @@ from aib_analysis.data_structures.data_models import Forecast, Question, User
 from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
 from tests.test_scoring import generate_cdf, Percentile
 
+
 def make_user(name: str, user_type: UserType = UserType.PRO) -> User:
     return User(name=name, type=user_type, aggregated_users=[])
+
 
 def make_question_binary(question_text: str = "Will it rain tomorrow?") -> Question:
     return Question(
@@ -26,6 +28,7 @@ def make_question_binary(question_text: str = "Will it rain tomorrow?") -> Quest
         created_at=datetime(2030, 5, 20, 0, 46, 31),
     )
 
+
 def make_question_mc() -> Question:
     return Question(
         post_id=random.randint(30000, 40000),
@@ -42,6 +45,7 @@ def make_question_mc() -> Question:
         spot_scoring_time=datetime(2025, 5, 30, 0, 46, 31),
         created_at=datetime(2030, 5, 20, 0, 46, 31),
     )
+
 
 def make_question_numeric() -> Question:
     return Question(
@@ -60,7 +64,13 @@ def make_question_numeric() -> Question:
         created_at=datetime(2030, 5, 20, 0, 46, 31),
     )
 
-def make_forecast(question: Question, user: User, prediction: list[float], forecast_time: datetime = datetime(2025, 5, 30, 0, 46, 31)) -> Forecast:
+
+def make_forecast(
+    question: Question,
+    user: User,
+    prediction: list[float],
+    forecast_time: datetime = datetime(2025, 5, 30, 0, 46, 31),
+) -> Forecast:
     if len(prediction) == 1:
         prediction = [prediction[0], 1 - prediction[0]]
     return Forecast(
@@ -72,7 +82,14 @@ def make_forecast(question: Question, user: User, prediction: list[float], forec
 
 
 def make_tournament() -> SimulatedTournament:
-    questions = [make_question_binary(), make_question_mc(), make_question_numeric()]
+    questions = [
+        make_question_binary(),
+        make_question_mc(),
+        make_question_numeric(),
+        make_question_binary(),
+        make_question_mc(),
+        make_question_numeric(),
+    ]
     users = [make_user(f"User {i}") for i in range(1, 10)]
 
     forecasts = []
@@ -99,7 +116,7 @@ def make_tournament() -> SimulatedTournament:
                 question=question,
                 user=user,
                 prediction=prediction,
-                prediction_time=datetime(2024, 12, 1)
+                prediction_time=datetime(2024, 12, 1),
             )
             forecasts.append(forecast)
     return SimulatedTournament(forecasts=forecasts)

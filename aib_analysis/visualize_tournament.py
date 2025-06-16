@@ -19,10 +19,9 @@ from aib_analysis.math.stats import MeanHypothesisCalculator
 from aib_analysis.process_tournament import (
     calculate_calibration_curve,
     constrain_question_types,
-    get_leaderboard,
     find_question_titles_unique_to_first_tournament,
+    get_leaderboard,
 )
-from conftest import pro_tournament
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +57,7 @@ def _display_individual_tournament(tournament: SimulatedTournament, name: str):
     with st.expander(f"{name} Baseline Leaderboard"):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_BASELINE)
         display_leaderboard(leaderboard)
-    with st.expander(f"{name} Statistics"):
+    with st.expander(f"{name} Stats"):
         display_tournament_stats(tournament)
     with st.expander(f"{name} Forecasts"):
         display_forecasts(tournament)
@@ -239,6 +238,7 @@ def display_questions(questions: list[Question],tournament: SimulatedTournament 
     data = []
     for question in questions:
         datum = {"url": question.url, **question.model_dump()}
+        datum["type"] = question.type.value
         if tournament is not None:
             forecasts = tournament.question_to_forecasts(question.question_id)
             spot_forecasts = tournament.question_to_spot_forecasts(question.question_id)
@@ -260,7 +260,7 @@ def display_leaderboard(leaderboard: Leaderboard):
     confidence_level = 0.95
     _display_average_scores_plot(leaderboard, confidence_level)
     _display_leaderboard_table(leaderboard, confidence_level)
-    _display_score_histogram_by_user(leaderboard.all_scores, title="All Users Scores Histogram")
+    _display_score_histogram_by_user(leaderboard.all_scores, title="All Users Scores Histogram (overlay, not stacked)")
 
 
 def _display_leaderboard_table(leaderboard: Leaderboard, confidence_level: float):
@@ -333,6 +333,7 @@ def _display_average_scores_plot(
             {
                 "user": entry.user.name,
                 "average_score": entry.average_score,
+                "sum_of_scores": entry.sum_of_scores,
                 "upper_bound": upper_bound,
                 "lower_bound": lower_bound,
                 "num_questions": entry.question_count,
@@ -344,7 +345,7 @@ def _display_average_scores_plot(
         return
 
     df = pd.DataFrame(entries)
-    df = df.sort_values("average_score", ascending=False)
+    df = df.sort_values("sum_of_scores", ascending=False)
 
     fig = go.Figure()
 

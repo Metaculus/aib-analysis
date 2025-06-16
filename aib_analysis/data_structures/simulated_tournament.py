@@ -298,13 +298,14 @@ class SimulatedTournament(BaseModel):
         min_expected_forecasts = total_users / 2
 
         questions_with_too_few_forecasts: list[Question] = []
+        messages = []
         for question in self.questions:
             forecasts_for_question = self.question_to_spot_forecasts(
                 question.question_id
             )
 
             if len(forecasts_for_question) < min_expected_forecasts:
-                logger.warning(
+                messages.append(
                     f"Question {question.question_id} ({question.url}) has only "
                     f"{len(forecasts_for_question)} forecasts out of {total_users} participants"
                 )
@@ -312,7 +313,7 @@ class SimulatedTournament(BaseModel):
 
         if len(questions_with_too_few_forecasts) > 0:
             logger.warning(
-                f"Found {len(questions_with_too_few_forecasts)} questions with too few forecasts"
+                f"Found {len(questions_with_too_few_forecasts)} questions with too few forecasts. First 5 instances: {messages[:5]}"
             )
 
     def _log_if_weights_are_too_low(self) -> None:
