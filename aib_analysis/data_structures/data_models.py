@@ -99,8 +99,8 @@ class Forecast(BaseModel):
         )
 
     def _error_if_need_zero_point(self) -> None:
-        if self.question.zero_point is not None and self.question.type == QuestionType.NUMERIC:
-            raise ValueError(f"Numeric question {self.question.question_id} has a zero point, but is not a numeric question")
+        if self.question.is_log_scale:
+            raise NotImplementedError(f"Numeric question {self.question.question_id} has a zero point. Log Scall is currently not supported")
 
     @model_validator(mode="after")
     def check_prediction_type_matches(self) -> Self:
@@ -260,6 +260,10 @@ class Question(BaseModel, frozen=True):
                     "Multiple choice questions must have at least two options."
                 )
         return self
+
+    @property
+    def is_log_scale(self) -> bool:
+        return self.type == QuestionType.NUMERIC and self.zero_point is not None
 
     @property
     def url(self) -> str:

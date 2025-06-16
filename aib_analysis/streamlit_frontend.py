@@ -32,13 +32,13 @@ def main():
     initialize_logging()
     pro_path = "input_data/pro_forecasts_q1.csv"
     bot_path = "input_data/bot_forecasts_q1.csv"
-    quarterly_cup_path = "local/quarterly_cup_forecasts_before_cp_reveal_time_q1.csv"
+    quarterly_cup_path = "local/quarterly_cup_forecats_before_cp_reveal_time_q1.csv"
     quarterly_cup_data_is_present = os.path.exists(quarterly_cup_path)
     bot_team_size = 10
 
     st.title("AI Benchmarking Analysis")
     st.warning(
-        "NOTICE: If you interact with the page before the analysis is done running, it will sometimes rerun on you. Inital data loading is cached and you can clear this in the triple dot menu."
+        "NOTICE: If you interact with the page before the analysis is done running, it will occasionally rerun on you."
     )
     if not quarterly_cup_data_is_present:
         st.warning(
