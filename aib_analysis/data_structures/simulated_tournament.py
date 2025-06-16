@@ -7,6 +7,7 @@ from typing_extensions import Self
 
 from aib_analysis.data_structures.custom_types import (
     AnnulledAmbiguousResolutionType,
+    QuestionType,
 )
 from aib_analysis.data_structures.data_models import (
     Forecast,
@@ -125,6 +126,7 @@ class SimulatedTournament(BaseModel):
     @model_validator(mode="after")
     def initialize_tournament(self) -> Self:
         logger.info(f"Initializing tournament {self.name}")
+        self._remove_log_scale_questions()
         self._initialize_spot_forecast_cache()
         self._initialize_user_and_question_caches()
         self._initialize_scores_cache()
@@ -140,6 +142,16 @@ class SimulatedTournament(BaseModel):
         self._log_if_less_than_half_users_forecasted()
         self._log_if_weights_are_too_low()
         return self
+
+    def _remove_log_scale_questions(self) -> None:
+        non_log_scale_forecasts = [
+            forecast
+            for forecast in self.forecasts
+            if not forecast.question.is_log_scale
+        ]
+        if not (len(non_log_scale_forecasts) == len(self.forecasts)):
+            logger.warning(f"Removed {len(self.forecasts) - len(non_log_scale_forecasts)} log scale questions")
+        self.forecasts = non_log_scale_forecasts
 
     def _initialize_spot_forecast_cache(self) -> None:
         spot_forecasts: dict[tuple[str, int], Forecast] = {}

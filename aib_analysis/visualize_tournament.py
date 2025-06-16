@@ -377,8 +377,9 @@ def _display_average_scores_plot(
         height=600,
         xaxis=dict(tickangle=45),
     )
-
-    st.plotly_chart(fig, use_container_width=True)
+    random_number = random.randint(0, 1000000)
+    plot_key = f"{random_number}"
+    st.plotly_chart(fig, use_container_width=True, key=plot_key)
 
 
 
@@ -483,7 +484,9 @@ def display_calibration_curve(tournament: SimulatedTournament) -> None:
         height=600,
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    random_number = random.randint(0, 1000000)
+    plot_key = f"{random_number}"
+    st.plotly_chart(fig, use_container_width=True, key=plot_key)
 
 
 def _display_score_histogram_by_user(scores: list[Score], title: str | None = None) -> None:
