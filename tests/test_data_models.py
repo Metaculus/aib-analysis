@@ -177,3 +177,17 @@ def test_question_validation_errors():
             spot_scoring_time=datetime(2025, 1, 1),
             created_at=datetime(2030, 5, 20, 0, 46, 31),
         )
+
+
+def test_everything_is_immutable():
+    question = make_question_binary()
+    with pytest.raises(Exception):
+        question.spot_scoring_time = datetime(2025, 1, 1) # type: ignore
+
+    user = make_user("alice")
+    with pytest.raises(Exception):
+        user.name = "bob"
+
+    forecast = make_forecast(question, user, [0.5])
+    with pytest.raises(Exception):
+        forecast.prediction = [0.1]

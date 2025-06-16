@@ -40,8 +40,6 @@ def calculate_peer_score(
     return peer_score * question_weight * 100
 
 
-
-
 def calculate_baseline_score(
     forecast: ForecastType,
     resolution: ResolutionType,
@@ -112,8 +110,7 @@ def _determine_baseline(
         if not isinstance(resolution, float):
             raise ValueError("Resolution must be a float for numeric questions")
 
-        # @Check: Which version is correct?
-        # Version 1:
+
         resolved_outside_bounds = False
         assert (
             range_min is not None and range_max is not None and resolution is not None
@@ -127,20 +124,6 @@ def _determine_baseline(
             baseline_prob = (
                 1 - 0.05 * open_bound_count
             ) / 200  # PMF has 202 bins, 2 of which represent the bounds. So 200 is the internal bins
-
-        # Version 2:
-        # open_bound_count = bool(open_upper_bound) + bool(open_lower_bound)
-        # if open_bound_count == 0:
-        #     baseline_prob = 1
-        # elif open_bound_count == 1:
-        #     baseline_prob = 0.95
-        # else:
-        #     baseline_prob = 0.9
-
-        # Version 3:
-        # baseline_prob = (
-        #     1 / 202
-        # )  # len(pmf) # bins = 201 because of extra appended bin
     else:
         raise ValueError("Unknown question type")
     assert (
@@ -272,7 +255,6 @@ def _numeric_resolution_prob(
     return prob_for_resolution
 
 
-
 def _determine_divisor_for_baseline_score(
     question_type: QuestionType, options: list[str] | None = None
 ) -> float:
@@ -313,7 +295,9 @@ def _resolution_value_to_pmf_index(
         position_in_range = _resolution_value_to_position_in_numeric_range(
             resolution, range_min, range_max
         )
-        resolution_bin_idx = round(position_in_range * 200 + 0.501) # python rounds 0.5 down when near 0 so add 0.001
+        resolution_bin_idx = round(
+            position_in_range * 200 + 0.501
+        )  # python rounds 0.5 down when near 0 so add 0.001
     if resolution_bin_idx >= len(pmf) or resolution_bin_idx < 0:
         raise ValueError(
             f"Invalid resolution bin index: {resolution_bin_idx}. Resolution: {resolution}, Range min: {range_min}, Range max: {range_max}"
@@ -474,7 +458,6 @@ def pmf_to_cdf(pmf: list[float]) -> list[float]:
         cdf.append(total)
     assert len(cdf) == 201, f"There should be 201 bins, but there are {len(cdf)}"
     return cdf
-
 
 
 # HOW TO CALCULATE PEER SCORE W/ GEOMETRIC MEAN AVERAGES

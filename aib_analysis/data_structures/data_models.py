@@ -177,6 +177,9 @@ class Score(BaseModel):
         return f"({self.score:.3f}) {self.forecast.question.url}"
 
 
+    def __hash__(self) -> int:
+        return hash((self.id, self.score, self.type, self.forecast.id))
+
 class Question(BaseModel, frozen=True):
     question_id: int
     type: QuestionType
@@ -353,11 +356,25 @@ class Leaderboard(BaseModel):
         self.entries.sort(key=lambda x: x.sum_of_scores, reverse=True)
         return self
 
+    @property
+    def all_scores(self) -> list[Score]:
+        return list(set([score for entry in self.entries for score in entry.scores]))
+
     def entries_via_sum_of_scores(self) -> list[LeaderboardEntry]:
         return sorted(self.entries, key=lambda x: x.sum_of_scores, reverse=True)
 
     def entries_via_average_score(self) -> list[LeaderboardEntry]:
         return sorted(self.entries, key=lambda x: x.average_score, reverse=True)
+
+    def entries_via_lower_bound_of_confidence_interval(self, confidence_level: float = 0.95) -> list[LeaderboardEntry]:
+        def get_lower_bound(entry: LeaderboardEntry) -> float:
+            try:
+                return entry.get_confidence_interval(confidence_level).lower_bound
+            except Exception:
+                logger.debug(f"Error getting confidence interval for leaderboard entry sorting for entry: {entry}")
+                return -1e6
+
+        return sorted(self.entries, key=get_lower_bound, reverse=True)
 
 
 class LeaderboardEntry(BaseModel):

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class SimulatedTournament(BaseModel):
-    name: str = "Unnamed"
+    name: str | None = None
     forecasts: list[Forecast]
 
     @property
