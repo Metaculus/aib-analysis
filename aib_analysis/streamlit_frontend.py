@@ -345,10 +345,15 @@ def display_questions(questions: list[Question],tournament: SimulatedTournament 
         datum = {"url": question.url, **question.model_dump()}
         if tournament is not None:
             forecasts = tournament.question_to_forecasts(question.question_id)
-            number_of_forecasts = len(forecasts)
-            number_of_forecasters = len(set([f.user.name for f in forecasts]))
-            datum["number_of_forecasts"] = number_of_forecasts
-            datum["number_of_forecasters"] = number_of_forecasters
+            spot_forecasts = tournament.question_to_spot_forecasts(question.question_id)
+            num_of_forecasts = len(forecasts)
+            num_of_forecasters = len(set([f.user.name for f in forecasts]))
+            num_of_spot_forecasts = len(spot_forecasts)
+            num_of_spot_forecasters = len(set([f.user.name for f in spot_forecasts]))
+            datum["num_forecasts"] = num_of_forecasts
+            datum["num_forecasters"] = num_of_forecasters
+            datum["num_spot_forecasts"] = num_of_spot_forecasts
+            datum["num_spot_forecasters"] = num_of_spot_forecasters
         data.append(datum)
     st.write(f"**Number of questions**: {len(questions)}")
     df = pd.DataFrame(data)

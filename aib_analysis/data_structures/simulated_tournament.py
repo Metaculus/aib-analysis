@@ -53,9 +53,7 @@ class SimulatedTournament(BaseModel):
     _question_cache: dict[int, Question] = PrivateAttr(default_factory=dict)
     _scores_cache: dict[str, Score] = PrivateAttr(default_factory=dict)
 
-    _spot_forecasts_cache: dict[str, Forecast] = PrivateAttr(
-        default_factory=dict
-    )
+    _spot_forecasts_cache: dict[str, Forecast] = PrivateAttr(default_factory=dict)
     _question_to_spot_forecasts_cache: dict[int, list[Forecast]] = PrivateAttr(
         default_factory=dict
     )
@@ -70,7 +68,9 @@ class SimulatedTournament(BaseModel):
                     forecast
                 )
         spot_forecasts = self._question_to_spot_forecasts_cache[question_id]
-        return spot_forecasts.copy() # Shallow copy (so you don't modify order of original list)
+        return (
+            spot_forecasts.copy()
+        )  # Shallow copy (so you don't modify order of original list)
 
     def question_to_forecasts(self, question_id: int) -> list[Forecast]:
         return [
@@ -79,7 +79,9 @@ class SimulatedTournament(BaseModel):
             if forecast.question.question_id == question_id
         ]
 
-    def question_and_user_to_forecasts(self, question_id: int, user_name: str) -> list[Forecast]:
+    def question_and_user_to_forecasts(
+        self, question_id: int, user_name: str
+    ) -> list[Forecast]:
         return [
             forecast
             for forecast in self.forecasts
@@ -124,36 +126,20 @@ class SimulatedTournament(BaseModel):
     def initialize_tournament(self) -> Self:
         logger.info(f"Initializing tournament {self.name}")
         self._initialize_spot_forecast_cache()
+        self._initialize_user_and_question_caches()
+        self._initialize_scores_cache()
 
-        self._user_cache = {
-            forecast.user.name: forecast.user for forecast in self.forecasts
-        }
-        self._question_cache = {
-            forecast.question.question_id: forecast.question
-            for forecast in self.forecasts
-        }
+        logger.info(
+            f"Finished initializing scoring caches for {len(self.scores)} scores"
+        )
 
+        self._validate_no_duplicate_questions()
+        self._validate_one_user_question_per_spot_score()
+        self._validate_num_scores_match_num_spot_forecasts()
 
-        log_every_n = 1000
-        all_scores: list[Score] = []
-        for i, forecast in enumerate(self.spot_forecasts):
-            should_log_scoring = i % log_every_n == 0
-            if should_log_scoring:
-                logger.info(
-                    f"Caching scores for forecast {i} of {len(self.spot_forecasts)}"
-                )
-            if isinstance(forecast.question.resolution, AnnulledAmbiguousResolutionType):
-                continue
-            new_scores = self._calculate_spot_scores_for_forecast(forecast)
-            all_scores.extend(new_scores)
-        self._scores_cache = {score.id: score for score in all_scores}
-
-        logger.info(f"Finished initializing scoring caches for {len(self.scores)} scores")
-        self._check_no_duplicate_questions()
-        self._check_spot_scores()
-        self._check_heuristics()
+        self._log_if_less_than_half_users_forecasted()
+        self._log_if_weights_are_too_low()
         return self
-
 
     def _initialize_spot_forecast_cache(self) -> None:
         spot_forecasts: dict[tuple[str, int], Forecast] = {}
@@ -170,6 +156,32 @@ class SimulatedTournament(BaseModel):
         self._spot_forecasts_cache = {
             forecast.id: forecast for forecast in spot_forecasts.values()
         }
+
+    def _initialize_user_and_question_caches(self) -> None:
+        self._user_cache = {
+            forecast.user.name: forecast.user for forecast in self.forecasts
+        }
+        self._question_cache = {
+            forecast.question.question_id: forecast.question
+            for forecast in self.forecasts
+        }
+
+    def _initialize_scores_cache(self) -> None:
+        log_every_n = 1000
+        all_scores: list[Score] = []
+        for i, forecast in enumerate(self.spot_forecasts):
+            should_log_scoring = i % log_every_n == 0
+            if should_log_scoring:
+                logger.info(
+                    f"Caching scores for forecast {i} of {len(self.spot_forecasts)}"
+                )
+            if isinstance(
+                forecast.question.resolution, AnnulledAmbiguousResolutionType
+            ):
+                continue
+            new_scores = self._calculate_spot_scores_for_forecast(forecast)
+            all_scores.extend(new_scores)
+        self._scores_cache = {score.id: score for score in all_scores}
 
     def _calculate_spot_scores_for_forecast(
         self, forecast_to_score: Forecast
@@ -193,13 +205,17 @@ class SimulatedTournament(BaseModel):
         scores = [spot_peer_score, spot_baseline_score]
         return scores
 
-    def _check_spot_scores(self) -> None:
+    def _validate_one_user_question_per_spot_score(self) -> None:
         # Group scores by question_id, user_name, and score_type
         score_groups: dict[tuple[int, str, ScoreType], list[Score]] = {}
         for score in self.scores:
             if not score.type.is_spot_score():
                 continue
-            key = (score.forecast.question.question_id, score.forecast.user.name, score.type)
+            key = (
+                score.forecast.question.question_id,
+                score.forecast.user.name,
+                score.type,
+            )
             score_groups.setdefault(key, []).append(score)
 
         # Check each group has exactly one score
@@ -210,7 +226,40 @@ class SimulatedTournament(BaseModel):
                     f"but found {len(scores)} scores"
                 )
 
-    def _check_no_duplicate_questions(self) -> None:
+    def _validate_num_scores_match_num_spot_forecasts(self) -> None:
+        spot_forecasts = self.spot_forecasts
+        non_annulled_spot_forecasts = len(
+            [
+                forecast
+                for forecast in spot_forecasts
+                if not forecast.question.is_annulled_or_ambiguous
+            ]
+        )
+        num_scores = len(self.scores)
+        num_score_types = len(
+            [score_type for score_type in ScoreType if score_type.is_spot_score()]
+        )
+        expected_scores = non_annulled_spot_forecasts * num_score_types
+        assert (
+            num_scores == expected_scores
+        ), f"Number of non-annulled spot forecasts ({non_annulled_spot_forecasts}) and scores ({num_scores}) do not match (expected {expected_scores} scores)"
+
+    def _validate_spot_forecasters_equal_forecasters(self) -> None:
+        for question in self.questions:
+            forecasts = self.question_to_forecasts(question.question_id)
+            spot_forecasts = self.question_to_spot_forecasts(question.question_id)
+            num_of_forecasts = len(forecasts)
+            num_of_forecasters = len(set([f.user.name for f in forecasts]))
+            num_of_spot_forecasts = len(spot_forecasts)
+            num_of_spot_forecasters = len(set([f.user.name for f in spot_forecasts]))
+            assert (
+                num_of_forecasters == num_of_spot_forecasters
+            ), f"Number of forecasts ({num_of_forecasts}) and number of spot forecasts ({num_of_spot_forecasts}) do not match for question {question.question_id} ({question.url})"
+            assert (
+                num_of_forecasts >= num_of_spot_forecasts
+            ), f"Number of forecasts ({num_of_forecasts}) and number of spot forecasts ({num_of_spot_forecasts}) do not match for question {question.question_id} ({question.url})"
+
+    def _validate_no_duplicate_questions(self) -> None:
         question_text_map: dict[str, list[Question]] = {}
         for question in self.questions:
             question_text_map.setdefault(question.question_text, []).append(question)
@@ -220,8 +269,12 @@ class SimulatedTournament(BaseModel):
             assert len(questions) > 0
             if len(questions) == 1:
                 continue
-            if ProblemManager.dont_log_in_duplicate_detection_within_tournament(questions):
-                logger.info(f"Duplicate question is prequalified for q1 bot tournament: {[q.url for q in questions]}")
+            if ProblemManager.dont_log_in_duplicate_detection_within_tournament(
+                questions
+            ):
+                logger.info(
+                    f"Duplicate question is prequalified for q1 bot tournament: {[q.url for q in questions]}"
+                )
                 continue
             error_message = "# Duplicates for question text: " + question_text + "\n"
             error_message += Question.question_comparison_table(questions)
@@ -229,7 +282,9 @@ class SimulatedTournament(BaseModel):
 
         if len(duplicate_error_messages) > 0:
             combined_error_message = "\n\n".join(duplicate_error_messages)
-            logger.warning(f"Duplicate question texts found in questions: \n{combined_error_message}")
+            logger.warning(
+                f"Duplicate question texts found in questions: \n{combined_error_message}"
+            )
 
         question_ids = [question.question_id for question in self.questions]
         if len(question_ids) != len(set(question_ids)):
@@ -238,17 +293,15 @@ class SimulatedTournament(BaseModel):
         if len(self.questions) != len(set(self.questions)):
             raise ValueError("Duplicate questions found in questions")
 
-    def _check_heuristics(self) -> None:
-        self._less_than_half_users_forecasted()
-        self._weights_are_too_low()
-
-    def _less_than_half_users_forecasted(self) -> None:
+    def _log_if_less_than_half_users_forecasted(self) -> None:
         total_users = len(self.users)
         min_expected_forecasts = total_users / 2
 
         questions_with_too_few_forecasts: list[Question] = []
         for question in self.questions:
-            forecasts_for_question = self.question_to_spot_forecasts(question.question_id)
+            forecasts_for_question = self.question_to_spot_forecasts(
+                question.question_id
+            )
 
             if len(forecasts_for_question) < min_expected_forecasts:
                 logger.warning(
@@ -258,9 +311,11 @@ class SimulatedTournament(BaseModel):
                 questions_with_too_few_forecasts.append(question)
 
         if len(questions_with_too_few_forecasts) > 0:
-            logger.warning(f"Found {len(questions_with_too_few_forecasts)} questions with too few forecasts")
+            logger.warning(
+                f"Found {len(questions_with_too_few_forecasts)} questions with too few forecasts"
+            )
 
-    def _weights_are_too_low(self) -> None:
+    def _log_if_weights_are_too_low(self) -> None:
         min_weight = 0.3
         for question in self.questions:
             if question.weight < min_weight:
