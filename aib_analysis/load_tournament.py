@@ -184,7 +184,9 @@ def _parse_lower_bound(forecast_row: dict) -> float | None:
 def _parse_zero_point(forecast_row: dict) -> float | None:
     if forecast_row["type"] == "numeric":
         zero_point = forecast_row.get("zero_point")
-        if zero_point is not None and pd.notnull(zero_point) and zero_point != "":
+        if pd.isna(zero_point):
+            return None
+        elif zero_point is not None and pd.notnull(zero_point) and zero_point != "":
             return float(zero_point)
         raise ValueError(f"Invalid zero point: {zero_point}")
     return None

@@ -32,7 +32,7 @@ def main():
     initialize_logging()
     pro_path = "input_data/pro_forecasts_q1.csv"
     bot_path = "input_data/bot_forecasts_q1.csv"
-    quarterly_cup_path = "local/quarterly_cup_forecasts_before_cp_reveal_q1.csv"
+    quarterly_cup_path = "local/quarterly_cup_forecasts_before_cp_reveal_time_q1.csv"
     quarterly_cup_data_is_present = os.path.exists(quarterly_cup_path)
     bot_team_size = 10
 
@@ -70,60 +70,60 @@ def main():
         )
         display_tournament_and_variations(bot_tournament, "Bot", divide_into_types=True)
 
-    #     metac_bot_users = [
-    #         user
-    #         for user in bot_tournament.users
-    #         if user.name.lower().startswith("metac")
-    #     ]
-    #     metac_bot_forecasts = [
-    #         forecast
-    #         for user in metac_bot_users
-    #         for forecast in bot_tournament.user_to_spot_forecasts(user.name)
-    #     ]
-    #     metac_bot_tournament = SimulatedTournament(
-    #         name="Metac Bot Tournament",
-    #         forecasts=metac_bot_forecasts,
-    #     )
-    #     display_tournament_and_variations(metac_bot_tournament, "Metac Bot")
+        metac_bot_users = [
+            user
+            for user in bot_tournament.users
+            if user.is_metac_bot
+        ]
+        metac_bot_forecasts = [
+            forecast
+            for user in metac_bot_users
+            for forecast in bot_tournament.user_to_spot_forecasts(user.name)
+        ]
+        metac_bot_tournament = SimulatedTournament(
+            name="Metac Bot Tournament",
+            forecasts=metac_bot_forecasts,
+        )
+        display_tournament_and_variations(metac_bot_tournament, "Metac Bot")
 
-    #     non_metac_bot_users = [user for user in bot_tournament.users if user not in metac_bot_users]
-    #     best_metac_bot = create_team(metac_bot_tournament, 1)
-    #     everyone_plus_best_metac_bot = non_metac_bot_users + best_metac_bot
-    #     everyone_plus_best_metac_bot_forecasts = [
-    #         forecast
-    #         for user in everyone_plus_best_metac_bot
-    #         for forecast in bot_tournament.user_to_spot_forecasts(user.name)
-    #     ]
-    #     everyone_plus_best_metac_bot_tournament = SimulatedTournament(
-    #         name="Everyone Plus Best Metac Bot Tournament",
-    #         forecasts=everyone_plus_best_metac_bot_forecasts,
-    #     )
-    #     display_tournament_and_variations(everyone_plus_best_metac_bot_tournament, "Everyone Plus Best Metac Bot")
+        non_metac_bot_users = [user for user in bot_tournament.users if user.is_metac_bot]
+        best_metac_bot = create_team(metac_bot_tournament, 1)
+        everyone_plus_best_metac_bot = non_metac_bot_users + best_metac_bot
+        everyone_plus_best_metac_bot_forecasts = [
+            forecast
+            for user in everyone_plus_best_metac_bot
+            for forecast in bot_tournament.user_to_spot_forecasts(user.name)
+        ]
+        everyone_plus_best_metac_bot_tournament = SimulatedTournament(
+            name="Everyone Plus Best Metac Bot Tournament",
+            forecasts=everyone_plus_best_metac_bot_forecasts,
+        )
+        display_tournament_and_variations(everyone_plus_best_metac_bot_tournament, "Everyone Plus Best Metac Bot")
 
-    # with tab3:
-    #     pro_with_bot_tourn = combine_tournaments(pro_tournament, bot_tournament)
-    #     display_tournament_and_variations(
-    #         pro_with_bot_tourn, "Pros w/ Bots (No Teams)", divide_into_types=True
-    #     )
+    with tab3:
+        pro_with_bot_tourn = combine_tournaments(pro_tournament, bot_tournament)
+        display_tournament_and_variations(
+            pro_with_bot_tourn, "Pros w/ Bots (No Teams)", divide_into_types=True
+        )
 
-    # with tab4:
-    #     pro_bot_aggregate_tournament = create_team_tournament(
-    #         pro_tournament,
-    #         bot_tournament,
-    #         t1_size=None,
-    #         t2_size=bot_team_size,
-    #         aggregate_name_1="Pro Team",
-    #         aggregate_name_2="Bot Team",
-    #     )
-    #     display_tournament_and_variations(
-    #         pro_bot_aggregate_tournament, "Pro vs Bot (Teams)", divide_into_types=True
-    #     )
+    with tab4:
+        pro_bot_aggregate_tournament = create_team_tournament(
+            pro_tournament,
+            bot_tournament,
+            t1_size=None,
+            t2_size=bot_team_size,
+            aggregate_name_1="Pro Team",
+            aggregate_name_2="Bot Team",
+        )
+        display_tournament_and_variations(
+            pro_bot_aggregate_tournament, "Pro vs Bot (Teams)", divide_into_types=True
+        )
 
-    # with tab5:
-    #     display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament)
+    with tab5:
+        display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament)
 
-    # if not quarterly_cup_data_is_present:
-    #     return
+    if not quarterly_cup_data_is_present:
+        return
 
     with tab6:
         cup_tournament = load_and_cache_tournament(

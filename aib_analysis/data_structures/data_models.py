@@ -49,6 +49,7 @@ class Forecast(BaseModel):
         return self._id
 
     def get_spot_baseline_score(self, resolution: ResolutionType) -> Score:
+        self._error_if_need_zero_point()
         q = self.question
         score_value = calculate_baseline_score(
             forecast=self.prediction,
@@ -72,6 +73,7 @@ class Forecast(BaseModel):
     def get_spot_peer_score(
         self, resolution: ResolutionType, other_users_forecasts: list[Forecast]
     ) -> Score:
+        self._error_if_need_zero_point()
         other_preds = [f.prediction for f in other_users_forecasts]
         users_used_in_scoring = [f.user for f in other_users_forecasts]
         if self.user in users_used_in_scoring:
@@ -95,6 +97,10 @@ class Forecast(BaseModel):
             forecast=self,
             users_used_in_scoring=[f.user for f in other_users_forecasts],
         )
+
+    def _error_if_need_zero_point(self) -> None:
+        if self.question.zero_point is not None and self.question.type == QuestionType.NUMERIC:
+            raise ValueError(f"Numeric question {self.question.question_id} has a zero point, but is not a numeric question")
 
     @model_validator(mode="after")
     def check_prediction_type_matches(self) -> Self:
@@ -190,12 +196,12 @@ class Question(BaseModel, frozen=True):
     range_min: float | None
     open_upper_bound: bool | None
     open_lower_bound: bool | None
-    zero_point: float | None
+    zero_point: float | None = None
     weight: float
     post_id: int
     created_at: datetime
     spot_scoring_time: datetime
-    project: str
+    project: str | None = None
     notes: str | None = None
     model_config = ConfigDict(frozen=True)
 
@@ -315,6 +321,7 @@ class Question(BaseModel, frozen=True):
             self.range_min,
             self.open_upper_bound,
             self.open_lower_bound,
+            self.zero_point,
             spot_scoring_window,
         )
         return str(hash(hash_fields))
@@ -328,7 +335,7 @@ class User(BaseModel):
 
     @property
     def is_metac_bot(self) -> bool:
-        return "metac-" in self.name
+        return "metac-" in self.name.lower()
 
 
 class Leaderboard(BaseModel):
