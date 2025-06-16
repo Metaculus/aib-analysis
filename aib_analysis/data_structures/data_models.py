@@ -190,10 +190,12 @@ class Question(BaseModel, frozen=True):
     range_min: float | None
     open_upper_bound: bool | None
     open_lower_bound: bool | None
+    zero_point: float | None
     weight: float
     post_id: int
     created_at: datetime
     spot_scoring_time: datetime
+    project: str
     notes: str | None = None
     model_config = ConfigDict(frozen=True)
 

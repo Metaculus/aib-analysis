@@ -81,7 +81,7 @@ def combine_tournaments(
         )
         combined_forecasts.extend(new_forecasts)
 
-    return SimulatedTournament(forecasts=combined_forecasts)
+    return SimulatedTournament(forecasts=combined_forecasts, name=f"{tournament_1.name} + {tournament_2.name}")
 
 
 def log_title_mapping_inconsistencies(
@@ -198,7 +198,7 @@ def constrain_question_types(
     return SimulatedTournament(forecasts=filtered_forecasts)
 
 
-def create_team_from_leaderboard(
+def create_team(
     tournament: SimulatedTournament,
     team_size: int | None,
 ) -> list[User]:
@@ -226,10 +226,10 @@ def create_team_tournament(
     aggregate_name_1: str,
     aggregate_name_2: str,
 ) -> SimulatedTournament:
-    team_1 = create_team_from_leaderboard(
+    team_1 = create_team(
         tournament_1, t1_size
     )
-    team_2 = create_team_from_leaderboard(
+    team_2 = create_team(
         tournament_2, t2_size
     )
 
@@ -247,8 +247,8 @@ def create_team_tournament(
         t2_aggregate.aggregate_forecasts, list[Forecast]
     )
 
-    t1_agg_tournament = SimulatedTournament(forecasts=t1_forecasts)
-    t2_agg_tournament = SimulatedTournament(forecasts=t2_forecasts)
+    t1_agg_tournament = SimulatedTournament(forecasts=t1_forecasts, name=f"{tournament_1.name} + {aggregate_name_1}")
+    t2_agg_tournament = SimulatedTournament(forecasts=t2_forecasts, name=f"{tournament_2.name} + {aggregate_name_2}")
     return combine_tournaments(t1_agg_tournament, t2_agg_tournament)
 
 class Bin(BaseModel):
