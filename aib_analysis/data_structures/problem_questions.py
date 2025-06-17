@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
+
 from pydantic import BaseModel
 
 from aib_analysis.data_structures.data_models import Question
+
+logger = logging.getLogger(__name__)
 
 """
 There are 3 questions of:
@@ -68,26 +72,29 @@ class ProblemQuestion(BaseModel):
         elif not text_matches and not url_matches:
             return False
         else:
-            raise ValueError(
+            logger.warning(
                 f"Input Question {input_url} matches some parts of problem but not all | "
                 f"Input Question_text: {question.question_text} | "
                 f"Problem Question_text: {self.question_text} | "
                 f"Problem: {self.model_dump_json()}"
             )
+            return False
 
 
 class ProblemManager:
     @classmethod
     def dont_log_in_tournament_matching(cls, questions: list[Question]) -> bool:
-        return cls._is_in_problem_question_list(
-            questions, cls._q1_bot_v_pro_matching_inconsistencies
+        return cls._question_list_fully_matches_a_problem_question(
+            questions,
+            cls._q1_bot_v_pro_matching_inconsistencies
+            + cls._q1_bot_v_cup_matching_inconsistencies,
         )
 
     @classmethod
     def dont_log_in_duplicate_detection_within_tournament(
         cls, questions: list[Question]
     ) -> bool:
-        return cls._is_in_problem_question_list(
+        return cls._question_list_fully_matches_a_problem_question(
             questions, cls._q1_bot__in_tournament_title_duplicates
         )
 
@@ -103,29 +110,32 @@ class ProblemManager:
         for question_group in question_title_map.values():
             if len(question_group) < 2:
                 continue
-            if cls._is_in_problem_question_list(
-                question_group, cls._q1_bot_v_pro_inconsistencies_to_force_match
+            if cls._question_list_fully_matches_a_problem_question(
+                question_group,
+                cls._q1_bot_v_pro_inconsistencies_to_force_match
+                + cls._q1_bot_v_cup_inconsistencies_to_force_match,
             ):
                 matches.append(question_group)
+        for match in matches:
+            if len(match) != 2:
+                raise ValueError(
+                    f"Found a group of {len(match)} questions. All matches should produce 2 questions"
+                )
         return matches
 
     @classmethod
-    def should_force_match_between_tournaments(cls, questions: list[Question]) -> bool:
-        return cls._is_in_problem_question_list(
-            questions, cls._q1_bot_v_pro_inconsistencies_to_force_match
-        )
-
-    @classmethod
-    def _is_in_problem_question_list(
+    def _question_list_fully_matches_a_problem_question(
         cls, questions: list[Question], problem_question_list: list[ProblemQuestion]
     ) -> bool:
-        for q in problem_question_list:
-            matches = [q.question_matches(question) for question in questions]
+        for pq in problem_question_list:
+            matches = [pq.question_matches(question) for question in questions]
             if all(matches):
                 return True
             elif any(matches):
-                raise ValueError(
-                    f"One of the questions matches the problem question, but not all of them. Problem question: {q.question_text}, Questions: {questions}"
+                logger.info(
+                    f"One of the input questions matches the problem question, ",
+                    f"but not all of them. Input Questions:",
+                    f"{[question.url for question in questions]}, Problem question: {pq}"
                 )
             else:
                 continue
@@ -193,7 +203,6 @@ class ProblemManager:
         ),
     ]
 
-
     _q1_bot_v_pro_to_remove_from_comparison: list[ProblemQuestion] = [
         ProblemQuestion(
             question_text="For Q1 2025, how many banks will be listed on the FDIC's Failed Bank List?",
@@ -206,7 +215,9 @@ class ProblemManager:
         ),
     ]
 
-    _q1_bot_v_pro_negligable_inconsistencies: list[ProblemQuestion] = [
+    _q1_bot_v_pro_inconsistencies_that_have_at_least_one_good_match: list[
+        ProblemQuestion
+    ] = [
         ProblemQuestion(
             question_text="How many arms sales globally will the US State Department approve in March 2025?",
             urls=[
@@ -235,7 +246,75 @@ class ProblemManager:
     _q1_bot_v_pro_matching_inconsistencies: list[ProblemQuestion] = [
         *_q1_bot_v_pro_inconsistencies_to_force_match,
         *_q1_bot_v_pro_to_remove_from_comparison,
-        *_q1_bot_v_pro_negligable_inconsistencies,
+        *_q1_bot_v_pro_inconsistencies_that_have_at_least_one_good_match,
+    ]
+
+    _q1_bot_v_cup_inconsistencies_to_force_match: list[ProblemQuestion] = [
+        # ProblemQuestion(
+        #     question_text="[TITLE MISMATCH] Premier League position",
+        #     urls=[
+        #         "https://www.metaculus.com/questions/34667/",
+        #         "https://www.metaculus.com/questions/31672/",
+        #     ],
+        #     notes="Titles mismatch. One resolves Mar 10 while ther other March 8"
+        # ),
+        ProblemQuestion(
+            question_text="How many earthquakes of magnitude ≥ 4 will happen near Santorini, Greece in the first week of March, 2025?",
+            urls=[
+                "https://www.metaculus.com/questions/34862/",
+                "https://www.metaculus.com/questions/34968/",
+            ],
+            notes="Same resolution (0.0) and spot scoring time, but different open bounds (True vs False for upper bound). Created a day apart.",
+            proposed_action="Force match",
+        ),
+        ProblemQuestion(
+            question_text="What will be the IMDb rating of Severance's second season finale?",
+            urls=[
+                "https://www.metaculus.com/questions/35318/",
+                "https://www.metaculus.com/questions/35470/",
+            ],
+            notes="Same resolution (9.6) and spot scoring time, but different open bounds (False vs True for upper bound). Created 2 days apart.",
+            proposed_action="Force match",
+        ),
+        ProblemQuestion(
+            question_text="What will the total number of Tesla vehicle deliveries be for Q1 2025?",
+            urls=[
+                "https://www.metaculus.com/questions/35589/",
+                "https://www.metaculus.com/questions/35888/",
+            ],
+            notes="Different resolutions ('below lower bound' vs 336681.0), though they are both below lower bound. Created 8 days apart.",
+            proposed_action="Force match",
+        ),
+    ]
+
+    _q1_bot_v_cup_to_remove_from_comparison: list[ProblemQuestion] = [
+        ProblemQuestion(
+            question_text="[TITLE MISMATCH] Cherry blossom peak bloom",
+            urls=[
+                "https://www.metaculus.com/questions/35670/",
+                "https://www.metaculus.com/questions/35588/",
+            ],
+            notes=(
+                "Titles mismatch, but they are asking the same idea. "
+                "The options are different enough to make this not viable"
+                "This question will probably already be excluded due to title mismatch"
+            ),
+            proposed_action="Remove from comparison",
+        ),
+        ProblemQuestion(
+            question_text="How many hostages will Hamas release after January 26 and before April 5, 2025?",
+            urls=[
+                "https://www.metaculus.com/questions/31849/",
+                "https://www.metaculus.com/questions/34274/",
+            ],
+            notes="Different resolutions (20-29 vs 30-39) and spot scoring times (17:00 vs 02:00). Created 2 days apart.",
+            proposed_action="Remove from comparison due to different resolutions",
+        ),
+    ]
+
+    _q1_bot_v_cup_matching_inconsistencies: list[ProblemQuestion] = [
+        *_q1_bot_v_cup_inconsistencies_to_force_match,
+        *_q1_bot_v_cup_to_remove_from_comparison,
     ]
 
 
@@ -431,6 +510,106 @@ class ProblemManager:
 | Post Id | 35002 | 34940 |
 | Created At | 2025-02-08 04:20:42.357783+00:00 | 2025-02-08 04:04:07.666456+00:00 |
 | Spot Scoring Time | 2025-02-10 06:00:00+00:00 | 2025-02-10 06:00:00+00:00 |
+| Notes | None | None |
+| Tournament 1 | True | False |
+| Tournament 2 | False | True |
+"""
+
+
+"""
+###################### Q1 Bot v Cup Matching Inconsistencies (excluding mismatched titles) ######################
+2025-06-16 18:57:57,787 - WARNING - aib_analysis.process_tournament - log_title_mapping_inconsistencies  -
+# Text-matched questions have different tournament-matching hashes (NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/34862/ | https://www.metaculus.com/questions/34968/ |
+| Question Id | 34356 | 34454 |
+| Type | QuestionType.NUMERIC | QuestionType.NUMERIC |
+| Question Text | How many earthquakes of magnitude ≥ 4 will happen near Santorini, Greece in the first week of March, 2025? | How many earthquakes of magnitude ≥ 4 will happen near Santorini, Greece in the first week of March, 2025? |
+| Resolution | 0.0 | 0.0 |
+| Options | None | None |
+| Range Max | 150.0 | 150.0 |
+| Range Min | 0.0 | 0.0 |
+| Open Upper Bound | True | False |
+| Open Lower Bound | False | False |
+| Zero Point | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 34862 | 34968 |
+| Created At | 2025-02-07 00:18:51.368391+00:00 | 2025-02-08 04:04:10.387471+00:00 |
+| Spot Scoring Time | 2025-02-13 17:00:00+00:00 | 2025-02-13 17:00:00+00:00 |
+| Project | 🏆 Quarterly Cup 🏆 | Q1 AI Forecasting Benchmark Tournament |
+| Notes | None | None |
+| Tournament 1 | True | False |
+| Tournament 2 | False | True |
+
+2025-06-16 18:57:57,791 - WARNING - aib_analysis.process_tournament - log_title_mapping_inconsistencies  -
+# Text-matched questions have different tournament-matching hashes (NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/35318/ | https://www.metaculus.com/questions/35470/ |
+| Question Id | 34788 | 34937 |
+| Type | QuestionType.NUMERIC | QuestionType.NUMERIC |
+| Question Text | What will be the IMDb rating of Severance's second season finale? | What will be the IMDb rating of Severance's second season finale? |
+| Resolution | 9.6 | 9.6 |
+| Options | None | None |
+| Range Max | 10.0 | 10.0 |
+| Range Min | 5.0 | 5.0 |
+| Open Upper Bound | False | True |
+| Open Lower Bound | True | True |
+| Zero Point | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 35318 | 35470 |
+| Created At | 2025-02-20 19:02:43.938942+00:00 | 2025-02-22 03:56:11.035398+00:00 |
+| Spot Scoring Time | 2025-02-27 17:00:00+00:00 | 2025-02-27 17:00:00+00:00 |
+| Project | 🏆 Quarterly Cup 🏆 | Q1 AI Forecasting Benchmark Tournament |
+| Notes | None | None |
+| Tournament 1 | True | False |
+| Tournament 2 | False | True |
+
+2025-06-16 18:57:57,795 - WARNING - aib_analysis.process_tournament - log_title_mapping_inconsistencies  -
+# Text-matched questions have different tournament-matching hashes (NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/31849/ | https://www.metaculus.com/questions/34274/ |
+| Question Id | 31360 | 33771 |
+| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
+| Question Text | How many hostages will Hamas release after January 26 and before April 5, 2025? | How many hostages will Hamas release after January 26 and before April 5, 2025? |
+| Resolution | 20-29 | 30-39 |
+| Options | ('≤9', '10-19', '20-29', '30-39', '≥40') | ('≤9', '10-19', '20-29', '30-39', '≥40') |
+| Range Max | None | None |
+| Range Min | None | None |
+| Open Upper Bound | None | None |
+| Open Lower Bound | None | None |
+| Zero Point | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 31849 | 34274 |
+| Created At | 2025-01-23 15:52:21.322919+00:00 | 2025-01-25 06:31:52.370373+00:00 |
+| Spot Scoring Time | 2025-01-30 17:00:00+00:00 | 2025-01-30 02:00:00+00:00 |
+| Project | 🏆 Quarterly Cup 🏆 | Q1 AI Forecasting Benchmark Tournament |
+| Notes | None | None |
+| Tournament 1 | True | False |
+| Tournament 2 | False | True |
+
+2025-06-16 18:57:57,805 - WARNING - aib_analysis.process_tournament - log_title_mapping_inconsistencies  -
+# Text-matched questions have different tournament-matching hashes (NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/35589/ | https://www.metaculus.com/questions/35888/ |
+| Question Id | 35032 | 35322 |
+| Type | QuestionType.NUMERIC | QuestionType.NUMERIC |
+| Question Text | What will the total number of Tesla vehicle deliveries be for Q1 2025? | What will the total number of Tesla vehicle deliveries be for Q1 2025? |
+| Resolution | -1e+32 | 336681.0 |
+| Options | None | None |
+| Range Max | 500000.0 | 500000.0 |
+| Range Min | 350000.0 | 350000.0 |
+| Open Upper Bound | True | True |
+| Open Lower Bound | True | True |
+| Zero Point | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 35589 | 35888 |
+| Created At | 2025-02-28 14:37:26.012903+00:00 | 2025-03-08 04:57:09.648719+00:00 |
+| Spot Scoring Time | 2025-03-08 17:00:00+00:00 | 2025-03-08 17:00:00+00:00 |
+| Project | 🏆 Quarterly Cup 🏆 | Q1 AI Forecasting Benchmark Tournament |
 | Notes | None | None |
 | Tournament 1 | True | False |
 | Tournament 2 | False | True |
