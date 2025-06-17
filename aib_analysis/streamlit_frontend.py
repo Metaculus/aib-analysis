@@ -45,15 +45,13 @@ def main():
             "NOTE: Quarterly Cup data is not available in this environment. Some tabs will be disabled."
         )
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
         [
             "Pro Tournament",
             "Bot Tournament",
             "Pros w/ Bots",
             "Pro vs Bot Teams",
-            "Hypothesis Test",
             "Quarterly Cup",
-            "Cup w/ Bots",
             "Cup vs Bot Teams",
         ]
     )
@@ -115,27 +113,21 @@ def main():
             aggregate_name_1="Pro Team",
             aggregate_name_2="Bot Team",
         )
+        display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament)
         display_tournament_and_variations(
             pro_bot_aggregate_tournament, "Pro vs Bot (Teams)", divide_into_types=True
         )
 
-    with tab5:
-        display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament)
-
     if not quarterly_cup_data_is_present:
         return
 
-    with tab6:
+    with tab5:
         cup_tournament = load_and_cache_tournament(
             quarterly_cup_path, UserType.BOT, "Quarterly Cup"
         )
         display_tournament_and_variations(cup_tournament, "Spot Score Quarterly Cup")
 
-    with tab7:
-        cup_with_bots = combine_tournaments(cup_tournament, bot_tournament)
-        display_tournament_and_variations(cup_with_bots, "Cup w/ Bots")
-
-    with tab8:
+    with tab6:
         cup_vs_bot_teams = create_team_tournament(
             cup_tournament,
             bot_tournament,

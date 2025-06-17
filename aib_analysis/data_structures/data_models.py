@@ -385,7 +385,7 @@ class Leaderboard(BaseModel):
                 return entry.get_confidence_interval(confidence_level).lower_bound
             except Exception:
                 logger.debug(f"Error getting confidence interval for leaderboard entry sorting for entry: {entry}")
-                return -1e6
+                return -1e10
 
         return sorted(self.entries, key=get_lower_bound, reverse=True)
 
