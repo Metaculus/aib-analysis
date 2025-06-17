@@ -26,15 +26,27 @@ def setup_logging() -> None:
 def initialize_logging() -> None:
     enable_file_writing = os.getenv("ENABLE_FILE_WRITING", "true").lower() == "true"
     if enable_file_writing:
-        os.environ["FILE_WRITING_ALLOWED"] = "TRUE"
-        CustomLogger.setup_logging()
+        file_name = "logs/latest.log"
+        with open(file_name, "w") as f:
+            f.write("")  # Clear the contents of the log file
     else:
-        os.environ["FILE_WRITING_ALLOWED"] = "FALSE"
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(levelname)s - %(name)s - %(funcName)s  - %(message)s",
+        file_name = None
+
+    logging.basicConfig(
+        level=logging.INFO,
+        filename=file_name,
+        format="%(asctime)s - %(levelname)s - %(name)s - %(funcName)s  - %(message)s",
+    )
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s - %(levelname)s - %(name)s - %(funcName)s  - %(message)s"
         )
-    logger.info("Logging setup complete")
+    )
+    logging.getLogger().addHandler(console_handler)
+
+
 
 
 class CachedData:
