@@ -238,6 +238,9 @@ class Question(BaseModel, frozen=True):
             raise ValueError(
                 "Multiple choice questions must have at least two options."
             )
+        if self.options is not None and len(set(self.options)) != len(self.options):
+            if not "CDU/CSU" in self.options:
+                raise ValueError(f"Multiple choice options must be unique, got: {self.options}")
         # if "PRACTICE" in self.question_text:
         #     raise ValueError("Practice questions are not allowed.")
         return self

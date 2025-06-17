@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta, timezone
 
 import numpy as np
 import typeguard
@@ -32,7 +33,9 @@ def get_leaderboard(
         if scores_of_type:
             entries.append(LeaderboardEntry(scores=scores_of_type))
         else:
-            logger.warning(f"No scores of type {score_type} for user {user.name} when creating leaderboard")
+            logger.warning(
+                f"No scores of type {score_type} for user {user.name} when creating leaderboard"
+            )
     return Leaderboard(entries=entries, type=score_type)
 
 
@@ -67,7 +70,11 @@ def combine_tournaments(
 
     combined_forecasts: list[Forecast] = []
     hash_matches = list(matching_hash_mapping.values())
-    prequalified_matches = ProblemManager.find_prequalified_matches_for_tournament_matching(combined_questions)
+    prequalified_matches = (
+        ProblemManager.find_prequalified_matches_for_tournament_matching(
+            combined_questions
+        )
+    )
     all_matches = hash_matches + prequalified_matches
 
     if len(all_matches) == 0:
@@ -81,7 +88,9 @@ def combine_tournaments(
         )
         combined_forecasts.extend(new_forecasts)
 
-    return SimulatedTournament(forecasts=combined_forecasts, name=f"{tournament_1.name} + {tournament_2.name}")
+    return SimulatedTournament(
+        forecasts=combined_forecasts, name=f"{tournament_1.name} + {tournament_2.name}"
+    )
 
 
 def log_title_mapping_inconsistencies(
@@ -98,9 +107,7 @@ def log_title_mapping_inconsistencies(
         if len(title_matched_questions) < 2:
             continue
 
-        if ProblemManager.dont_log_in_tournament_matching(
-            title_matched_questions
-        ):
+        if ProblemManager.dont_log_in_tournament_matching(title_matched_questions):
             logger.info(
                 f"Prequalified Mismatch for tournament matching: {[q.url for q in title_matched_questions]}"
             )
@@ -127,8 +134,12 @@ def log_title_mapping_inconsistencies(
                 f"{question_comparison_table}"
             )
         else:
-            if ProblemManager.dont_log_in_duplicate_detection_within_tournament(title_matched_questions):
-                logger.info(f"Prequalified duplicate within tournament: {[q.url for q in title_matched_questions]}")
+            if ProblemManager.dont_log_in_duplicate_detection_within_tournament(
+                title_matched_questions
+            ):
+                logger.info(
+                    f"Prequalified duplicate within tournament: {[q.url for q in title_matched_questions]}"
+                )
                 continue
             urls = [q.url for q in title_matched_questions]
             logger.warning(
@@ -151,11 +162,39 @@ def _squash_questions_and_get_their_forecasts(
     t2_forecasts = tournament_2.question_to_forecasts(question_t2.question_id)
     forecasts_to_use: list[Forecast] = t1_forecasts + t2_forecasts
 
-    # TODO: @Check Are all relationships between objects kept correct? Should I also deep copy users? Or can I remove deep copying? Probably make this into a class function for sake of sfetry for new objects added to heirarchy.
+    max_weight = max(question_t1.weight, question_t2.weight)
+    if question_t1.weight != question_t2.weight:
+        logger.warning(
+            f"Question weights are different: {question_t1.weight} != {question_t2.weight}. Using the max of the two weights ({max_weight})."
+        )
+
+    max_spot_scoring_time = max(
+        question_t1.spot_scoring_time, question_t2.spot_scoring_time
+    )
+    if question_t1.spot_scoring_time != question_t2.spot_scoring_time:
+        logger.warning(
+            f"Question spot scoring times are different: {question_t1.spot_scoring_time} != {question_t2.spot_scoring_time}. Using the max of the two spot scoring times ({max_spot_scoring_time})."
+        )
+        allowed_days_apart = timedelta(days=2)
+        if (
+            abs(
+                question_t1.spot_scoring_time.astimezone(timezone.utc)
+                - question_t2.spot_scoring_time.astimezone(timezone.utc)
+            )
+            > allowed_days_apart
+        ):
+            raise ValueError(
+                f"Question spot scoring times are more than {allowed_days_apart} days apart: {question_t1.spot_scoring_time} != {question_t2.spot_scoring_time}"
+            )
+
     squashed_question = question_t1.model_copy(
         update={
             "notes": f"Combined {question_t1.url} (QID:{question_t1.question_id}) and {question_t2.url} (QID:{question_t2.question_id})\nQ1 Notes: {question_t1.notes}\nQ2 Notes: {question_t2.notes}",
-            "project": f"{question_t1.project} and {question_t2.project}"
+            "project": f"{question_t1.project} and {question_t2.project}",
+            "weight": max_weight,
+            "spot_scoring_time": max(
+                question_t1.spot_scoring_time, question_t2.spot_scoring_time
+            ),
         }
     )
     combined_forecasts: list[Forecast] = []
@@ -191,7 +230,6 @@ def _validate_and_pair_tournament_questions(
 def constrain_question_types(
     tournament: SimulatedTournament, question_types: list[QuestionType]
 ) -> SimulatedTournament:
-    # TODO: @Check should I do a deep copy here?
     filtered_forecasts = []
     for forecast in tournament.forecasts:
         if forecast.question.type in question_types:
@@ -207,7 +245,9 @@ def create_team(
         return tournament.users
     if team_size > len(tournament.users):
         team_size = len(tournament.users)
-        logger.warning(f"Team size is larger than the number of users in the tournament: {team_size} > {len(tournament.users)}. Using all users.")
+        logger.warning(
+            f"Team size is larger than the number of users in the tournament: {team_size} > {len(tournament.users)}. Using all users."
+        )
     if team_size < 1:
         raise ValueError(f"Team size is less than 1: {team_size}")
 
@@ -227,12 +267,8 @@ def create_team_tournament(
     aggregate_name_1: str,
     aggregate_name_2: str,
 ) -> SimulatedTournament:
-    team_1 = create_team(
-        tournament_1, t1_size
-    )
-    team_2 = create_team(
-        tournament_2, t2_size
-    )
+    team_1 = create_team(tournament_1, t1_size)
+    team_2 = create_team(tournament_2, t2_size)
 
     t1_aggregate = create_aggregated_user_at_spot_time(
         team_1, tournament_1, aggregate_name_1
@@ -248,9 +284,14 @@ def create_team_tournament(
         t2_aggregate.aggregate_forecasts, list[Forecast]
     )
 
-    t1_agg_tournament = SimulatedTournament(forecasts=t1_forecasts, name=f"{tournament_1.name} ({aggregate_name_1})")
-    t2_agg_tournament = SimulatedTournament(forecasts=t2_forecasts, name=f"{tournament_2.name} ({aggregate_name_2})")
+    t1_agg_tournament = SimulatedTournament(
+        forecasts=t1_forecasts, name=f"{tournament_1.name} ({aggregate_name_1})"
+    )
+    t2_agg_tournament = SimulatedTournament(
+        forecasts=t2_forecasts, name=f"{tournament_2.name} ({aggregate_name_2})"
+    )
     return combine_tournaments(t1_agg_tournament, t2_agg_tournament)
+
 
 class Bin(BaseModel):
     lower_bound: float
@@ -342,4 +383,6 @@ def find_question_titles_unique_to_first_tournament(
     tournament_2: SimulatedTournament,
 ) -> list[Question]:
     question_titles_2 = set([q.question_text for q in tournament_2.questions])
-    return [q for q in tournament_1.questions if q.question_text not in question_titles_2]
+    return [
+        q for q in tournament_1.questions if q.question_text not in question_titles_2
+    ]
