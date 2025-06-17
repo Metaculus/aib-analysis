@@ -27,9 +27,13 @@ def initialize_logging() -> None:
     enable_file_writing = os.getenv("ENABLE_FILE_WRITING", "true").lower() == "true"
     if enable_file_writing:
         os.environ["FILE_WRITING_ALLOWED"] = "TRUE"
+        CustomLogger.setup_logging()
     else:
         os.environ["FILE_WRITING_ALLOWED"] = "FALSE"
-    CustomLogger.setup_logging()
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(name)s - %(funcName)s  - %(message)s",
+        )
     logger.info("Logging setup complete")
 
 
