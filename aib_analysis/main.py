@@ -84,7 +84,7 @@ def main():
         )
         display_tournament_and_variations(metac_bot_tournament, "Metac Bot")
 
-        non_metac_bot_users = [user for user in bot_tournament.users if user.is_metac_bot]
+        non_metac_bot_users = [user for user in bot_tournament.users if not user.is_metac_bot]
         best_metac_bot = create_team(metac_bot_tournament, 1)
         everyone_plus_best_metac_bot = non_metac_bot_users + best_metac_bot
         everyone_plus_best_metac_bot_forecasts = [
