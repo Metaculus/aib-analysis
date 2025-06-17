@@ -1,7 +1,8 @@
-from pydantic import BaseModel
 import numpy as np
-from scipy.stats import t, shapiro
 import scipy.stats as stats
+from pydantic import BaseModel
+from scipy.stats import shapiro, t
+
 
 class ConfidenceInterval(BaseModel):
     mean: float
@@ -210,7 +211,6 @@ class MeanHypothesisCalculator:
 def test_normality_assumption(
     sample_size: int, observations: list[float] | None = None
 ) -> None:
-    pass
     if sample_size < 2:
         raise ValueError("Not enough data for T-based confidence interval")
 
