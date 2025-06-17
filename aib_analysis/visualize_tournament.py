@@ -72,36 +72,42 @@ def _display_individual_tournament(tournament: SimulatedTournament, name: str):
 
 
 def display_bot_v_pro_hypothesis_test(
-    pro_bot_aggregate_tournament: SimulatedTournament,
+    team_tournament: SimulatedTournament, expander_name: str
 ) -> None:
     hypothesis_mean = 0
     confidence_level = 0.95
-    leaderboard = get_leaderboard(pro_bot_aggregate_tournament, ScoreType.SPOT_PEER)
-    st.subheader(f"Pro vs Bot (Team) Hypothesis Test")
-    with st.expander("Pro vs Bot (Team) Hypothesis Test"):
+    leaderboard = get_leaderboard(team_tournament, ScoreType.SPOT_PEER)
+    st.subheader(expander_name)
+    with st.expander(expander_name):
         st.write(f"## The Test")
         st.write(
-            "The below runs 2 tests: 1) tests if the each team's average spot peer score is not equal to zero and 2) if it is greater than zero. If its not equal to zero, then we can conclude that there is a statistically significant difference between bots and pros performance. If its greater than zero, then we can conclude that one group is doing better than another."
+            "The below runs 2 tests: 1) tests if the each team's average spot peer score is not equal to zero and 2) if it is greater than zero. If its not equal to zero, then we can conclude that there is a statistically significant difference between the two teams (not necessarily that one group is doing better than another). If its greater than zero, then we can conclude that one group is doing better than another."
         )
-        for entry in leaderboard.entries_via_sum_of_scores():
-            observations = [s.score for s in entry.scores]
-            equal_to_hypothesis_test = (
-                MeanHypothesisCalculator.test_if_mean_is_equal_to_than_hypothesis_mean(
-                    observations, hypothesis_mean, confidence_level
+        entries = leaderboard.entries_via_sum_of_scores()
+        if len(entries) != 2:
+            raise ValueError(f"Expected 2 entries, got {len(entries)}")
+        for entry in entries:
+            try:
+                observations = [s.score for s in entry.scores]
+                equal_to_hypothesis_test = (
+                    MeanHypothesisCalculator.test_if_mean_is_equal_to_than_hypothesis_mean(
+                        observations, hypothesis_mean, confidence_level
+                    )
                 )
-            )
-            greater_than_hypothesis_test = (
-                MeanHypothesisCalculator.test_if_mean_is_greater_than_hypothesis_mean(
-                    observations, hypothesis_mean, confidence_level
+                greater_than_hypothesis_test = (
+                    MeanHypothesisCalculator.test_if_mean_is_greater_than_hypothesis_mean(
+                        observations, hypothesis_mean, confidence_level
+                    )
                 )
-            )
-            st.write(f"## {entry.user.name}")
-            st.write(f"### Equal to {hypothesis_mean}")
-            st.write(f"**P-value**: {equal_to_hypothesis_test.p_value:.5f}")
-            st.write(equal_to_hypothesis_test.written_conclusion)
-            st.write(f"### Greater than {hypothesis_mean}")
-            st.write(f"**P-value**: {greater_than_hypothesis_test.p_value:.5f}")
-            st.write(greater_than_hypothesis_test.written_conclusion)
+                st.write(f"## {entry.user.name}")
+                st.write(f"### Equal to {hypothesis_mean}")
+                st.write(f"**P-value**: {equal_to_hypothesis_test.p_value:.5f}")
+                st.write(equal_to_hypothesis_test.written_conclusion)
+                st.write(f"### Greater than {hypothesis_mean}")
+                st.write(f"**P-value**: {greater_than_hypothesis_test.p_value:.5f}")
+                st.write(greater_than_hypothesis_test.written_conclusion)
+            except Exception as e:
+                st.write(f"Error: {e}")
 
 
 def display_tournament_stats(tournament: SimulatedTournament) -> None:
