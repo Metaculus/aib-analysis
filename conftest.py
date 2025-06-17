@@ -10,7 +10,6 @@ import pytest
 from aib_analysis.data_structures.custom_types import UserType
 from aib_analysis.load_tournament import load_tournament
 from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
-from forecasting_tools.util.custom_logger import CustomLogger
 
 logger = logging.getLogger(__name__)
 
