@@ -154,7 +154,8 @@ def _squash_questions_and_get_their_forecasts(
     # TODO: @Check Are all relationships between objects kept correct? Should I also deep copy users? Or can I remove deep copying? Probably make this into a class function for sake of sfetry for new objects added to heirarchy.
     squashed_question = question_t1.model_copy(
         update={
-            "notes": f"Combined {question_t1.url} (QID:{question_t1.question_id}) and {question_t2.url} (QID:{question_t2.question_id})\nQ1 Notes: {question_t1.notes}\nQ2 Notes: {question_t2.notes}"
+            "notes": f"Combined {question_t1.url} (QID:{question_t1.question_id}) and {question_t2.url} (QID:{question_t2.question_id})\nQ1 Notes: {question_t1.notes}\nQ2 Notes: {question_t2.notes}",
+            "project": f"{question_t1.project} and {question_t2.project}"
         }
     )
     combined_forecasts: list[Forecast] = []
@@ -247,8 +248,8 @@ def create_team_tournament(
         t2_aggregate.aggregate_forecasts, list[Forecast]
     )
 
-    t1_agg_tournament = SimulatedTournament(forecasts=t1_forecasts, name=f"{tournament_1.name} + {aggregate_name_1}")
-    t2_agg_tournament = SimulatedTournament(forecasts=t2_forecasts, name=f"{tournament_2.name} + {aggregate_name_2}")
+    t1_agg_tournament = SimulatedTournament(forecasts=t1_forecasts, name=f"{tournament_1.name} ({aggregate_name_1})")
+    t2_agg_tournament = SimulatedTournament(forecasts=t2_forecasts, name=f"{tournament_2.name} ({aggregate_name_2})")
     return combine_tournaments(t1_agg_tournament, t2_agg_tournament)
 
 class Bin(BaseModel):

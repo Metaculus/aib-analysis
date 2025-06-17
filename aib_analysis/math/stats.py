@@ -42,12 +42,7 @@ class ConfidenceIntervalCalculator:
         if sample_size < 2:
             raise ValueError("Not enough data for T-based confidence interval")
 
-        if sample_size < 30:
-            _, normality_pvalue = shapiro(observations)
-            if normality_pvalue < 0.05:
-                raise ValueError(
-                    "Data fails normality assumption for T-based confidence interval"
-                )
+        test_normality_assumption(sample_size, observations)
 
         sample_mean = np.mean(observations)
         sample_std = np.std(observations, ddof=1)
@@ -175,7 +170,7 @@ class MeanHypothesisCalculator:
         if hypothesis_rejected:
             written_conclusion = f"We reject the null hypothesis (the population mean is less than or equal to {hypothesis_mean}) with {confidence*100:.2f}% confidence since at the {alpha*100:.2f}% level of significance, the sample data do, in fact, give enough evidence to conclude that the population mean is greater than {hypothesis_mean}. If the null hypothesis is true, then there is a {p_value*100:.2f}% probability that the sample (observed) mean would be observed at {average} or more. Since the mean value observed in the sample was {average} we can reject the null hypothesis. This also means there is sufficient evidence to support the alternative hypothesis that the population mean is greater than {hypothesis_mean}. The sample consisted of {count} observations."
         else:
-            written_conclusion = f"We fail to reject the null hypothesis (the population mean is less than or equal to {hypothesis_mean}) since at the {alpha*100:.2f}% level of significance, the sample data do not give enough evidence to conclude that the population mean is greater than {hypothesis_mean}. If the null hypothesis is true, then there is a {p_value*100:.2f}% probability that the sample (observed) mean would be observed at {average} or more. Thus there is not enough evidence to suggest that the population mean is greater than {hypothesis_mean} (i.e. we would need to run a separate test to say it is less than {hypothesis_mean}). The sample consisted of {count} observations."
+            written_conclusion = f"We fail to reject the null hypothesis (the population mean is less than or equal to {hypothesis_mean}) since at the {alpha*100:.2f}% level of significance, the sample data do not give enough evidence to conclude that the population mean is greater than {hypothesis_mean}. If the null hypothesis is true, then there is a {p_value*100:.2f}% probability that the sample (observed) mean would be observed at {average} or more. Thus there is not enough evidence to suggest that the population mean is greater than {hypothesis_mean}. The sample consisted of {count} observations."
         return HypothesisTest(
             p_value=p_value,
             hypothesis_rejected=hypothesis_rejected,
@@ -215,6 +210,7 @@ class MeanHypothesisCalculator:
 def test_normality_assumption(
     sample_size: int, observations: list[float] | None = None
 ) -> None:
+    pass
     if sample_size < 2:
         raise ValueError("Not enough data for T-based confidence interval")
 

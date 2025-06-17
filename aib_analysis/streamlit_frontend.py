@@ -113,7 +113,7 @@ def main():
             aggregate_name_1="Pro Team",
             aggregate_name_2="Bot Team",
         )
-        display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament)
+        display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament, "Pro vs Bot (Team) Hypothesis Test")
         display_tournament_and_variations(
             pro_bot_aggregate_tournament, "Pro vs Bot (Teams)", divide_into_types=True
         )
@@ -136,6 +136,7 @@ def main():
             aggregate_name_1="Cup Team (All forecasters)",
             aggregate_name_2="Bot Team",
         )
+        display_bot_v_pro_hypothesis_test(cup_vs_bot_teams, "Cup (All forecasters) vs Bot Teams Hypothesis Test")
         display_tournament_and_variations(
             cup_vs_bot_teams, "Cup (All forecasters) vs Bot Teams"
         )
@@ -148,6 +149,7 @@ def main():
             aggregate_name_1="Cup MVP Team",
             aggregate_name_2="Bot Team",
         )
+        display_bot_v_pro_hypothesis_test(cup_mvp_team_vs_bot_team, "Cup MVP Team vs Bot Teams Hypothesis Test")
         display_tournament_and_variations(
             cup_mvp_team_vs_bot_team, "Cup MVP Team vs Bot Teams"
         )
