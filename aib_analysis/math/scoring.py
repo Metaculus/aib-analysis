@@ -221,7 +221,7 @@ def _multiple_choice_resolution_prob(
     pmf = [float(p) for p in forecast]
     options = [
         str(opt) for opt in options
-    ]  # @Check: TODO: For whatever reason, options had " and ' surrounding them, and were not parsed at this point. This is the easier way to handle it, but should be dealt with earlier in the pipeline.
+    ]
     resolution_idx = options.index(str(resolution))
     prob_for_resolution = pmf[resolution_idx]
     return prob_for_resolution

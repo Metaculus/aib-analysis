@@ -80,7 +80,6 @@ class TestLeaderboard:
         self,
         bot_tournament: SimulatedTournament,
     ):
-        # TODO: @Check Why is this leaderboard not matching, but the pro leaderboard is?
         tournament = bot_tournament
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
         entries = leaderboard.entries_via_sum_of_scores()

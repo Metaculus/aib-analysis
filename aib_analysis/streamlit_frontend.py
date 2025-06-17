@@ -38,7 +38,7 @@ def main():
 
     st.title("AI Benchmarking Analysis")
     st.warning(
-        "NOTICE: If you interact with the page before the analysis is done running, it will occasionally rerun on you."
+        "NOTICE: If you interact with the page before the analysis is done running, it will occasionally rerun before finishing."
     )
     if not quarterly_cup_data_is_present:
         st.warning(

@@ -307,7 +307,7 @@ class SimulatedTournament(BaseModel):
 
     def _log_if_less_than_half_users_forecasted(self) -> None:
         total_users = len(self.users)
-        min_expected_forecasts = total_users / 2
+        min_expected_forecasts = total_users / 4
 
         questions_with_too_few_forecasts: list[Question] = []
         messages = []

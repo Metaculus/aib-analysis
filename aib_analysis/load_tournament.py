@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+import ast
 
 import pandas as pd
 
@@ -36,9 +37,7 @@ def load_tournament(
         )
         forecasts.append(forecast)
     logger.info(f"Finished parsing {len(forecasts)} forecast rows")
-    tournament = SimulatedTournament(forecasts=forecasts)
-    if tournament_name is not None:
-        tournament.name = tournament_name
+    tournament = SimulatedTournament(forecasts=forecasts, name=tournament_name)
     logger.info(f"Finished inializing tournament '{tournament.name}' from forecasts")
     return tournament
 
@@ -159,7 +158,9 @@ def _parse_options(forecast_row: dict) -> tuple[str, ...] | None:
     if forecast_row["type"] == "multiple_choice":
         options = forecast_row.get("options")
         if options is not None and pd.notnull(options) and options != "":
-            return tuple(eval(options))
+            evaluated_options = tuple(ast.literal_eval(options))
+            cleaned_options = [str(opt).strip().strip("'").strip('"') for opt in evaluated_options]
+            return tuple(cleaned_options)
         raise ValueError(f"Invalid options: {options}")
     return None
 

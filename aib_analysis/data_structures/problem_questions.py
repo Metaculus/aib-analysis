@@ -133,12 +133,8 @@ class ProblemManager:
                 return True
             elif any(matches):
                 logger.info(
-                    f"One of the input questions matches the problem question, ",
-                    f"but not all of them. Input Questions:",
-                    f"{[question.url for question in questions]}, Problem question: {pq}"
+                    f"One of the input questions matches the problem question, but not all of them. Input Questions: {[question.url for question in questions]}, Problem question: {pq.model_dump_json()}"
                 )
-            else:
-                continue
         return False
 
     # These are questions with duplicate titles in the q1 tournament
@@ -159,7 +155,7 @@ class ProblemManager:
                 "https://www.metaculus.com/questions/34667/",
             ],
             notes="Different weights (1.0 vs 0.5) and spot scoring times (off by ~2 days). Accidental rerelease",
-            proposed_action="Remove this",  # TODO: Remove @Check
+            proposed_action="Remove this",  # TODO: Create mechanism to remove one of the versions of this question from scoring
         ),
         ProblemQuestion(
             question_text="Which party will win the most seats in Curaçao in the March 2025 general election?",

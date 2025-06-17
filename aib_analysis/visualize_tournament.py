@@ -63,10 +63,6 @@ def _display_individual_tournament(tournament: SimulatedTournament, name: str):
         display_forecasts(tournament)
     with st.expander(f"{name} Questions"):
         display_questions(tournament.questions, tournament)
-    # with st.expander(f"{name} Peer Score Histograms"):
-    #     display_score_histogram_of_all_users(tournament, ScoreType.SPOT_PEER)
-    # with st.expander(f"{name} Baseline Score Histograms"):
-    #     display_score_histogram_of_all_users(tournament, ScoreType.SPOT_BASELINE)
     # with st.expander(f"{name} Calibration Curve"):
     #     display_calibration_curve(tournament)
 
