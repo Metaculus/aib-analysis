@@ -291,7 +291,7 @@ def _display_leaderboard_table(leaderboard: Leaderboard, confidence_level: float
                 "average_score": entry.average_score,
                 "average_upper_bound": upper_bound,
                 "average_lower_bound": lower_bound,
-                "num_questions": entry.question_count,
+                "num_questions_with_scores": entry.question_count,
                 "random_sample_of_scores": [
                     score.display_score_and_question()
                     for score in random_sample_of_scores
@@ -304,7 +304,6 @@ def _display_leaderboard_table(leaderboard: Leaderboard, confidence_level: float
                 ],
             }
         )
-    st.write(f"**Confidence level**: {confidence_level}")
     df = pd.DataFrame(data)
     st.dataframe(
         df.sort_values(by="sum_of_scores", ascending=False),
@@ -372,7 +371,7 @@ def _display_average_scores_plot(
     )
 
     fig.update_layout(
-        title=f"Average Scores with {confidence_level*100}% Confidence Intervals",
+        title=f"Average Score with {confidence_level*100}% Confidence Intervals",
         xaxis_title="User",
         yaxis_title="Average Score",
         showlegend=False,

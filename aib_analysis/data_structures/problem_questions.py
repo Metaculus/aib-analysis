@@ -263,6 +263,24 @@ class ProblemManager:
             notes="Different resolutions ('below lower bound' vs 336681.0), though they are both below lower bound. Created 8 days apart.",
             proposed_action="Force match",
         ),
+        ProblemQuestion(
+            question_text="How many earthquakes of magnitude ≥ 4 will happen near Santorini, Greece in the first week of March, 2025?",
+            urls=[
+                "https://www.metaculus.com/questions/34862/",
+                "https://www.metaculus.com/questions/34968/",
+            ],
+            notes="Different open bounds (True vs False for upper bound). Created a day apart.",
+            proposed_action="",
+        ),
+        ProblemQuestion(
+            question_text="What will be the IMDb rating of Severance's second season finale?",
+            urls=[
+                "https://www.metaculus.com/questions/35318/",
+                "https://www.metaculus.com/questions/35470/",
+            ],
+            notes="Different open bounds (False vs True for upper bound). Created 2 days apart.",
+            proposed_action="",
+        ),
     ]
 
     _q1_bot_v_cup_to_remove_from_comparison: list[ProblemQuestion] = [
@@ -288,24 +306,7 @@ class ProblemManager:
             notes="Different resolutions (20-29 vs 30-39) and spot scoring times (17:00 vs 02:00). Created 2 days apart.",
             proposed_action="Remove from comparison due to different resolutions",
         ),
-        ProblemQuestion(
-            question_text="How many earthquakes of magnitude ≥ 4 will happen near Santorini, Greece in the first week of March, 2025?",
-            urls=[
-                "https://www.metaculus.com/questions/34862/",
-                "https://www.metaculus.com/questions/34968/",
-            ],
-            notes="Same resolution (0.0) and spot scoring time, but different open bounds (True vs False for upper bound). Created a day apart.",
-            proposed_action="",
-        ),
-        ProblemQuestion(
-            question_text="What will be the IMDb rating of Severance's second season finale?",
-            urls=[
-                "https://www.metaculus.com/questions/35318/",
-                "https://www.metaculus.com/questions/35470/",
-            ],
-            notes="Same resolution (9.6) and spot scoring time, but different open bounds (False vs True for upper bound). Created 2 days apart.",
-            proposed_action="",
-        ),
+
     ]
 
     _q1_bot_v_cup_matching_inconsistencies: list[ProblemQuestion] = [
