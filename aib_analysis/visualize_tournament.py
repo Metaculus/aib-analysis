@@ -51,10 +51,10 @@ def _display_individual_tournament(tournament: SimulatedTournament, name: str):
     st.subheader(f"{name} Tournament")
 
     # Display tournament statistics
-    with st.expander(f"{name} Peer Leaderboard"):
+    with st.expander(f"{name} Spot Peer Leaderboard"):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
         display_leaderboard(leaderboard)
-    with st.expander(f"{name} Baseline Leaderboard"):
+    with st.expander(f"{name} Spot Baseline Leaderboard"):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_BASELINE)
         display_leaderboard(leaderboard)
     with st.expander(f"{name} Stats"):

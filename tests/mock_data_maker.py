@@ -29,12 +29,12 @@ def make_question_binary(question_text: str = "Will it rain tomorrow?") -> Quest
     )
 
 
-def make_question_mc() -> Question:
+def make_question_mc(question_text: str = "Which color?") -> Question:
     return Question(
         post_id=random.randint(30000, 40000),
         question_id=random.randint(30000, 40000),
         type=QuestionType.MULTIPLE_CHOICE,
-        question_text="Which color?",
+        question_text=question_text,
         resolution="Red",
         options=("Red", "Blue", "Green"),
         range_max=None,
@@ -47,12 +47,12 @@ def make_question_mc() -> Question:
     )
 
 
-def make_question_numeric() -> Question:
+def make_question_numeric(question_text: str = "How many apples?") -> Question:
     return Question(
         post_id=random.randint(30000, 40000),
         question_id=random.randint(30000, 40000),
         type=QuestionType.NUMERIC,
-        question_text="How many apples?",
+        question_text=question_text,
         resolution=42.0,
         options=None,
         range_max=100.0,
@@ -83,12 +83,12 @@ def make_forecast(
 
 def make_tournament() -> SimulatedTournament:
     questions = [
-        make_question_binary(),
-        make_question_mc(),
-        make_question_numeric(),
-        make_question_binary(),
-        make_question_mc(),
-        make_question_numeric(),
+        make_question_binary("Will it rain tomorrow?"),
+        make_question_mc("Which color?"),
+        make_question_numeric("How many apples?"),
+        make_question_binary("Will it snow tomorrow?"),
+        make_question_mc("Which option?"),
+        make_question_numeric("How many oranges?"),
     ]
     users = [make_user(f"User {i}") for i in range(1, 10)]
 
