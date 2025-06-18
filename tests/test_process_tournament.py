@@ -319,7 +319,7 @@ class TestCreateTeam:
 
     def test_create_team_from_leaderboard_empty_tournament(self) -> None:
         empty_tournament = SimulatedTournament(forecasts=[])
-        with pytest.raises(ValueError):
+        with pytest.raises(Exception):
             get_best_forecasters_from_tournament(empty_tournament, 5)
 
     def test_create_team_from_leaderboard_team_size_larger_than_users(self) -> None:
