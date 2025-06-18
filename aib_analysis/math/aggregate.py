@@ -14,7 +14,9 @@ from aib_analysis.data_structures.custom_types import (
     UserType,
 )
 from aib_analysis.data_structures.data_models import Forecast, Question, User
-from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
+from aib_analysis.data_structures.simulated_tournament import (
+    SimulatedTournament,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +76,11 @@ def create_aggregated_user_at_spot_time(
     Takes in a list of users and tournament, and creates a aggregate forecast for each question in the tournament.
     These forecasts use a new 'aggregate' user with the name provided
     """
+    tournament_users = set([user.name for user in tournament.users])
+    for user in users:
+        if user.name not in tournament_users:
+            raise ValueError(f"User '{user.name}' not found in tournament")
+
     each_users_forecasts = [tournament.user_to_spot_forecasts(user.name) for user in users]
     flattened_user_forecasts = [
         forecast

@@ -255,6 +255,9 @@ class SimulatedTournament(BaseModel):
         assert (
             num_scores == expected_scores
         ), f"Number of non-annulled spot forecasts ({non_annulled_spot_forecasts}) and scores ({num_scores}) do not match (expected {expected_scores} scores)"
+        assert len(self.forecasts) > 0, "No forecasts found"
+        assert len(spot_forecasts) > 0, "No spot forecasts found"
+
 
     def _validate_spot_forecasters_equal_forecasters(self) -> None:
         for question in self.questions:

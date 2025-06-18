@@ -72,7 +72,7 @@ class ProblemQuestion(BaseModel):
         elif not text_matches and not url_matches:
             return False
         else:
-            logger.warning(
+            logger.info(
                 f"Input Question {input_url} matches some parts of problem but not all | "
                 f"Input Question_text: {question.question_text} | "
                 f"Problem Question_text: {self.question_text} | "
@@ -110,11 +110,7 @@ class ProblemManager:
         for question_group in question_title_map.values():
             if len(question_group) < 2:
                 continue
-            if cls._question_list_fully_matches_a_problem_question(
-                question_group,
-                cls._q1_bot_v_pro_inconsistencies_to_force_match
-                + cls._q1_bot_v_cup_inconsistencies_to_force_match,
-            ):
+            if cls.is_prequalified_for_tournament_matching(question_group):
                 matches.append(question_group)
         for match in matches:
             if len(match) != 2:
@@ -122,6 +118,17 @@ class ProblemManager:
                     f"Found a group of {len(match)} questions. All matches should produce 2 questions"
                 )
         return matches
+
+    @classmethod
+    def is_prequalified_for_tournament_matching(cls, questions: list[Question]) -> bool:
+        if cls._question_list_fully_matches_a_problem_question(
+            questions,
+            cls._all_questions_to_force_match
+        ):
+            return True
+        return False
+
+
 
     @classmethod
     def _question_list_fully_matches_a_problem_question(
@@ -132,10 +139,12 @@ class ProblemManager:
             if all(matches):
                 return True
             elif any(matches):
-                logger.info(
+                logger.debug(
                     f"One of the input questions matches the problem question, but not all of them. Input Questions: {[question.url for question in questions]}, Problem question: {pq.model_dump_json()}"
                 )
         return False
+
+
 
     # These are questions with duplicate titles in the q1 tournament
     _q1_bot__in_tournament_title_duplicates: list[ProblemQuestion] = [
@@ -314,6 +323,11 @@ class ProblemManager:
         *_q1_bot_v_cup_to_remove_from_comparison,
     ]
 
+
+    _all_questions_to_force_match = (
+        _q1_bot_v_pro_inconsistencies_to_force_match
+        + _q1_bot_v_cup_inconsistencies_to_force_match
+    )
 
 """
 ##################### Q1 Duplicate Question - Bot Tournament #####################

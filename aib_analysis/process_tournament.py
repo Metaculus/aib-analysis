@@ -1,5 +1,6 @@
 import logging
 from datetime import timedelta, timezone
+from typing import Literal
 
 import numpy as np
 import typeguard
@@ -237,24 +238,80 @@ def constrain_question_types(
     return SimulatedTournament(forecasts=filtered_forecasts)
 
 
-def create_team(
+def smart_remove_questions_from_tournament(
     tournament: SimulatedTournament,
-    team_size: int | None,
-) -> list[User]:
-    if team_size is None:
-        return tournament.users
-    if team_size > len(tournament.users):
-        team_size = len(tournament.users)
-        logger.warning(
-            f"Team size is larger than the number of users in the tournament: {team_size} > {len(tournament.users)}. Using all users."
+    questions_to_exclude: list[Question],
+    use_tournament_matching_hash: bool = True,
+) -> SimulatedTournament:
+    if not use_tournament_matching_hash:
+        raise NotImplementedError("Not implemented")
+
+    final_questions_to_include = []
+    all_matches_in_current_tournament: list[list[Question]] = []
+    for current_question in tournament.questions:
+        matches_with_current_question: list[Question] = []
+        for question_to_exclude in questions_to_exclude:
+            exclude_hash = question_to_exclude.get_hash_for_tournament_matching()
+            current_hash = current_question.get_hash_for_tournament_matching()
+            if current_hash == exclude_hash:
+                logger.debug(
+                    f"Question {current_question.url} is in the list of questions to exclude. Removing it from the tournament."
+                )
+                matches_with_current_question.append(question_to_exclude)
+            elif ProblemManager.is_prequalified_for_tournament_matching(
+                [current_question, question_to_exclude]
+            ):
+                logger.debug(
+                    f"Question {current_question.url} is a prequalified match. Removing it from the tournament."
+                )
+                matches_with_current_question.append(question_to_exclude)
+        if len(matches_with_current_question) == 0:
+            final_questions_to_include.append(current_question)
+        all_matches_in_current_tournament.append(matches_with_current_question)
+
+    initial_questions_count = len(tournament.questions)
+    num_questions_removed = initial_questions_count - len(final_questions_to_include)
+    if num_questions_removed != len(questions_to_exclude):
+        logger.warning(f"{len(questions_to_exclude)} questions were supposed to be removed from tournament. Instead, {num_questions_removed} removals were made.")
+
+    for matches_with_current_question in all_matches_in_current_tournament:
+        if len(matches_with_current_question) > 1:
+            logger.warning(f"Question {current_question.url} has multiple matches with questions to exclude: {matches_with_current_question}")
+
+    filtered_forecasts = [
+        forecast
+        for forecast in tournament.forecasts
+        if forecast.question in final_questions_to_include
+    ]
+    if len(filtered_forecasts) == 0:
+        raise ValueError(
+            f"No forecasts left after removing {len(questions_to_exclude)} questions from {tournament.name}"
         )
-    if team_size < 1:
-        raise ValueError(f"Team size is less than 1: {team_size}")
+
+    return SimulatedTournament(
+        forecasts=filtered_forecasts,
+        name=f"{tournament.name} ({len(questions_to_exclude)} Questions removed)",
+    )
+
+
+def get_best_forecasters_from_tournament(
+    tournament: SimulatedTournament,
+    num_users: int | None,
+) -> list[User]:
+    if num_users is None:
+        return tournament.users
+    if num_users > len(tournament.users):
+        num_users = len(tournament.users)
+        logger.warning(
+            f"Team size is larger than the number of users in the tournament: {num_users} > {len(tournament.users)}. Using all users."
+        )
+    if num_users < 1:
+        raise ValueError(f"Team size is less than 1: {num_users}")
 
     leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
     entries = leaderboard.entries_via_sum_of_scores()
 
-    top_entries = entries[:team_size]
+    top_entries = entries[:num_users]
     users = [entry.user for entry in top_entries]
     return users
 
@@ -262,13 +319,20 @@ def create_team(
 def create_team_tournament(
     tournament_1: SimulatedTournament,
     tournament_2: SimulatedTournament,
-    t1_size: int | None,
-    t2_size: int | None,
+    team_1: list[User] | Literal["all"],
+    team_2: list[User] | Literal["all"],
     aggregate_name_1: str,
     aggregate_name_2: str,
 ) -> SimulatedTournament:
-    team_1 = create_team(tournament_1, t1_size)
-    team_2 = create_team(tournament_2, t2_size)
+    if team_1 == "all":
+        team_1 = tournament_1.users
+    if team_2 == "all":
+        team_2 = tournament_2.users
+
+    if len(team_1) == 0:
+        raise ValueError(f"Team 1 is empty: {team_1}")
+    if len(team_2) == 0:
+        raise ValueError(f"Team 2 is empty: {team_2}")
 
     t1_aggregate = create_aggregated_user_at_spot_time(
         team_1, tournament_1, aggregate_name_1

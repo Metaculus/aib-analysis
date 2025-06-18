@@ -119,4 +119,8 @@ def make_tournament() -> SimulatedTournament:
                 prediction_time=datetime(2024, 12, 1),
             )
             forecasts.append(forecast)
-    return SimulatedTournament(forecasts=forecasts)
+    tournament = SimulatedTournament(forecasts=forecasts)
+    assert len(tournament.questions) == len(questions)
+    assert len(tournament.forecasts) == len(forecasts)
+    assert len(tournament.forecasts) == len(questions) * len(users)
+    return tournament
