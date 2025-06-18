@@ -72,7 +72,7 @@ class ProblemQuestion(BaseModel):
         elif not text_matches and not url_matches:
             return False
         else:
-            logger.info(
+            logger.debug(
                 f"Input Question {input_url} matches some parts of problem but not all | "
                 f"Input Question_text: {question.question_text} | "
                 f"Problem Question_text: {self.question_text} | "
