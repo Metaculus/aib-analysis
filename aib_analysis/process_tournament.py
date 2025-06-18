@@ -235,7 +235,7 @@ def constrain_question_types(
     for forecast in tournament.forecasts:
         if forecast.question.type in question_types:
             filtered_forecasts.append(forecast)
-    return SimulatedTournament(forecasts=filtered_forecasts)
+    return SimulatedTournament(forecasts=filtered_forecasts, name=f"{tournament.name} ({', '.join([qt.name for qt in question_types])})")
 
 
 def smart_remove_questions_from_tournament(
@@ -296,9 +296,9 @@ def smart_remove_questions_from_tournament(
 
 def get_best_forecasters_from_tournament(
     tournament: SimulatedTournament,
-    num_users: int | None,
+    num_users: int | Literal["all"],
 ) -> list[User]:
-    if num_users is None:
+    if num_users == "all":
         return tournament.users
     if num_users > len(tournament.users):
         num_users = len(tournament.users)

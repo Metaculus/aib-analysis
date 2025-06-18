@@ -208,7 +208,7 @@ class TestCombineTournaments:
 class TestCreateTeam:
     def test_create_team_from_leaderboard_none_size(self) -> None:
         tournament = make_tournament()
-        team = get_best_forecasters_from_tournament(tournament, None)
+        team = get_best_forecasters_from_tournament(tournament, "all")
         assert len(team) == len(tournament.users)
         assert all(user in tournament.users for user in team)
 
@@ -255,7 +255,7 @@ class TestCreateTeam:
 
         # Create team tournament with top 1 from each tournament
         team_tournament = create_team_tournament(
-            tournament1, tournament2, 1, 1, "Team1", "Team2"
+            tournament1, tournament2, [user1], [user3], "Team1", "Team2"
         )
 
         # Verify the combined tournament
@@ -296,7 +296,7 @@ class TestCreateTeam:
 
         # Create team tournament with all users from each tournament
         team_tournament = create_team_tournament(
-            tournament1, tournament2, None, None, "Team1", "Team2"
+            tournament1, tournament2, "all", "all", "Team1", "Team2"
         )
 
         # Verify the combined tournament

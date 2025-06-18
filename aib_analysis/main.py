@@ -104,10 +104,11 @@ def main():
             aggregate_name_1="Pro Team",
             aggregate_name_2="Bot Team",
         )
-        display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament, "Pro vs Bot (Team) Hypothesis Test")
+        display_bot_v_pro_hypothesis_test(pro_bot_aggregate_tournament, "Pro vs Bot (Teams) Hypothesis Test")
         display_tournament_and_variations(
             pro_bot_aggregate_tournament, "Pro vs Bot (Teams)", divide_into_types=True
         )
+        st.write(f"---\nBot Team (best {bot_team_size} on non pro questions): {[user.name for user in bot_team_for_pro_comparison]}")
 
     if not quarterly_cup_data_is_present:
         return
@@ -116,7 +117,7 @@ def main():
         cup_tournament = load_and_cache_tournament(
             quarterly_cup_path, UserType.BOT, "Quarterly Cup"
         )
-        display_tournament_and_variations(cup_tournament, "Spot Score Quarterly Cup")
+        display_tournament_and_variations(cup_tournament, "Spot Scores for Quarterly Cup")
 
         bot_tournament_wo_cup_questions = smart_remove_questions_from_tournament(bot_tournament, cup_tournament.questions)
         display_tournament_and_variations(bot_tournament_wo_cup_questions, "Bot (No Cup Questions)")
@@ -136,6 +137,7 @@ def main():
             cup_vs_bot_teams, "Cup (All forecasters) vs Bot Teams"
         )
         display_unique_questions(cup_tournament, bot_tournament)
+        st.write(f"---\nBot Team (best {bot_team_size} on non cup questions): {[user.name for user in bot_team_for_cup_comparison]}")
 
 
 @st.cache_data(show_spinner="Loading tournaments...")

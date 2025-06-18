@@ -292,6 +292,7 @@ def _display_leaderboard_table(leaderboard: Leaderboard, confidence_level: float
                 "average_upper_bound": upper_bound,
                 "average_lower_bound": lower_bound,
                 "num_questions_with_scores": entry.question_count,
+                "aggregated_users": [user.name for user in entry.user.aggregated_users],
                 "random_sample_of_scores": [
                     score.display_score_and_question()
                     for score in random_sample_of_scores
