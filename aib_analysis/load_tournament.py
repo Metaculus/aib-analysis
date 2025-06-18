@@ -25,7 +25,9 @@ def load_tournament(
     forecasts = []
     question_cache: dict[int, Question] = {}
     user_cache: dict[str, User] = {}
+
     dataframe = pd.read_csv(forecast_file_path, low_memory=False)
+
     logger.info(f"Loaded {len(dataframe)} forecast rows")
     log_every_n = 5000
     for i, (_, row) in enumerate(dataframe.iterrows()):
@@ -37,9 +39,45 @@ def load_tournament(
         )
         forecasts.append(forecast)
     logger.info(f"Finished parsing {len(forecasts)} forecast rows")
+
     tournament = SimulatedTournament(forecasts=forecasts, name=tournament_name)
+    _log_tournament_vs_dataframe_mismatches(tournament, dataframe)
     logger.info(f"Finished inializing tournament '{tournament.name}' from forecasts")
+
     return tournament
+
+
+def _log_tournament_vs_dataframe_mismatches(
+    tournament: SimulatedTournament, dataframe: pd.DataFrame
+) -> None:
+    dataframe_unique_question_ids: set[int] = set(dataframe["question_id"])
+    dataframe_unique_users: set[str] = set(dataframe["forecaster"])
+
+    tournament_unique_question_ids = set(
+        [f.question.question_id for f in tournament.forecasts]
+    )
+    tournament_unique_users = set([f.user.name for f in tournament.forecasts])
+
+    if dataframe_unique_question_ids != tournament_unique_question_ids:
+        unique_to_dataframe = (
+            dataframe_unique_question_ids - tournament_unique_question_ids
+        )
+        unique_to_tournament = (
+            tournament_unique_question_ids - dataframe_unique_question_ids
+        )
+        logger.warning(
+            f"Question ids in dataframe do not match question ids in tournament. IDs unique to dataframe: {unique_to_dataframe}, IDs unique to tournament: {unique_to_tournament}"
+        )
+    if dataframe_unique_users != tournament_unique_users:
+        unique_to_dataframe = dataframe_unique_users - tournament_unique_users
+        unique_to_tournament = tournament_unique_users - dataframe_unique_users
+        logger.warning(
+            f"Users in dataframe do not match users in tournament. Users unique to dataframe: {unique_to_dataframe}, Users unique to tournament: {unique_to_tournament}"
+        )
+    if len(tournament.forecasts) != len(dataframe):
+        logger.warning(
+            f"Number of forecasts ({len(tournament.forecasts)}) does not match number of rows in dataframe ({len(dataframe)})"
+        )
 
 
 def _parse_forecast_row(
@@ -159,7 +197,9 @@ def _parse_options(forecast_row: dict) -> tuple[str, ...] | None:
         options = forecast_row.get("options")
         if options is not None and pd.notnull(options) and options != "":
             evaluated_options = tuple(ast.literal_eval(options))
-            cleaned_options = [str(opt).strip().strip("'").strip('"') for opt in evaluated_options]
+            cleaned_options = [
+                str(opt).strip().strip("'").strip('"') for opt in evaluated_options
+            ]
             return tuple(cleaned_options)
         raise ValueError(f"Invalid options: {options}")
     return None
@@ -182,6 +222,7 @@ def _parse_lower_bound(forecast_row: dict) -> float | None:
         raise ValueError(f"Invalid lower bound: {lower}")
     return None
 
+
 def _parse_zero_point(forecast_row: dict) -> float | None:
     if forecast_row["type"] == "numeric":
         zero_point = forecast_row.get("zero_point")
@@ -191,6 +232,7 @@ def _parse_zero_point(forecast_row: dict) -> float | None:
             return float(zero_point)
         raise ValueError(f"Invalid zero point: {zero_point}")
     return None
+
 
 def _parse_open_upper_bound(forecast_row: dict) -> bool | None:
     if forecast_row["type"] == "numeric":

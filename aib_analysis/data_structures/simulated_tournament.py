@@ -50,13 +50,13 @@ class SimulatedTournament(BaseModel):
         ), "Spot forecasts cache is not initialized"
         return list(self._spot_forecasts_cache.values())
 
-    _user_cache: dict[str, User] = PrivateAttr(default_factory=dict)
-    _question_cache: dict[int, Question] = PrivateAttr(default_factory=dict)
-    _scores_cache: dict[str, Score] = PrivateAttr(default_factory=dict)
+    _user_cache: dict[str, User] = PrivateAttr(default_factory=dict) # user_name -> User
+    _question_cache: dict[int, Question] = PrivateAttr(default_factory=dict) # question_id -> Question
+    _scores_cache: dict[str, Score] = PrivateAttr(default_factory=dict) # score_id -> Score
 
-    _spot_forecasts_cache: dict[str, Forecast] = PrivateAttr(default_factory=dict)
+    _spot_forecasts_cache: dict[str, Forecast] = PrivateAttr(default_factory=dict) # forecast_id -> Forecast
     _question_to_spot_forecasts_cache: dict[int, list[Forecast]] = PrivateAttr(
-        default_factory=dict
+        default_factory=dict # question_id -> list[Forecast]
     )
 
     def question_to_spot_forecasts(self, question_id: int) -> list[Forecast]:
@@ -150,7 +150,8 @@ class SimulatedTournament(BaseModel):
             if not forecast.question.is_log_scale
         ]
         if not (len(non_log_scale_forecasts) == len(self.forecasts)):
-            logger.warning(f"Removed {len(self.forecasts) - len(non_log_scale_forecasts)} log scale questions")
+            non_log_scaled_questions = [question for question in self.questions if question.is_log_scale]
+            logger.warning(f"Removed {len(self.forecasts) - len(non_log_scale_forecasts)} log scale forecasts and {len(self.questions) - len(non_log_scaled_questions)} log scale questions")
         self.forecasts = non_log_scale_forecasts
 
     def _initialize_spot_forecast_cache(self) -> None:
@@ -279,7 +280,7 @@ class SimulatedTournament(BaseModel):
         for question in self.questions:
             question_text_map.setdefault(question.question_text, []).append(question)
 
-        duplicate_error_messages = []
+        duplicate_warning_messages = []
         for question_text, questions in question_text_map.items():
             assert len(questions) > 0
             if len(questions) == 1:
@@ -293,13 +294,17 @@ class SimulatedTournament(BaseModel):
                 continue
             error_message = "# Duplicates for question text: " + question_text + "\n"
             error_message += Question.question_comparison_table(questions)
-            duplicate_error_messages.append(error_message)
+            duplicate_warning_messages.append(error_message)
 
-        if len(duplicate_error_messages) > 0:
-            combined_error_message = "\n\n".join(duplicate_error_messages)
+        if len(duplicate_warning_messages) > 0:
+            combined_error_message = "\n\n".join(duplicate_warning_messages)
             logger.warning(
                 f"Duplicate question texts found in questions: \n{combined_error_message}"
             )
+
+        tournament_matching_hashes = [question.get_hash_for_tournament_matching() for question in self.questions]
+        if len(tournament_matching_hashes) != len(set(tournament_matching_hashes)):
+            logger.warning(f"Duplicate tournament matching hashes found in questions (questions are too similar on their core fields). num unique hashes: {len(set(tournament_matching_hashes))}, num hashes: {len(tournament_matching_hashes)}, num questions: {len(self.questions)}")
 
         question_ids = [question.question_id for question in self.questions]
         if len(question_ids) != len(set(question_ids)):
@@ -310,7 +315,8 @@ class SimulatedTournament(BaseModel):
 
     def _log_if_less_than_half_users_forecasted(self) -> None:
         total_users = len(self.users)
-        min_expected_forecasts = total_users / 4
+        expected_forecast_ratio = 0.25
+        min_expected_forecasts = total_users * expected_forecast_ratio
 
         questions_with_too_few_forecasts: list[Question] = []
         messages = []
@@ -324,11 +330,12 @@ class SimulatedTournament(BaseModel):
                     f"Question {question.question_id} ({question.url}) has only "
                     f"{len(forecasts_for_question)} forecasts out of {total_users} participants"
                 )
+                logger.debug(f"Question {question.question_id} ({question.url}) has only {len(forecasts_for_question)} forecasts out of {total_users} participants")
                 questions_with_too_few_forecasts.append(question)
 
         if len(questions_with_too_few_forecasts) > 0:
             logger.warning(
-                f"Found {len(questions_with_too_few_forecasts)} questions with too few forecasts. First 5 instances: {messages[:5]}"
+                f"Found {len(questions_with_too_few_forecasts)} questions with too few forecasts (less than {expected_forecast_ratio*100}% of users forecasted). First 5 instances: {messages[:5]}"
             )
 
     def _log_if_weights_are_too_low(self) -> None:

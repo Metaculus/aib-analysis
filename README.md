@@ -1,4 +1,4 @@
-The main entry point to the project is `streamlit_frontend.py`
+The main entry point to the project is `aib_analysis/main.py`
 
 ## Installing Dependencies
 To set up the project please run:
