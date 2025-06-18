@@ -7,15 +7,17 @@ from aib_analysis.data_structures.custom_types import (
     QuestionType,
     ScoreType,
 )
+from aib_analysis.data_structures.data_models import Question
 from aib_analysis.data_structures.simulated_tournament import (
     SimulatedTournament,
 )
 from aib_analysis.process_tournament import (
     combine_tournaments,
     constrain_question_types,
-    create_team,
     create_team_tournament,
+    get_best_forecasters_from_tournament,
     get_leaderboard,
+    smart_remove_questions_from_tournament,
 )
 from tests.mock_data_maker import (
     make_forecast,
@@ -206,7 +208,7 @@ class TestCombineTournaments:
 class TestCreateTeam:
     def test_create_team_from_leaderboard_none_size(self) -> None:
         tournament = make_tournament()
-        team = create_team(tournament, None)
+        team = get_best_forecasters_from_tournament(tournament, None)
         assert len(team) == len(tournament.users)
         assert all(user in tournament.users for user in team)
 
@@ -225,7 +227,7 @@ class TestCreateTeam:
             forecasts=[forecast_medium, forecast_good, forecast_bad]
         )
 
-        team = create_team(tournament, 2)
+        team = get_best_forecasters_from_tournament(tournament, 2)
         assert len(team) == 2
         assert team[0].name == "good"
         assert team[1].name == "medium"
@@ -318,18 +320,18 @@ class TestCreateTeam:
     def test_create_team_from_leaderboard_empty_tournament(self) -> None:
         empty_tournament = SimulatedTournament(forecasts=[])
         with pytest.raises(ValueError):
-            create_team(empty_tournament, 5)
+            get_best_forecasters_from_tournament(empty_tournament, 5)
 
     def test_create_team_from_leaderboard_team_size_larger_than_users(self) -> None:
         tournament = make_tournament()
-        team = create_team(tournament, len(tournament.users) + 5)
+        team = get_best_forecasters_from_tournament(tournament, len(tournament.users) + 5)
         assert len(team) == len(tournament.users)
         assert all(user in tournament.users for user in team)
 
     def test_create_team_from_leaderboard_zero_team_size(self) -> None:
         tournament = make_tournament()
         with pytest.raises(ValueError):
-            create_team(tournament, 0)
+            get_best_forecasters_from_tournament(tournament, 0)
 
     def test_create_team_tournament_no_common_questions(self) -> None:
         # Create two tournaments with completely different questions
@@ -347,7 +349,7 @@ class TestCreateTeam:
         )
 
         with pytest.raises(ValueError):
-            create_team_tournament(tournament1, tournament2, 1, 1, "Team1", "Team2")
+            create_team_tournament(tournament1, tournament2, "all", "all", "Team1", "Team2")
 
     def test_combine_pro_and_bot_tournament(
         self, bot_tournament: SimulatedTournament, pro_tournament: SimulatedTournament
@@ -355,11 +357,12 @@ class TestCreateTeam:
         bot_team_size = 10
         pro_team_name = "Pro Team"
         bot_team_name = "Bot Team"
+        team_2 = get_best_forecasters_from_tournament(bot_tournament, bot_team_size)
         aggregate_tournament = create_team_tournament(
             pro_tournament,
             bot_tournament,
-            t1_size=None,
-            t2_size=bot_team_size,
+            team_1="all",
+            team_2=team_2,
             aggregate_name_1=pro_team_name,
             aggregate_name_2=bot_team_name,
         )
@@ -428,3 +431,150 @@ def test_constrain_question_types():
     assert all(forecast.question.type == QuestionType.BINARY or forecast.question.type == QuestionType.MULTIPLE_CHOICE for forecast in binary_and_multiple_choice_tournament.forecasts)
     assert all(question.type == QuestionType.BINARY or question.type == QuestionType.MULTIPLE_CHOICE for question in binary_and_multiple_choice_tournament.questions)
     assert len(binary_and_multiple_choice_tournament.forecasts) < len(tournament.forecasts)
+
+
+class TestRemoveQuestions:
+    def test_basic_question_removal(self) -> None:
+        # Create a tournament with multiple questions
+        question1 = make_question_binary("Q1")
+        question2 = make_question_binary("Q2")
+        question3 = make_question_binary("Q3")
+
+        user1 = make_user("user1")
+        user2 = make_user("user2")
+
+        # Create forecasts for each question
+        forecast1_1 = make_forecast(question1, user1, [0.8])
+        forecast1_2 = make_forecast(question1, user2, [0.7])
+        forecast2_1 = make_forecast(question2, user1, [0.6])
+        forecast2_2 = make_forecast(question2, user2, [0.5])
+        forecast3_1 = make_forecast(question3, user1, [0.4])
+        forecast3_2 = make_forecast(question3, user2, [0.3])
+
+        tournament = SimulatedTournament(
+            forecasts=[forecast1_1, forecast1_2, forecast2_1, forecast2_2, forecast3_1, forecast3_2]
+        )
+
+        # Remove question2
+        filtered_tournament = smart_remove_questions_from_tournament(tournament, [question2])
+
+        # Verify results
+        assert len(filtered_tournament.questions) == 2
+        assert question1 in filtered_tournament.questions
+        assert question3 in filtered_tournament.questions
+        assert question2 not in filtered_tournament.questions
+        assert len(filtered_tournament.forecasts) == 4  # 2 forecasts per remaining question
+
+    def test_remove_multiple_questions(self) -> None:
+        # Create a tournament with multiple questions
+        question1 = make_question_binary("Q1")
+        question2 = make_question_binary("Q2")
+        question3 = make_question_binary("Q3")
+        question4 = make_question_binary("Q4")
+
+        user = make_user("user1")
+
+        # Create one forecast per question
+        forecast1 = make_forecast(question1, user, [0.8])
+        forecast2 = make_forecast(question2, user, [0.7])
+        forecast3 = make_forecast(question3, user, [0.6])
+        forecast4 = make_forecast(question4, user, [0.5])
+
+        tournament = SimulatedTournament(
+            forecasts=[forecast1, forecast2, forecast3, forecast4]
+        )
+        assert len(tournament.questions) == 4
+        assert len(tournament.forecasts) == 4
+
+        # Remove question2 and question3
+        filtered_tournament = smart_remove_questions_from_tournament(
+            tournament, [question2, question3]
+        )
+
+        # Verify results
+        assert len(filtered_tournament.questions) == 2
+        assert question1 in filtered_tournament.questions
+        assert question4 in filtered_tournament.questions
+        assert question2 not in filtered_tournament.questions
+        assert question3 not in filtered_tournament.questions
+        assert len(filtered_tournament.forecasts) == 2  # One forecast per remaining question
+
+    def test_remove_all_questions_raises_error(self) -> None:
+        # Create a tournament with one question
+        question = make_question_binary("Q1")
+        user = make_user("user1")
+        forecast = make_forecast(question, user, [0.8])
+
+        tournament = SimulatedTournament(forecasts=[forecast])
+        assert len(tournament.questions) == 1
+        assert len(tournament.forecasts) == 1
+
+        # Attempt to remove the only question
+        with pytest.raises(ValueError, match="No forecasts left after removing"):
+            smart_remove_questions_from_tournament(tournament, [question])
+
+    def test_remove_nonexistent_question(self) -> None:
+        # Create a tournament with one question
+        question1 = make_question_binary("Q1")
+        user = make_user("user1")
+        forecast = make_forecast(question1, user, [0.8])
+
+        tournament = SimulatedTournament(forecasts=[forecast])
+        assert len(tournament.questions) == 1
+        assert len(tournament.forecasts) == 1
+
+        # Create a different question to try to remove
+        question2 = make_question_binary("Q2")
+
+        # Remove question2 (which isn't in the tournament)
+        filtered_tournament = smart_remove_questions_from_tournament(tournament, [question2])
+
+        # Verify tournament is unchanged
+        assert len(filtered_tournament.questions) == 1
+        assert question1 in filtered_tournament.questions
+        assert len(filtered_tournament.forecasts) == 1
+
+    def test_remove_questions_with_prequalified_matches(self) -> None:
+        # Create two questions that are prequalified matches
+        template_question = make_question_binary("How many Grammy awards will Taylor Swift win in 2025?")
+        question1 = template_question.model_copy(update={"post_id": 31797, "options": ("0", "1", "2", "3 or more"), "question_id": 1111111})
+        question2 = template_question.model_copy(update={"post_id": 31865, "options": ("0", "1", "2", "Greater than 2"), "question_id": 2222222})
+        question3 = template_question
+
+        user = make_user("user1")
+        forecast1 = make_forecast(question1, user, [0.8])
+        forecast3 = make_forecast(question3, user, [0.6])
+
+        tournament = SimulatedTournament(forecasts=[forecast1, forecast3])
+        assert len(tournament.questions) == 2
+        assert len(tournament.forecasts) == 2
+
+        # Remove question2
+        filtered_tournament = smart_remove_questions_from_tournament(tournament, [question2])
+
+        # Verify question1 was also removed due to prequalified match
+        assert len(filtered_tournament.questions) == 1
+        assert len(filtered_tournament.forecasts) == 1
+
+
+    def test_remove_questions_with_hash_matches(self) -> None:
+        # Create two questions with the same hash
+        question1 = make_question_binary("Q1")
+        question2 = make_question_binary("Q1")  # Same text to ensure same hash
+        question3 = make_question_binary("Q3")  # Different text to ensure different hash
+
+        user = make_user("user1")
+        forecast1 = make_forecast(question1, user, [0.8])
+        forecast2 = make_forecast(question2, user, [0.7])
+        forecast3 = make_forecast(question3, user, [0.6])
+
+        tournament = SimulatedTournament(forecasts=[forecast1, forecast2, forecast3])
+        assert len(tournament.questions) == 3
+        assert len(tournament.forecasts) == 3
+
+        # Remove question2
+        filtered_tournament = smart_remove_questions_from_tournament(tournament, [question2])
+
+        # Verify question1 was also removed due to hash match
+        assert len(filtered_tournament.questions) == 1
+        assert len(filtered_tournament.forecasts) == 1

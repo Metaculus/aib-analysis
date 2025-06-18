@@ -15,8 +15,9 @@ from aib_analysis.data_structures.simulated_tournament import (
 from aib_analysis.load_tournament import load_tournament
 from aib_analysis.process_tournament import (
     combine_tournaments,
-    create_team,
     create_team_tournament,
+    get_best_forecasters_from_tournament,
+    smart_remove_questions_from_tournament,
 )
 from aib_analysis.visualize_tournament import (
     display_bot_v_pro_hypothesis_test,
@@ -68,6 +69,9 @@ def main():
         )
         display_tournament_and_variations(bot_tournament, "Bot", divide_into_types=True)
 
+        bot_tournament_wo_pro_questions = smart_remove_questions_from_tournament(bot_tournament, pro_tournament.questions)
+        display_tournament_and_variations(bot_tournament_wo_pro_questions, "Bot (No Pro Questions)")
+
         metac_bot_users = [
             user
             for user in bot_tournament.users
@@ -84,20 +88,6 @@ def main():
         )
         display_tournament_and_variations(metac_bot_tournament, "Metac Bot")
 
-        non_metac_bot_users = [user for user in bot_tournament.users if not user.is_metac_bot]
-        best_metac_bot = create_team(metac_bot_tournament, 1)
-        everyone_plus_best_metac_bot = non_metac_bot_users + best_metac_bot
-        everyone_plus_best_metac_bot_forecasts = [
-            forecast
-            for user in everyone_plus_best_metac_bot
-            for forecast in bot_tournament.user_to_spot_forecasts(user.name)
-        ]
-        everyone_plus_best_metac_bot_tournament = SimulatedTournament(
-            name="Everyone Plus Best Metac Bot Tournament",
-            forecasts=everyone_plus_best_metac_bot_forecasts,
-        )
-        display_tournament_and_variations(everyone_plus_best_metac_bot_tournament, "Everyone Plus Best Metac Bot")
-
     with tab3:
         pro_with_bot_tourn = combine_tournaments(pro_tournament, bot_tournament)
         display_tournament_and_variations(
@@ -105,11 +95,12 @@ def main():
         )
 
     with tab4:
+        bot_team_for_pro_comparison = get_best_forecasters_from_tournament(bot_tournament_wo_pro_questions, bot_team_size)
         pro_bot_aggregate_tournament = create_team_tournament(
             pro_tournament,
             bot_tournament,
-            t1_size=None,
-            t2_size=bot_team_size,
+            team_1="all",
+            team_2=bot_team_for_pro_comparison,
             aggregate_name_1="Pro Team",
             aggregate_name_2="Bot Team",
         )
@@ -127,12 +118,16 @@ def main():
         )
         display_tournament_and_variations(cup_tournament, "Spot Score Quarterly Cup")
 
+        bot_tournament_wo_cup_questions = smart_remove_questions_from_tournament(bot_tournament, cup_tournament.questions)
+        display_tournament_and_variations(bot_tournament_wo_cup_questions, "Bot (No Cup Questions)")
+
     with tab6:
+        bot_team_for_cup_comparison = get_best_forecasters_from_tournament(bot_tournament_wo_cup_questions, bot_team_size)
         cup_vs_bot_teams = create_team_tournament(
             cup_tournament,
             bot_tournament,
-            t1_size=None,
-            t2_size=bot_team_size,
+            team_1="all",
+            team_2=bot_team_for_cup_comparison,
             aggregate_name_1="Cup Team (All forecasters)",
             aggregate_name_2="Bot Team",
         )
@@ -140,20 +135,6 @@ def main():
         display_tournament_and_variations(
             cup_vs_bot_teams, "Cup (All forecasters) vs Bot Teams"
         )
-
-        cup_mvp_team_vs_bot_team = create_team_tournament(
-            cup_tournament,
-            bot_tournament,
-            t1_size=bot_team_size,
-            t2_size=bot_team_size,
-            aggregate_name_1="Cup MVP Team",
-            aggregate_name_2="Bot Team",
-        )
-        display_bot_v_pro_hypothesis_test(cup_mvp_team_vs_bot_team, "Cup MVP Team vs Bot Teams Hypothesis Test")
-        display_tournament_and_variations(
-            cup_mvp_team_vs_bot_team, "Cup MVP Team vs Bot Teams"
-        )
-
         display_unique_questions(cup_tournament, bot_tournament)
 
 
