@@ -318,8 +318,8 @@ class TestCreateTeam:
         assert all(user in team2_user.aggregated_users for user in tournament2.users)
 
     def test_create_team_from_leaderboard_empty_tournament(self) -> None:
-        empty_tournament = SimulatedTournament(forecasts=[])
         with pytest.raises(Exception):
+            empty_tournament = SimulatedTournament(forecasts=[])
             get_best_forecasters_from_tournament(empty_tournament, 5)
 
     def test_create_team_from_leaderboard_team_size_larger_than_users(self) -> None:
