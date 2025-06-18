@@ -282,22 +282,10 @@ def _resolution_value_to_pmf_index(
     """
     if len(pmf) != 202:
         raise ValueError(f"PMF should have 202 bins, but has {len(pmf)}")
-    position_in_range: float | None = None
-    if resolution > range_max:
-        resolution_bin_idx = 201  # 202nd index
-    elif resolution < range_min:
-        resolution_bin_idx = 0
-    elif resolution == range_max:
-        resolution_bin_idx = 200
-    elif resolution == range_min:
-        resolution_bin_idx = 1
-    else:
-        position_in_range = _resolution_value_to_position_in_numeric_range(
-            resolution, range_min, range_max
-        )
-        resolution_bin_idx = round(
-            position_in_range * 200 + 0.501
-        )  # python rounds 0.5 down when near 0 so add 0.001
+    position_in_range = _resolution_value_to_position_in_numeric_range(
+        resolution, range_min, range_max
+    )
+    resolution_bin_idx = _position_in_range_to_bucket_index(position_in_range)
     if resolution_bin_idx >= len(pmf) or resolution_bin_idx < 0:
         raise ValueError(
             f"Invalid resolution bin index: {resolution_bin_idx}. Resolution: {resolution}, Range min: {range_min}, Range max: {range_max}"
@@ -307,6 +295,19 @@ def _resolution_value_to_pmf_index(
     )
     return resolution_bin_idx
 
+def _position_in_range_to_bucket_index(
+    position_in_range: float
+) -> int:
+    outcome_count = 200
+    if position_in_range < 0:
+        return 0
+    if position_in_range > 1:
+        return outcome_count + 1
+    if position_in_range == 1:
+        return outcome_count
+    return max(
+        int(position_in_range * outcome_count + 1 - 1e-10), 1
+    )
 
 def _test_resolution_bin_idx_edge_cases(
     pmf: list[float],
