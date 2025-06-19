@@ -1166,14 +1166,14 @@ woff = ["brotli (>=1.0.1) ; platform_python_implementation == \"CPython\"", "bro
 
 [[package]]
 name = "forecasting-tools"
-version = "0.2.45"
+version = "0.2.47"
 description = "AI forecasting and research tools to help humans reason about and forecast the future"
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "forecasting_tools-0.2.45-py3-none-any.whl", hash = "sha256:a6286624c4340ba9ea8f99742689541e20a3a1b372bee64deb4cf169a0d170d5"},
-    {file = "forecasting_tools-0.2.45.tar.gz", hash = "sha256:e1a34efc7807cfd251598f7fd976bc9d197e915bb42a0dbb7628fc91129445ca"},
+    {file = "forecasting_tools-0.2.47-py3-none-any.whl", hash = "sha256:8669327c0201b50ab3fd55fb60a34d13af91edbe5c36cf4a36fda7dbb95a8d4f"},
+    {file = "forecasting_tools-0.2.47.tar.gz", hash = "sha256:33df6b9e5543516973ca416f2556dbbef3223061d3f31029d5788dab2162226c"},
 ]
 
 [package.dependencies]
@@ -5564,4 +5564,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "ebb8b4de8552f7e6678dbbf8a6ca0f6a7ac11154745579534cc7d24e38247ee9"
+content-hash = "5cc707c8aac83beced7e083e3cb08a967731c710e477a47d1f6e7c88a06c2666"
