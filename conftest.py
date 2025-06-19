@@ -10,6 +10,7 @@ import pytest
 from aib_analysis.data_structures.custom_types import UserType
 from aib_analysis.load_tournament import load_tournament
 from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
+from forecasting_tools.util.custom_logger import CustomLogger
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,6 @@ def setup_logging() -> None:
 def initialize_logging() -> None:
     enable_file_writing = os.getenv("ENABLE_FILE_WRITING", "true").lower() == "true"
     if enable_file_writing:
-        from forecasting_tools.util.custom_logger import CustomLogger
         os.environ["FILE_WRITING_ALLOWED"] = "TRUE"
         CustomLogger.setup_logging()
     else:
