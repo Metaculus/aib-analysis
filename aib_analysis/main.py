@@ -29,11 +29,8 @@ from conftest import initialize_logging
 logger = logging.getLogger(__name__)
 
 
-def main():
+def main(pro_path: str, bot_path: str, quarterly_cup_path: str):
     initialize_logging()
-    pro_path = "input_data/pro_forecasts_q1.csv"
-    bot_path = "input_data/bot_forecasts_q1.csv"
-    quarterly_cup_path = "local/quarterly_cup_forecats_before_cp_reveal_time_q1.csv"
     quarterly_cup_data_is_present = os.path.exists(quarterly_cup_path)
     bot_team_size = 10
 
