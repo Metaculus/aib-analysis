@@ -3,7 +3,7 @@ import os
 import sys
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
+top_level_dir = os.path.abspath(os.path.join(current_dir, "../../"))
 sys.path.append(top_level_dir)
 
 from aib_analysis.data_structures.data_models import QuestionType, UserType
@@ -23,9 +23,8 @@ from conftest import initialize_logging
 logger = logging.getLogger(__name__)
 
 
-def main(pro_path: str, bot_path: str, quarterly_cup_path: str, output_folder: str):
+def main(pro_path: str, bot_path: str, quarterly_cup_path: str | None, output_folder: str):
     initialize_logging()
-    quarterly_cup_data_is_present = os.path.exists(quarterly_cup_path)
     bot_team_size = 10
 
     pro_tournament = grab_tournament_data(pro_path, UserType.PRO, "Pro Tournament")
@@ -44,7 +43,7 @@ def main(pro_path: str, bot_path: str, quarterly_cup_path: str, output_folder: s
     )
     save_tournament(
         bot_tournament_wo_pro_questions,
-        "bot_tournament_wo_pro_questions.json",
+        "bot_tournament_without_pro_questions.json",
         divide_into_types=True,
         folder=output_folder,
     )
@@ -104,10 +103,14 @@ def main(pro_path: str, bot_path: str, quarterly_cup_path: str, output_folder: s
     )
     save_tournament(
         pro_v_bot_tournament__teams,
-        "pro_v_bot_tournament__teams.json",
+        "pro_vs_bot_tournament__teams.json",
         divide_into_types=True,
         folder=output_folder,
     )
+
+    # ------------------- Quarterly Cup -------------------
+    if quarterly_cup_path is None:
+        return
 
     cup_tournament = grab_tournament_data(
         quarterly_cup_path, UserType.BOT, "Quarterly Cup"
@@ -144,16 +147,21 @@ def grab_tournament_data(
 ) -> SimulatedTournament:
     return load_tournament(path, user_type, tournament_name)
 
-
+counter = 0
 def save_tournament(
     tournament: SimulatedTournament,
-    path: str,
+    file_name: str,
     divide_into_types: bool = False,
     folder: str = "local/cache/",
 ):
+    global counter
+    counter += 1
+    non_json_name = file_name.replace(".json", "")
+    save_path = f"{folder}{counter}_{non_json_name}"
+    logger.info(f"Saving tournament {counter} of {non_json_name}")
     os.makedirs(folder, exist_ok=True)
 
-    with open(f"{folder}{path}", "w") as f:
+    with open(f"{save_path}.json", "w") as f:
         f.write(tournament.model_dump_json(indent=4))
 
     if divide_into_types:
@@ -166,21 +174,27 @@ def save_tournament(
         numeric_combined_tournament = constrain_question_types(
             tournament, [QuestionType.NUMERIC]
         )
-        non_json_path = path.replace(".json", "")
-        with open(f"{folder}{non_json_path}__binary.json", "w") as f:
+        with open(f"{save_path}__binary.json", "w") as f:
             f.write(binary_combined_tournament.model_dump_json(indent=4))
 
-        with open(f"{folder}{non_json_path}__multiple_choice.json", "w") as f:
+        with open(f"{save_path}__multiple_choice.json", "w") as f:
             f.write(multiple_choice_combined_tournament.model_dump_json(indent=4))
 
-        with open(f"{folder}{non_json_path}__numeric.json", "w") as f:
+        with open(f"{save_path}__numeric.json", "w") as f:
             f.write(numeric_combined_tournament.model_dump_json(indent=4))
 
 
 if __name__ == "__main__":
     main(
-        pro_path="input_data/pro_forecasts_q2.csv",
-        bot_path="input_data/bot_forecasts_q2.csv",
-        quarterly_cup_path="local/quarterly_cup_forecats_before_cp_reveal_time_q2.csv",
-        output_folder="local/cache/",
+        pro_path="input_data/pro_forecasts_q1.csv",
+        bot_path="input_data/bot_forecasts_q1.csv",
+        quarterly_cup_path=None, # "local/quarterly_cup_forecats_before_cp_reveal_time_q1.csv",
+        output_folder="local/q1_2025_tournaments/",
     )
+
+    # main(
+    #     pro_path="input_data/pro_forecasts_q2.csv",
+    #     bot_path="input_data/bot_forecasts_q2.csv",
+    #     quarterly_cup_path=None,
+    #     output_folder="local/q2_2025_tournaments/",
+    # )
