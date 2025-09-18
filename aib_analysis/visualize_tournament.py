@@ -25,30 +25,29 @@ from aib_analysis.process_tournament import (
 
 logger = logging.getLogger(__name__)
 
-
 def display_tournament_and_variations(
     tournament: SimulatedTournament, name: str, divide_into_types: bool = False
 ):
-    _display_individual_tournament(tournament, name)
+    display_individual_tournament(tournament, name)
     if divide_into_types:
         binary_combined_tournament = constrain_question_types(
             tournament, [QuestionType.BINARY]
         )
-        _display_individual_tournament(binary_combined_tournament, f"{name} (Binary)")
+        display_individual_tournament(binary_combined_tournament, f"{name} (Binary)")
         multiple_choice_combined_tournament = constrain_question_types(
             tournament, [QuestionType.MULTIPLE_CHOICE]
         )
-        _display_individual_tournament(
+        display_individual_tournament(
             multiple_choice_combined_tournament, f"{name} (Multiple Choice)"
         )
         numeric_combined_tournament = constrain_question_types(
             tournament, [QuestionType.NUMERIC]
         )
-        _display_individual_tournament(numeric_combined_tournament, f"{name} (Numeric)")
+        display_individual_tournament(numeric_combined_tournament, f"{name} (Numeric)")
 
 
-def _display_individual_tournament(tournament: SimulatedTournament, name: str):
-    st.subheader(f"{name} Tournament")
+def display_individual_tournament(tournament: SimulatedTournament, name: str):
+    st.subheader(f"{name}")
 
     # Display tournament statistics
     with st.expander(f"{name} Spot Peer Leaderboard"):
