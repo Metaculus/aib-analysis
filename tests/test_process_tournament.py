@@ -11,7 +11,7 @@ from aib_analysis.data_structures.data_models import Question
 from aib_analysis.data_structures.simulated_tournament import (
     SimulatedTournament,
 )
-from aib_analysis.process_tournament import (
+from aib_analysis.main_logic.process_tournament import (
     combine_tournaments,
     constrain_question_types,
     create_team_tournament,
@@ -64,19 +64,20 @@ class TestLeaderboard:
     def test_leaderboard_pros(
         self,
         pro_tournament: SimulatedTournament,
+        json_loaded_pro_tournament: SimulatedTournament,
     ):
-        tournament = pro_tournament
-        leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
-        assert len(leaderboard.entries) == 10
-        entries = leaderboard.entries_via_sum_of_scores()
-        assert entries[0].user.name == "draaglom"
-        assert entries[0].sum_of_scores == pytest.approx(511.338, abs=0.1)
-        assert entries[1].user.name == "Jgalt"
-        assert entries[1].sum_of_scores == pytest.approx(439.233, abs=0.1)
-        assert entries[2].user.name == "MaciekK"
-        assert entries[3].user.name == "SpottedBear"
-        assert entries[9].user.name == "OpenSystem"
-        assert entries[9].sum_of_scores == pytest.approx(-908.457, abs=0.1)
+        for tournament in [pro_tournament, json_loaded_pro_tournament]:
+            leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
+            assert len(leaderboard.entries) == 10
+            entries = leaderboard.entries_via_sum_of_scores()
+            assert entries[0].user.name == "draaglom"
+            assert entries[0].sum_of_scores == pytest.approx(511.338, abs=0.1)
+            assert entries[1].user.name == "Jgalt"
+            assert entries[1].sum_of_scores == pytest.approx(439.233, abs=0.1)
+            assert entries[2].user.name == "MaciekK"
+            assert entries[3].user.name == "SpottedBear"
+            assert entries[9].user.name == "OpenSystem"
+            assert entries[9].sum_of_scores == pytest.approx(-908.457, abs=0.1)
 
     def test_leaderboard_bots(
         self,
