@@ -82,6 +82,23 @@ class ProblemQuestion(BaseModel):
 
 
 class ProblemManager:
+    """
+    When adding to this manager:
+    1. Run the simulation
+    2. Find the log statements indicating either
+        a) A duplicate was found within a tournament
+        b) A mismatch was found between tournaments
+    3. Copy those logs into this file
+    4. Make a list of problem questions matching these questions
+    5. Sort the lists into the right action
+        a) For mismatches that should be forced to match, make sure they are in the is_prequalified_for_tournament_matching function
+        b) For other mismatches that are fine to be left out, make sure they are
+        c) For duplicates
+            - ... that are not a concern
+            - ... that are a concern
+        d)
+    """
+
     @classmethod
     def dont_log_in_tournament_matching(cls, questions: list[Question]) -> bool:
         return cls._question_list_fully_matches_a_problem_question(
@@ -122,13 +139,10 @@ class ProblemManager:
     @classmethod
     def is_prequalified_for_tournament_matching(cls, questions: list[Question]) -> bool:
         if cls._question_list_fully_matches_a_problem_question(
-            questions,
-            cls._all_questions_to_force_match
+            questions, cls._all_questions_to_force_match
         ):
             return True
         return False
-
-
 
     @classmethod
     def _question_list_fully_matches_a_problem_question(
@@ -143,8 +157,6 @@ class ProblemManager:
                     f"One of the input questions matches the problem question, but not all of them. Input Questions: {[question.url for question in questions]}, Problem question: {pq.model_dump_json()}"
                 )
         return False
-
-
 
     # These are questions with duplicate titles in the q1 tournament
     _q1_bot__in_tournament_title_duplicates: list[ProblemQuestion] = [
@@ -183,6 +195,82 @@ class ProblemManager:
             ],
             notes="Completely different options: first has ('The New York Times Daily', 'The Tucker Carlson Show') resolved to None, second has ('Call Her Daddy', 'Candace') and resolved to 'Candace'. Spot scoring time 2 days off. First was annulled",
             proposed_action="Leave this. The first one was annulled",
+        ),
+    ]
+
+    _q2_bot__in_tournament_title_duplicates: list[ProblemQuestion] = [
+        ProblemQuestion(
+            question_text='How many "Level 4 – Do Not Travel" travel advisories will the US State Department issue in June 2025?',
+            urls=[
+                "https://www.metaculus.com/questions/38539/",
+                "https://www.metaculus.com/questions/38052/",
+            ],
+            notes="Different options: first has ('Zero', 'One', 'Two', 'Three or more'), second has ('Zero', 'One', 'Two', 'Greater than two'). Different resolutions: first was annulled, second 'Two'",
+            proposed_action="Leave as is, the first one was annulled",
+        ),
+        ProblemQuestion(
+            question_text="How many people will be in space on June 27, 2025, according to whoisinspace.com?",
+            urls=[
+                "https://www.metaculus.com/questions/38532/",
+                "https://www.metaculus.com/questions/38083/",
+                "https://www.metaculus.com/questions/37480/",
+            ],
+            notes="Three duplicates with slightly different options: ('Less than Ten', 'Exactly Ten', 'Greater than Ten') vs ('Less than Ten', 'Ten', 'Greater than Ten') vs ('Less than 10', '10', 'Greater than 10'). First resolved to 'Greater than Ten', others annulled",
+            proposed_action="Leave as is. 2 of them were annulled",
+        ),
+        ProblemQuestion(
+            question_text='At the end of June 2025, will Wikipedia still list all these countries as "currently" blocking access to X (formerly Twitter)?',
+            urls=[
+                "https://www.metaculus.com/questions/38331/",
+                "https://www.metaculus.com/questions/38092/",
+            ],
+            notes="Binary questions with different resolutions: first resolved to True, second unresolved. One got annulled because 'annulling this question, since Pakistan got moved from Current to Former before the launch of this question'",
+            proposed_action="Leave as is. The first one was annulled",
+        ),
+        ProblemQuestion(
+            question_text="How many unique posters will Bluesky have on June 28, 2025?",
+            urls=[
+                "https://www.metaculus.com/questions/38326/",
+                "https://www.metaculus.com/questions/38076/",
+            ],
+            notes="Numeric questions with different resolutions: first resolved to 640344.0, second annulled because of bad background",
+            proposed_action="Leave as is. The second one was annulled",
+        ),
+        ProblemQuestion(
+            question_text="For Q2 2025, how many banks will be listed on the FDIC's Failed Bank List?",
+            urls=[
+                "https://www.metaculus.com/questions/38096/",
+                "https://www.metaculus.com/questions/37247/",
+            ],
+            notes="Different options: first has ('Exactly 0', 'Exactly 1', '2-3', '4-6', '7-20', '>20'), second has ('0', '1', '2-3', '4-6', '7-20', '>20'). Different resolutions: first 'Exactly 1', second anulled",
+            proposed_action="Leave as is. The second one was annulled",
+        ),
+        ProblemQuestion(
+            question_text="How many Chinese universities will be in the top 20 of the QS World University Rankings 2026?",
+            urls=[
+                "https://www.metaculus.com/questions/38072/",
+                "https://www.metaculus.com/questions/37046/",
+            ],
+            notes="Different options: first has ('Zero or One', 'Two', 'Three or more'), second has ('0 or 1', '2', '3 or more'). Different resolutions: first 'Two', second annulled",
+            proposed_action="Leave as is. The second one was annulled",
+        ),
+        ProblemQuestion(
+            question_text="How many mentions of Ghana will Pharma Manufacturing magazine make before July 1, 2025?",
+            urls=[
+                "https://www.metaculus.com/questions/37651/",
+                "https://www.metaculus.com/questions/37248/",
+            ],
+            notes="Different options: first has ('Zero', 'One', 'Two or Three', 'Four or more'), second has ('0', '1', '2-3', '4 or more'). Different resolutions: first 'Zero', second annulled",
+            proposed_action="Leave as is. The second one was annulled",
+        ),
+        ProblemQuestion(
+            question_text="How many foreign visitors to the United States will the International Trade Administration report for April 2025?",
+            urls=[
+                "https://www.metaculus.com/questions/37216/",
+                "https://www.metaculus.com/questions/37010/",
+            ],
+            notes="Numeric questions with different resolutions: first resolved to 5040051.0, second annulled due to a fine print typo",
+            proposed_action="Leave as is. The second one was annulled",
         ),
     ]
 
@@ -315,7 +403,6 @@ class ProblemManager:
             notes="Different resolutions (20-29 vs 30-39) and spot scoring times (17:00 vs 02:00). Created 2 days apart.",
             proposed_action="Remove from comparison due to different resolutions",
         ),
-
     ]
 
     _q1_bot_v_cup_matching_inconsistencies: list[ProblemQuestion] = [
@@ -323,11 +410,191 @@ class ProblemManager:
         *_q1_bot_v_cup_to_remove_from_comparison,
     ]
 
-
     _all_questions_to_force_match = (
         _q1_bot_v_pro_inconsistencies_to_force_match
         + _q1_bot_v_cup_inconsistencies_to_force_match
     )
+
+
+"""
+##################### Q2 Duplicate Question - Bot Tournament #####################
+
+# Duplicates for question text: How many "Level 4 – Do Not Travel" travel advisories will the US State Department issue in June 2025?
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/38539/ | https://www.metaculus.com/questions/38052/ |
+| Question Id | 37770 | 37358 |
+| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
+| Question Text | How many "Level 4 – Do Not Travel" travel advisories will the US State Department issue in June 2025? | How many "Level 4 – Do Not Travel" travel advisories will the US State Department issue in June 2025? |
+| Resolution | None | Two |
+| Options | ('Zero', 'One', 'Two', 'Three or more') | ('Zero', 'One', 'Two', 'Greater than two') |
+| Range Max | None | None |
+| Range Min | None | None |
+| Open Upper Bound | None | None |
+| Open Lower Bound | None | None |
+| Zero Point | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 38539 | 38052 |
+| Created At | 2025-06-06 23:33:33.485716+00:00 | 2025-05-24 05:50:05.303416+00:00 |
+| Spot Scoring Time | 2025-06-14 14:00:00+00:00 | 2025-05-26 04:00:00+00:00 |
+| Project | Q2 AI Forecasting Benchmark Tournament | Q2 AI Forecasting Benchmark Tournament |
+| Notes | None | None |
+
+
+# Duplicates for question text: How many people will be in space on June 27, 2025, according to whoisinspace.com?
+| Parameter | Question 1 | Question 2 | Question 3 |
+|-----------|---|---|---|
+| URL | https://www.metaculus.com/questions/38532/ | https://www.metaculus.com/questions/38083/ | https://www.metaculus.com/questions/37480/ |
+| Question Id | 37763 | 37389 | 36840 |
+| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
+| Question Text | How many people will be in space on June 27, 2025, according to whoisinspace.com? | How many people will be in space on June 27, 2025, according to whoisinspace.com? | How many people will be in space on June 27, 2025, according to whoisinspace.com? |
+| Resolution | Greater than Ten | None | None |
+| Options | ('Less than Ten', 'Exactly Ten', 'Greater than Ten') | ('Less than Ten', 'Ten', 'Greater than Ten') | ('Less than 10', '10', 'Greater than 10') |
+| Range Max | None | None | None |
+| Range Min | None | None | None |
+| Open Upper Bound | None | None | None |
+| Open Lower Bound | None | None | None |
+| Zero Point | None | None | None |
+| Weight | 1.0 | 1.0 | 1.0 |
+| Post Id | 38532 | 38083 | 37480 |
+| Created At | 2025-06-06 23:33:32.267839+00:00 | 2025-05-24 05:50:06.929652+00:00 | 2025-05-03 02:27:38.243986+00:00 |
+| Spot Scoring Time | 2025-06-11 12:00:00+00:00 | 2025-05-29 00:00:00+00:00 | 2025-05-09 18:00:00+00:00 |
+| Project | Q2 AI Forecasting Benchmark Tournament | Q2 AI Forecasting Benchmark Tournament | Q2 AI Forecasting Benchmark Tournament |
+| Notes | None | None | None |
+
+
+# Duplicates for question text: At the end of June 2025, will Wikipedia still list all these countries as "currently" blocking access to X (formerly Twitter)?
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/38331/ | https://www.metaculus.com/questions/38092/ |
+| Question Id | 37607 | 37398 |
+| Type | QuestionType.BINARY | QuestionType.BINARY |
+| Question Text | At the end of June 2025, will Wikipedia still list all these countries as "currently" blocking access to X (formerly Twitter)? | At the end of June 2025, will Wikipedia still list all these countries as "currently" blocking access to X (formerly Twitter)? |
+| Resolution | True | None |
+| Options | None | None |
+| Range Max | None | None |
+| Range Min | None | None |
+| Open Upper Bound | None | None |
+| Open Lower Bound | None | None |
+| Zero Point | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 38331 | 38092 |
+| Created At | 2025-05-31 04:11:49.586557+00:00 | 2025-05-24 05:50:07.272330+00:00 |
+| Spot Scoring Time | 2025-06-05 16:00:00+00:00 | 2025-05-29 18:00:00+00:00 |
+| Project | Q2 AI Forecasting Benchmark Tournament | Q2 AI Forecasting Benchmark Tournament |
+| Notes | None | None |
+
+
+# Duplicates for question text: How many unique posters will Bluesky have on June 28, 2025?
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/38326/ | https://www.metaculus.com/questions/38076/ |
+| Question Id | 37602 | 37382 |
+| Type | QuestionType.NUMERIC | QuestionType.NUMERIC |
+| Question Text | How many unique posters will Bluesky have on June 28, 2025? | How many unique posters will Bluesky have on June 28, 2025? |
+| Resolution | 640344.0 | None |
+| Options | None | None |
+| Range Max | 2000000.0 | 2000000.0 |
+| Range Min | 200000.0 | 200000.0 |
+| Open Upper Bound | True | True |
+| Open Lower Bound | True | True |
+| Zero Point | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 38326 | 38076 |
+| Created At | 2025-05-31 04:11:49.263493+00:00 | 2025-05-24 05:50:06.475972+00:00 |
+| Spot Scoring Time | 2025-06-05 04:00:00+00:00 | 2025-05-28 08:00:00+00:00 |
+| Project | Q2 AI Forecasting Benchmark Tournament | Q2 AI Forecasting Benchmark Tournament |
+| Notes | None | None |
+
+
+# Duplicates for question text: For Q2 2025, how many banks will be listed on the FDIC's Failed Bank List?
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/38096/ | https://www.metaculus.com/questions/37247/ |
+| Question Id | 37402 | 36625 |
+| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
+| Question Text | For Q2 2025, how many banks will be listed on the FDIC's Failed Bank List? | For Q2 2025, how many banks will be listed on the FDIC's Failed Bank List? |
+| Resolution | Exactly 1 | None |
+| Options | ('Exactly 0', 'Exactly 1', '2-3', '4-6', '7-20', '>20') | ('0', '1', '2-3', '4-6', '7-20', '>20') |
+| Range Max | None | None |
+| Range Min | None | None |
+| Open Upper Bound | None | None |
+| Open Lower Bound | None | None |
+| Zero Point | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 38096 | 37247 |
+| Created At | 2025-05-24 05:50:07.291011+00:00 | 2025-04-26 05:58:11.711088+00:00 |
+| Spot Scoring Time | 2025-05-30 02:00:00+00:00 | 2025-05-01 02:00:00+00:00 |
+| Project | Q2 AI Forecasting Benchmark Tournament | Q2 AI Forecasting Benchmark Tournament |
+| Notes | None | None |
+
+
+# Duplicates for question text: How many Chinese universities will be in the top 20 of the QS World University Rankings 2026?
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/38072/ | https://www.metaculus.com/questions/37046/ |
+| Question Id | 37378 | 36441 |
+| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
+| Question Text | How many Chinese universities will be in the top 20 of the QS World University Rankings 2026? | How many Chinese universities will be in the top 20 of the QS World University Rankings 2026? |
+| Resolution | Two | None |
+| Options | ('Zero or One', 'Two', 'Three or more') | ('0 or 1', '2', '3 or more') |
+| Range Max | None | None |
+| Range Min | None | None |
+| Open Upper Bound | None | None |
+| Open Lower Bound | None | None |
+| Zero Point | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 38072 | 37046 |
+| Created At | 2025-05-24 05:50:06.456786+00:00 | 2025-04-18 04:06:42.027745+00:00 |
+| Spot Scoring Time | 2025-05-28 00:00:00+00:00 | 2025-04-24 18:00:00+00:00 |
+| Project | Q2 AI Forecasting Benchmark Tournament | Q2 AI Forecasting Benchmark Tournament |
+| Notes | None | None |
+
+
+# Duplicates for question text: How many mentions of Ghana will Pharma Manufacturing magazine make before July 1, 2025?
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/37651/ | https://www.metaculus.com/questions/37248/ |
+| Question Id | 37004 | 36626 |
+| Type | QuestionType.MULTIPLE_CHOICE | QuestionType.MULTIPLE_CHOICE |
+| Question Text | How many mentions of Ghana will Pharma Manufacturing magazine make before July 1, 2025? | How many mentions of Ghana will Pharma Manufacturing magazine make before July 1, 2025? |
+| Resolution | Zero | None |
+| Options | ('Zero', 'One', 'Two or Three', 'Four or more') | ('0', '1', '2-3', '4 or more') |
+| Range Max | None | None |
+| Range Min | None | None |
+| Open Upper Bound | None | None |
+| Open Lower Bound | None | None |
+| Zero Point | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 37651 | 37248 |
+| Created At | 2025-05-09 21:48:35.077445+00:00 | 2025-04-26 05:58:11.716639+00:00 |
+| Spot Scoring Time | 2025-05-15 16:00:00+00:00 | 2025-05-01 06:00:00+00:00 |
+| Project | Q2 AI Forecasting Benchmark Tournament | Q2 AI Forecasting Benchmark Tournament |
+| Notes | None | None |
+
+
+# Duplicates for question text: How many foreign visitors to the United States will the International Trade Administration report for April 2025?
+| Parameter | Question 1 | Question 2 |
+|-----------|---|---|
+| URL | https://www.metaculus.com/questions/37216/ | https://www.metaculus.com/questions/37010/ |
+| Question Id | 36594 | 36405 |
+| Type | QuestionType.NUMERIC | QuestionType.NUMERIC |
+| Question Text | How many foreign visitors to the United States will the International Trade Administration report for April 2025? | How many foreign visitors to the United States will the International Trade Administration report for April 2025? |
+| Resolution | 5040051.0 | None |
+| Options | None | None |
+| Range Max | 6000000.0 | 6000000.0 |
+| Range Min | 4000000.0 | 4000000.0 |
+| Open Upper Bound | True | True |
+| Open Lower Bound | True | True |
+| Zero Point | None | None |
+| Weight | 1.0 | 1.0 |
+| Post Id | 37216 | 37010 |
+| Created At | 2025-04-26 05:58:08.840506+00:00 | 2025-04-18 04:06:40.480103+00:00 |
+| Spot Scoring Time | 2025-04-28 04:00:00+00:00 | 2025-04-21 18:00:00+00:00 |
+| Project | Q2 AI Forecasting Benchmark Tournament | Q2 AI Forecasting Benchmark Tournament |
+| Notes | None | None |
+"""
+
 
 """
 ##################### Q1 Duplicate Question - Bot Tournament #####################
