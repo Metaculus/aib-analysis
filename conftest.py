@@ -6,11 +6,13 @@ import os
 
 import dotenv
 import pytest
+from forecasting_tools.util.custom_logger import CustomLogger
 
 from aib_analysis.data_structures.custom_types import UserType
-from aib_analysis.load_tournament import load_tournament
-from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
-from forecasting_tools.util.custom_logger import CustomLogger
+from aib_analysis.data_structures.simulated_tournament import (
+    SimulatedTournament,
+)
+from aib_analysis.main_logic.load_tournament import load_tournament
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,7 @@ def initialize_logging() -> None:
 class CachedData:
     cached_loaded_pro_tournament: SimulatedTournament | None = None
     cached_loaded_bot_tournament: SimulatedTournament | None = None
+    cached_json_loaded_pro_tournament: SimulatedTournament | None = None # Loaded from pydantic json for SimulatedTournament
 
 @pytest.fixture(scope="function")
 def pro_tournament() -> SimulatedTournament:
@@ -55,3 +58,13 @@ def bot_tournament() -> SimulatedTournament:
         user_type = UserType.BOT
         CachedData.cached_loaded_bot_tournament = load_tournament(file_path, user_type)
     return copy.deepcopy(CachedData.cached_loaded_bot_tournament)
+
+@pytest.fixture(scope="function")
+def json_loaded_pro_tournament() -> SimulatedTournament:
+    if CachedData.cached_json_loaded_pro_tournament is None:
+        file_path = "tests/test_data/json_pro_tournament.json"
+        with open(file_path) as f:
+            loaded_tournament = SimulatedTournament.model_validate_json(f.read())
+            CachedData.cached_json_loaded_pro_tournament = loaded_tournament
+    return copy.deepcopy(CachedData.cached_json_loaded_pro_tournament)
+

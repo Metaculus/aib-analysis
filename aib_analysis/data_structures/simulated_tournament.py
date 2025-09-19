@@ -130,8 +130,8 @@ class SimulatedTournament(BaseModel):
         if len(self.scores_cache) > 0 and len(self.forecasts) == 0:
             # TODO: There might be problems with this clause if not every forecast has a score
             scores = list(self.scores_cache.values())
-            self.forecasts = [score.forecast for score in scores]
-            unique_forecasts = list(set(self.forecasts))
+            forecasts = [score.forecast for score in scores]
+            unique_forecasts = list(set(tuple(forecasts)))
             self.forecasts = unique_forecasts
 
         self._remove_log_scale_questions()

@@ -437,7 +437,7 @@ class ProblemManager:
 | Tournament 1 | True | False |
 | Tournament 2 | False | True |
 
-2025-06-14 13:00:13,710 - WARNING - aib_analysis.process_tournament - _log_title_mapping_inconsistencies  -
+2025-06-14 13:00:13,710 - WARNING - from aib_analysis.main_logic.process_tournament - _log_title_mapping_inconsistencies  -
 # Text-matched questions have different tournament-matching hashes (NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):
 | Parameter | Question 1 | Question 2 |
 |-----------|---|---|
@@ -459,7 +459,7 @@ class ProblemManager:
 | Tournament 1 | True | False |
 | Tournament 2 | False | True |
 
-2025-06-14 13:00:13,714 - WARNING - aib_analysis.process_tournament - _log_title_mapping_inconsistencies  -
+2025-06-14 13:00:13,714 - WARNING - from aib_analysis.main_logic.process_tournament - _log_title_mapping_inconsistencies  -
 # Text-matched questions have different tournament-matching hashes (NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):
 | Parameter | Question 1 | Question 2 | Question 3 |
 |-----------|---|---|---|
@@ -481,7 +481,7 @@ class ProblemManager:
 | Tournament 1 | True | False | False |
 | Tournament 2 | False | True | True |
 
-2025-06-14 13:00:13,717 - WARNING - aib_analysis.process_tournament - _log_title_mapping_inconsistencies  -
+2025-06-14 13:00:13,717 - WARNING - from aib_analysis.main_logic.process_tournament - _log_title_mapping_inconsistencies  -
 # Text-matched questions have different tournament-matching hashes (NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):
 | Parameter | Question 1 | Question 2 | Question 3 |
 |-----------|---|---|---|
@@ -503,7 +503,7 @@ class ProblemManager:
 | Tournament 1 | True | False | False |
 | Tournament 2 | False | True | True |
 
-2025-06-14 13:00:13,721 - WARNING - aib_analysis.process_tournament - _log_title_mapping_inconsistencies  -
+2025-06-14 13:00:13,721 - WARNING - from aib_analysis.main_logic.process_tournament - _log_title_mapping_inconsistencies  -
 # Text-matched questions have different tournament-matching hashes (NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):
 | Parameter | Question 1 | Question 2 |
 |-----------|---|---|
@@ -529,7 +529,7 @@ class ProblemManager:
 
 """
 ###################### Q1 Bot v Cup Matching Inconsistencies (excluding mismatched titles) ######################
-2025-06-16 18:57:57,787 - WARNING - aib_analysis.process_tournament - log_title_mapping_inconsistencies  -
+2025-06-16 18:57:57,787 - WARNING - from aib_analysis.main_logic.process_tournament - log_title_mapping_inconsistencies  -
 # Text-matched questions have different tournament-matching hashes (NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):
 | Parameter | Question 1 | Question 2 |
 |-----------|---|---|
@@ -553,7 +553,7 @@ class ProblemManager:
 | Tournament 1 | True | False |
 | Tournament 2 | False | True |
 
-2025-06-16 18:57:57,791 - WARNING - aib_analysis.process_tournament - log_title_mapping_inconsistencies  -
+2025-06-16 18:57:57,791 - WARNING - from aib_analysis.main_logic.process_tournament - log_title_mapping_inconsistencies  -
 # Text-matched questions have different tournament-matching hashes (NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):
 | Parameter | Question 1 | Question 2 |
 |-----------|---|---|
@@ -577,7 +577,7 @@ class ProblemManager:
 | Tournament 1 | True | False |
 | Tournament 2 | False | True |
 
-2025-06-16 18:57:57,795 - WARNING - aib_analysis.process_tournament - log_title_mapping_inconsistencies  -
+2025-06-16 18:57:57,795 - WARNING - from aib_analysis.main_logic.process_tournament - log_title_mapping_inconsistencies  -
 # Text-matched questions have different tournament-matching hashes (NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):
 | Parameter | Question 1 | Question 2 |
 |-----------|---|---|
@@ -601,7 +601,7 @@ class ProblemManager:
 | Tournament 1 | True | False |
 | Tournament 2 | False | True |
 
-2025-06-16 18:57:57,805 - WARNING - aib_analysis.process_tournament - log_title_mapping_inconsistencies  -
+2025-06-16 18:57:57,805 - WARNING - from aib_analysis.main_logic.process_tournament - log_title_mapping_inconsistencies  -
 # Text-matched questions have different tournament-matching hashes (NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):
 | Parameter | Question 1 | Question 2 |
 |-----------|---|---|
