@@ -1,8 +1,10 @@
 import ast
 import logging
+from datetime import datetime
 
+import numpy as np
 import pandas as pd
-
+import pendulum
 from aib_analysis.data_structures.data_models import (
     Forecast,
     ForecastType,
@@ -128,15 +130,19 @@ def _parse_forecast_row(
         user_cache[username] = user
 
     try:
-        end_time = pd.to_datetime(row["forecast_endtime"])
-    except KeyError:
+        end_time = pendulum.parse(row["forecast_endtime"])
+        assert isinstance(end_time, datetime)
+    except Exception as e:
         end_time = None
+
+    prediction_time = pendulum.parse(row["forecast_timestamp"])
+    assert isinstance(prediction_time, datetime)
 
     forecast = Forecast(
         question=question,
         user=user,
         prediction=prediction,
-        prediction_time=pd.to_datetime(row["forecast_timestamp"]),
+        prediction_time=prediction_time,
         end_time=end_time,
     )
     return forecast, question, user

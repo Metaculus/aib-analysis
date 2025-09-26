@@ -1,4 +1,5 @@
 import copy
+import json
 import logging
 import os
 import sys
@@ -33,7 +34,7 @@ def main(pro_path: str, bot_path: str, quarterly_cup_path: str | None, output_fo
 
     bot_tournament_full = grab_tournament_data(bot_path, UserType.BOT, "Bot Tournament Full")
     bot_tournament = SimulatedTournament(
-        name="Bot Tournament",
+        name="Bot Tournament - Only spot forecasts",
         forecasts=bot_tournament_full.spot_forecasts,
     )
     save_tournament(
@@ -185,8 +186,49 @@ def save_tournament(
 def _save_specific_tournament_to_file(tournament_to_save: SimulatedTournament, save_path: str):
     modified_tournament = copy.deepcopy(tournament_to_save)
     modified_tournament.forecasts = []
-    with open(save_path, "w") as f:
-        f.write(modified_tournament.model_dump_json(indent=4))
+    SimulatedTournament.model_validate(modified_tournament)
+
+    try:
+        with open(save_path, "w") as f:
+            f.write(modified_tournament.model_dump_json(indent=4))
+    except Exception as original_error:
+        # Provide more detailed error information
+        logger.error(f"Failed to serialize tournament '{modified_tournament.name}' to JSON")
+        logger.error(f"Error type: {type(original_error).__name__}")
+        logger.error(f"Error message: {str(original_error)}")
+        logger.error(f"Number of scores: {len(modified_tournament.scores)}")
+        logger.error(f"Number of spot forecasts: {len(modified_tournament.spot_forecasts)}")
+        logger.error(f"Number of forecasts: {len(modified_tournament.forecasts)}")
+        logger.error(f"Number of questions: {len(modified_tournament.questions)}")
+        logger.error(f"Number of users: {len(modified_tournament.users)}")
+
+        for question in modified_tournament.questions:
+            try:
+                pydantic_json = question.model_dump_json()
+            except Exception as e:
+                logger.error(f"Failed to serialize question '{question.question_id}' to JSON")
+                logger.error(f"Error type: {type(e).__name__}")
+                logger.error(f"Error message: {str(e)}")
+
+        for forecast in modified_tournament.forecasts:
+            try:
+                pydantic_json = forecast.model_dump_json()
+            except Exception as e:
+                logger.error(f"Failed to serialize forecast '{forecast.id}' to JSON")
+                logger.error(f"Error type: {type(e).__name__}")
+                logger.error(f"Error message: {str(e)}")
+                logger.error(f"Forecast: {forecast}")
+
+        for score in modified_tournament.scores:
+            try:
+                pydantic_json = score.model_dump_json()
+            except Exception as e:
+                logger.error(f"Failed to serialize score '{score.id}' to JSON")
+                logger.error(f"Error type: {type(e).__name__}")
+                logger.error(f"Error message: {str(e)}")
+
+        raise original_error
+
 
 
 if __name__ == "__main__":
