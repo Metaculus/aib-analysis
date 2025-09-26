@@ -31,7 +31,8 @@ class Forecast(BaseModel):
     question: Question
     user: User
     prediction: ForecastType
-    prediction_time: datetime
+    prediction_time: datetime # Same as forecast start time
+    end_time: datetime | None
     _id: str | None = None
     model_config = ConfigDict(frozen=True)
 
