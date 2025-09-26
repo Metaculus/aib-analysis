@@ -78,6 +78,7 @@ def make_forecast(
         user=user,
         prediction=prediction,
         prediction_time=forecast_time,
+        end_time=None,
     )
 
 
@@ -117,6 +118,7 @@ def make_tournament() -> SimulatedTournament:
                 user=user,
                 prediction=prediction,
                 prediction_time=datetime(2024, 12, 1),
+                end_time=None,
             )
             forecasts.append(forecast)
     tournament = SimulatedTournament(forecasts=forecasts)

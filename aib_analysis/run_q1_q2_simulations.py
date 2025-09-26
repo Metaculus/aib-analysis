@@ -34,7 +34,7 @@ def main(pro_path: str, bot_path: str, quarterly_cup_path: str | None, output_fo
 
     bot_tournament_full = grab_tournament_data(bot_path, UserType.BOT, "Bot Tournament Full")
     bot_tournament = SimulatedTournament(
-        name="Bot Tournament - Only spot forecasts",
+        name="Bot Tournament (Only spot forecasts)",
         forecasts=bot_tournament_full.spot_forecasts,
     )
     save_tournament(

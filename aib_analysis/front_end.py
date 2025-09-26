@@ -14,6 +14,7 @@ from aib_analysis.data_structures.simulated_tournament import (
 from aib_analysis.main_logic.visualize_tournament import (
     display_bot_v_pro_hypothesis_test,
     display_individual_tournament,
+    display_unique_questions,
 )
 from conftest import initialize_logging
 
@@ -48,7 +49,7 @@ def main(tournaments_folder: str):
     selected_group_number = int(selected_group.split()[-1])
 
     # Display tournaments for the selected group
-    files = files_grouped_by_first_number[selected_group_number]
+    files: list[str] = files_grouped_by_first_number[selected_group_number]
     for file in files:
         logger.info(f"Displaying tournament {file}")
         if file.endswith(".json"):
@@ -57,6 +58,10 @@ def main(tournaments_folder: str):
             if file in hypothesis_test_tourns:
                 display_bot_v_pro_hypothesis_test(tournament, f"Hypothesis test for {tournament_name}")
             display_individual_tournament(tournament, tournament_name)
+
+            if file == "7_pro_vs_bot_tournament__teams.json":
+                comparison_tournament = grab_tournament_data(tournaments_folder, "1_pro_tournament.json")
+                display_unique_questions(comparison_tournament, tournament)
 
     st.write("---")
     st.info("Contact ben [at] metaculus [.com] with any questions about this data")
