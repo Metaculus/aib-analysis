@@ -22,9 +22,45 @@ logger = logging.getLogger(__name__)
 
 
 class SimulatedTournament(BaseModel):
+    """
+    This class is used to simulate a tournament.
+
+    You can initialize with a series of scores or forecasts (not both), and
+    it will fill in all the other properties for you on initialization
+    (including scores)
+    """
     name: str | None = None
     forecasts: list[Forecast] = Field(default_factory=list)
     scores_cache: dict[str, Score] = Field(default_factory=dict) # score_id -> Score
+
+    @model_validator(mode="after")
+    def initialize_tournament(self) -> Self:
+        logger.info(f"Initializing tournament {self.name}")
+
+        if len(self.scores_cache) > 0 and len(self.forecasts) == 0:
+            # TODO: There might be problems with this clause if not every forecast has a score
+            scores = list(self.scores_cache.values())
+            forecasts = [score.forecast for score in scores]
+            unique_forecasts = list(set(tuple(forecasts)))
+            self.forecasts = unique_forecasts
+
+        self._remove_log_scale_questions()
+        self._initialize_spot_forecast_cache()
+        self._initialize_user_and_question_caches()
+        if len(self.scores_cache) == 0:
+            self._initialize_scores_cache()
+
+        logger.info(
+            f"Finished initializing scoring caches for {len(self.scores)} scores"
+        )
+
+        self._validate_no_duplicate_questions()
+        self._validate_one_user_question_per_spot_score()
+        self._validate_num_scores_match_num_spot_forecasts()
+
+        self._log_if_less_than_half_users_forecasted()
+        self._log_if_weights_are_too_low()
+        return self
 
     @property
     def users(self) -> list[User]:
@@ -122,35 +158,6 @@ class SimulatedTournament(BaseModel):
         ]
         assert len(scores) == 1, "Expected exactly for question for user if spot score"
         return scores[0]
-
-    @model_validator(mode="after")
-    def initialize_tournament(self) -> Self:
-        logger.info(f"Initializing tournament {self.name}")
-
-        if len(self.scores_cache) > 0 and len(self.forecasts) == 0:
-            # TODO: There might be problems with this clause if not every forecast has a score
-            scores = list(self.scores_cache.values())
-            forecasts = [score.forecast for score in scores]
-            unique_forecasts = list(set(tuple(forecasts)))
-            self.forecasts = unique_forecasts
-
-        self._remove_log_scale_questions()
-        self._initialize_spot_forecast_cache()
-        self._initialize_user_and_question_caches()
-        if len(self.scores_cache) == 0:
-            self._initialize_scores_cache()
-
-        logger.info(
-            f"Finished initializing scoring caches for {len(self.scores)} scores"
-        )
-
-        self._validate_no_duplicate_questions()
-        self._validate_one_user_question_per_spot_score()
-        self._validate_num_scores_match_num_spot_forecasts()
-
-        self._log_if_less_than_half_users_forecasted()
-        self._log_if_weights_are_too_low()
-        return self
 
     def _remove_log_scale_questions(self) -> None:
         non_log_scale_forecasts = [
