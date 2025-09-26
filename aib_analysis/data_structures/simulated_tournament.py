@@ -171,6 +171,8 @@ class SimulatedTournament(BaseModel):
             spot_time = question.spot_scoring_time
             if forecast.prediction_time >= spot_time:
                 continue
+            if forecast.end_time and forecast.end_time < spot_time:
+                continue
             key = (user_name, question.question_id)
             current = spot_forecasts.get(key)
             if current is None or forecast.prediction_time > current.prediction_time:

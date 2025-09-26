@@ -1,6 +1,5 @@
-import logging
-from datetime import datetime
 import ast
+import logging
 
 import pandas as pd
 
@@ -13,7 +12,9 @@ from aib_analysis.data_structures.data_models import (
     User,
     UserType,
 )
-from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
+from aib_analysis.data_structures.simulated_tournament import (
+    SimulatedTournament,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -125,11 +126,18 @@ def _parse_forecast_row(
             aggregated_users=[],
         )
         user_cache[username] = user
+
+    try:
+        end_time = pd.to_datetime(row["forecast_endtime"])
+    except KeyError:
+        end_time = None
+
     forecast = Forecast(
         question=question,
         user=user,
         prediction=prediction,
         prediction_time=pd.to_datetime(row["forecast_timestamp"]),
+        end_time=end_time,
     )
     return forecast, question, user
 

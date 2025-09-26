@@ -1,4 +1,3 @@
--- Dataclip query for the data used in Q1 analysis
 SELECT
       f.id AS forecast_id,
       q.id AS question_id,
@@ -10,6 +9,7 @@ SELECT
       f.probability_yes_per_category,
       f.continuous_cdf,
       f.start_time AS forecast_timestamp,
+      f.end_time AS forecast_endtime,
       u.username AS forecaster,
       u.is_bot,
       q.resolution,
@@ -39,9 +39,11 @@ LEFT JOIN questions_question_post qp ON q.id = qp.question_id
 LEFT JOIN posts_post p ON p.id = qp.post_id
 LEFT JOIN projects_project pr ON p.default_project_id = pr.id
 WHERE q.title NOT ILIKE '%[practice]%'
-AND p.default_project_id = 32627 -- Q1 AIB BOT Tournament
--- AND p.default_project_id = 32631 -- Q1 AIB PRO Tournament
--- AND p.default_project_id = 32630 -- Q1 Quarterly Cup
+-- AND p.default_project_id = 32627 -- Q1 AIB BOT Tournament
+--AND p.default_project_id = 32631 -- Q1 AIB PRO Tournament
+--AND p.default_project_id = 32630 -- Q1 Quarterly Cup
+AND p.default_project_id = 32721 -- Q2 AIB BOT Tournament
+-- AND p.default_project_id = 32761 -- Q2 AIB PRO Tournament
 AND u.is_bot = true
 -- AND f.start_time < q.cp_reveal_time -- If for quarterly cup
 ORDER BY f.start_time DESC;
