@@ -7,7 +7,6 @@ from typing_extensions import Self
 
 from aib_analysis.data_structures.custom_types import (
     AnnulledAmbiguousResolutionType,
-    QuestionType,
 )
 from aib_analysis.data_structures.data_models import (
     Forecast,
