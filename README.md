@@ -36,7 +36,7 @@ To display the analysis please execute:
 poetry run streamlit run aib_analysis/front_end.py
 ```
 
-This will bring up the visuals for the analysis. Make sure you have chosen the right input data in this script.
+This will bring up the visuals for the analysis. Make sure you have chosen the right input data in this script. Front end uses caching, so restart streamlit if you update the underlying data.
 
 
 Make sure to restart the site or click "clear cache" in the triple dot menu on the site if you change the underlying data or simulated_tournament loading/intialization code.

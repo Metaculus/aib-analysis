@@ -527,7 +527,7 @@ def display_unique_questions(tournament_1: SimulatedTournament, tournament_2: Si
     t1_name = tournament_1.name if tournament_1.name else "First Tournament"
     t2_name = tournament_2.name if tournament_2.name else "Second Tournament"
 
-    st.subheader(f"Questions titles in {t1_name} but not in {t2_name}")
-    with st.expander(f"Questions titles in {t1_name} but not in {t2_name}"):
+    st.subheader(f"Questions titles in \"{t1_name}\" but not in \"{t2_name}\"")
+    with st.expander(f"Questions titles in \"{t1_name}\" but not in \"{t2_name}\""):
         unique_questions = find_question_titles_unique_to_first_tournament(tournament_1, tournament_2)
         display_questions(unique_questions, tournament_1)
