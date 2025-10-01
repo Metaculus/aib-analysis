@@ -340,7 +340,7 @@ class User(BaseModel):
 
     @property
     def is_metac_bot(self) -> bool:
-        return "metac-" in self.name.lower()
+        return "metac-" in self.name.lower() or "mf-bot-" in self.name.lower()
 
 
 class Leaderboard(BaseModel):

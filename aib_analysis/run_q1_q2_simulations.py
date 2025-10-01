@@ -30,7 +30,10 @@ logger = logging.getLogger(__name__)
 
 
 def main(
-    pro_path: str, bot_path: str, quarterly_cup_path: str | None, output_folder: str
+    pro_path: str,
+    bot_path: str,
+    quarterly_cup_path: str | None,
+    output_folder: str,
 ):
     initialize_logging()
     bot_team_size = 10
@@ -128,6 +131,7 @@ def main(
     )
 
     # ------------------- Control/comparison Bots -------------------
+    number_to_use = 99
     comparison_vs_bot__teams = create_team_tournament(
         pro_with_bot_tourn,
         pro_with_bot_tourn,
@@ -135,6 +139,12 @@ def main(
         team_2=bot_team_for_pro_comparison,
         aggregate_name_1="Comparison Team",
         aggregate_name_2="Bot Team",
+    )
+    save_tournament(
+        comparison_vs_bot__teams,
+        "comparison_vs_bot__teams.json",
+        folder=output_folder,
+        counter_override=number_to_use,
     )
     comparison_vs_pros__teams = create_team_tournament(
         pro_with_bot_tourn,
@@ -145,10 +155,19 @@ def main(
         aggregate_name_2="Pro Team",
     )
     save_tournament(
-        comparison_vs_bot__teams, "comparison_vs_bot__teams.json", folder=output_folder
+        comparison_vs_pros__teams,
+        "comparison_vs_pro__teams.json",
+        folder=output_folder,
+        counter_override=number_to_use,
+    )
+    combined_comparison_bot_pro_tournament = combine_tournaments(
+        comparison_vs_bot__teams, comparison_vs_pros__teams
     )
     save_tournament(
-        comparison_vs_pros__teams, "comparison_vs_pro__teams.json", folder=output_folder
+        combined_comparison_bot_pro_tournament,
+        "comparison_vs_bot_vs_pro__teams.json",
+        folder=output_folder,
+        counter_override=number_to_use,
     )
 
     # ------------------- Quarterly Cup -------------------
@@ -218,12 +237,17 @@ def save_tournament(
     file_name: str,
     divide_into_types: bool = False,
     folder: str = "local/cache/",
+    counter_override: int | None = None,
 ):
     global counter
-    counter += 1
+    if counter_override is None:
+        counter += 1
+        count_to_use = counter
+    else:
+        count_to_use = counter_override
     non_json_name = file_name.replace(".json", "")
-    save_path = f"{folder}{counter}_{non_json_name}"
-    logger.info(f"Saving tournament {counter} of {non_json_name}")
+    save_path = f"{folder}{count_to_use}_{non_json_name}"
+    logger.info(f"Saving tournament {count_to_use} of {non_json_name}")
     os.makedirs(folder, exist_ok=True)
 
     _save_specific_tournament_to_file(tournament_to_save, f"{save_path}.json")
@@ -305,12 +329,26 @@ def _save_specific_tournament_to_file(
 
 
 if __name__ == "__main__":
+    # main(
+    #     pro_path="local/private_input_data/pro_forecasts_q3.csv",
+    #     bot_path="local/private_input_data/bot_forecasts_q3.csv",
+    #     quarterly_cup_path=None,
+    #     output_folder="local/q3_2024_simulations/",
+    # )
+
     main(
-        pro_path="input_data/pro_forecasts_q1.csv",
-        bot_path="input_data/bot_forecasts_q1.csv",
-        quarterly_cup_path=None,  # "local/quarterly_cup_forecats_before_cp_reveal_time_q1.csv",
-        output_folder="local/q1_2025_simulations/",
+        pro_path="local/private_input_data/pro_forecasts_q4.csv",
+        bot_path="local/private_input_data/bot_forecasts_q4.csv",
+        quarterly_cup_path=None,
+        output_folder="local/q4_2024_simulations/",
     )
+
+    # main(
+    #     pro_path="input_data/pro_forecasts_q1.csv",
+    #     bot_path="input_data/bot_forecasts_q1.csv",
+    #     quarterly_cup_path=None,  # "local/quarterly_cup_forecats_before_cp_reveal_time_q1.csv",
+    #     output_folder="local/q1_2025_simulations/",
+    # )
 
     # main(
     #     pro_path="input_data/pro_forecasts_q2.csv",

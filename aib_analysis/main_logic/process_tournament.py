@@ -56,16 +56,13 @@ def combine_tournaments(
 
     combined_questions: list[Question] = tournament_1.questions + tournament_2.questions
 
-    # Check if any question titles overlap between tournaments
-    t1_titles = {q.question_text.lower().strip() for q in tournament_1.questions}
-    t2_titles = {q.question_text.lower().strip() for q in tournament_2.questions}
-    if not t1_titles & t2_titles:
-        raise ValueError("No overlapping question titles found between tournaments")
-
     matching_hash_mapping: dict[str, list[Question]] = {}
     for question in combined_questions:
         tournamnet_matching_hash = question.get_hash_for_tournament_matching()
         matching_hash_mapping.setdefault(tournamnet_matching_hash, []).append(question)
+
+    if not any(len(questions) > 1 for questions in matching_hash_mapping.values()):
+        raise ValueError("No matches found between tournaments")
 
     log_title_mapping_inconsistencies(tournament_1, tournament_2)
 
