@@ -39,11 +39,20 @@ LEFT JOIN questions_question_post qp ON q.id = qp.question_id
 LEFT JOIN posts_post p ON p.id = qp.post_id
 LEFT JOIN projects_project pr ON p.default_project_id = pr.id
 WHERE q.title NOT ILIKE '%[practice]%'
+
+-- AND p.default_project_id = 3349 -- Q3 AIB BOT Tournament
+-- AND p.default_project_id = 32506 -- Q4 AIB BOT Tournament
 -- AND p.default_project_id = 32627 -- Q1 AIB BOT Tournament
---AND p.default_project_id = 32631 -- Q1 AIB PRO Tournament
---AND p.default_project_id = 32630 -- Q1 Quarterly Cup
 AND p.default_project_id = 32721 -- Q2 AIB BOT Tournament
+-- AND p.default_project_id = 32813 -- Fall 2025 AIB BOT Tournament
+
+-- AND p.default_project_id = 3345 -- Q3 AIB PRO Tournament
+-- AND p.default_project_id = 3673 -- Q4 AIB PRO Tournament
+-- AND p.default_project_id = 32631 -- Q1 AIB PRO Tournament
 -- AND p.default_project_id = 32761 -- Q2 AIB PRO Tournament
+
+--AND p.default_project_id = 32630 -- Q1 Quarterly Cup
+
 AND u.is_bot = true
 -- AND f.start_time < q.cp_reveal_time -- If for quarterly cup
 ORDER BY f.start_time DESC;

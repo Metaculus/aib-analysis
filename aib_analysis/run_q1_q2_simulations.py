@@ -8,7 +8,11 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
 sys.path.append(top_level_dir)
 
-from aib_analysis.data_structures.data_models import QuestionType, UserType
+from aib_analysis.data_structures.data_models import (
+    QuestionType,
+    User,
+    UserType,
+)
 from aib_analysis.data_structures.simulated_tournament import (
     SimulatedTournament,
 )
@@ -25,14 +29,18 @@ from conftest import initialize_logging
 logger = logging.getLogger(__name__)
 
 
-def main(pro_path: str, bot_path: str, quarterly_cup_path: str | None, output_folder: str):
+def main(
+    pro_path: str, bot_path: str, quarterly_cup_path: str | None, output_folder: str
+):
     initialize_logging()
     bot_team_size = 10
 
     pro_tournament = grab_tournament_data(pro_path, UserType.PRO, "Pro Tournament")
     save_tournament(pro_tournament, "pro_tournament.json", folder=output_folder)
 
-    bot_tournament_full = grab_tournament_data(bot_path, UserType.BOT, "Bot Tournament Full")
+    bot_tournament_full = grab_tournament_data(
+        bot_path, UserType.BOT, "Bot Tournament Full"
+    )
     bot_tournament = SimulatedTournament(
         name="Bot Tournament (Only spot forecasts)",
         forecasts=bot_tournament_full.spot_forecasts,
@@ -43,6 +51,10 @@ def main(pro_path: str, bot_path: str, quarterly_cup_path: str | None, output_fo
         divide_into_types=True,
         folder=output_folder,
     )
+
+    comparison_bot_users = get_comparison_bot_users(
+        bot_tournament
+    )  # Do this early so we can error out if we don't have right comparison bot users
 
     bot_tournament_wo_pro_questions = smart_remove_questions_from_tournament(
         bot_tournament, pro_tournament.questions
@@ -96,13 +108,14 @@ def main(pro_path: str, bot_path: str, quarterly_cup_path: str | None, output_fo
         folder=output_folder,
     )
 
+    pro_team = pro_tournament.users
     bot_team_for_pro_comparison = get_best_forecasters_from_tournament(
         bot_tournament_wo_pro_questions, bot_team_size
     )
     pro_v_bot_tournament__teams = create_team_tournament(
         pro_tournament,
         bot_tournament,
-        team_1="all",
+        team_1=pro_team,
         team_2=bot_team_for_pro_comparison,
         aggregate_name_1="Pro Team",
         aggregate_name_2="Bot Team",
@@ -112,6 +125,30 @@ def main(pro_path: str, bot_path: str, quarterly_cup_path: str | None, output_fo
         "pro_vs_bot_tournament__teams.json",
         divide_into_types=True,
         folder=output_folder,
+    )
+
+    # ------------------- Control/comparison Bots -------------------
+    comparison_vs_bot__teams = create_team_tournament(
+        pro_with_bot_tourn,
+        pro_with_bot_tourn,
+        team_1=comparison_bot_users,
+        team_2=bot_team_for_pro_comparison,
+        aggregate_name_1="Comparison Team",
+        aggregate_name_2="Bot Team",
+    )
+    comparison_vs_pros__teams = create_team_tournament(
+        pro_with_bot_tourn,
+        pro_with_bot_tourn,
+        team_1=comparison_bot_users,
+        team_2=pro_team,
+        aggregate_name_1="Comparison Team",
+        aggregate_name_2="Pro Team",
+    )
+    save_tournament(
+        comparison_vs_bot__teams, "comparison_vs_bot__teams.json", folder=output_folder
+    )
+    save_tournament(
+        comparison_vs_pros__teams, "comparison_vs_pro__teams.json", folder=output_folder
     )
 
     # ------------------- Quarterly Cup -------------------
@@ -148,12 +185,34 @@ def main(pro_path: str, bot_path: str, quarterly_cup_path: str | None, output_fo
     save_tournament(cup_vs_bot_teams, "cup_vs_bot_teams.json", folder=output_folder)
 
 
+def get_comparison_bot_users(bot_tournament: SimulatedTournament) -> list[User]:
+    comparison_bot_names = [
+        "metac-gpt-4o+asknews",  # Q2 version of gpt-4o
+        "metac-claude-3-5-sonnet-20240620+asknews",  # Q2 version of claude 3.5 sonnet
+        "metac-gpt-4o",  # Q1 version of gpt-4o
+        "metac-claude-3-5-sonnet-20240620",  # Q1 version of claude 3.5 sonnet
+        "mf-bot-1",  # Q3/4 version of gpt-4o
+        "mf-bot-3",  # Q3/4 version of claude 3.5 sonnet
+        # "metac-claude-3-5-sonnet-latest+asknews", # Wasn't around in Q3
+    ]
+    comparison_bot_users = [
+        user for user in bot_tournament.users if user.name in comparison_bot_names
+    ]
+    assert (
+        len(comparison_bot_users) == 2
+    ), f"Expected 2 control bot users, got {len(comparison_bot_users)}"
+    return comparison_bot_users
+
+
 def grab_tournament_data(
     path: str, user_type: UserType, tournament_name: str
 ) -> SimulatedTournament:
     return load_tournament(path, user_type, tournament_name)
 
+
 counter = 0
+
+
 def save_tournament(
     tournament_to_save: SimulatedTournament,
     file_name: str,
@@ -179,11 +238,20 @@ def save_tournament(
         numeric_combined_tournament = constrain_question_types(
             tournament_to_save, [QuestionType.NUMERIC]
         )
-        _save_specific_tournament_to_file(binary_combined_tournament, f"{save_path}__binary.json")
-        _save_specific_tournament_to_file(multiple_choice_combined_tournament, f"{save_path}__multiple_choice.json")
-        _save_specific_tournament_to_file(numeric_combined_tournament, f"{save_path}__numeric.json")
+        _save_specific_tournament_to_file(
+            binary_combined_tournament, f"{save_path}__binary.json"
+        )
+        _save_specific_tournament_to_file(
+            multiple_choice_combined_tournament, f"{save_path}__multiple_choice.json"
+        )
+        _save_specific_tournament_to_file(
+            numeric_combined_tournament, f"{save_path}__numeric.json"
+        )
 
-def _save_specific_tournament_to_file(tournament_to_save: SimulatedTournament, save_path: str):
+
+def _save_specific_tournament_to_file(
+    tournament_to_save: SimulatedTournament, save_path: str
+):
     modified_tournament = copy.deepcopy(tournament_to_save)
     modified_tournament.forecasts = []
     SimulatedTournament.model_validate(modified_tournament)
@@ -193,11 +261,15 @@ def _save_specific_tournament_to_file(tournament_to_save: SimulatedTournament, s
             f.write(modified_tournament.model_dump_json(indent=4))
     except Exception as original_error:
         # Provide more detailed error information
-        logger.error(f"Failed to serialize tournament '{modified_tournament.name}' to JSON")
+        logger.error(
+            f"Failed to serialize tournament '{modified_tournament.name}' to JSON"
+        )
         logger.error(f"Error type: {type(original_error).__name__}")
         logger.error(f"Error message: {str(original_error)}")
         logger.error(f"Number of scores: {len(modified_tournament.scores)}")
-        logger.error(f"Number of spot forecasts: {len(modified_tournament.spot_forecasts)}")
+        logger.error(
+            f"Number of spot forecasts: {len(modified_tournament.spot_forecasts)}"
+        )
         logger.error(f"Number of forecasts: {len(modified_tournament.forecasts)}")
         logger.error(f"Number of questions: {len(modified_tournament.questions)}")
         logger.error(f"Number of users: {len(modified_tournament.users)}")
@@ -206,7 +278,9 @@ def _save_specific_tournament_to_file(tournament_to_save: SimulatedTournament, s
             try:
                 pydantic_json = question.model_dump_json()
             except Exception as e:
-                logger.error(f"Failed to serialize question '{question.question_id}' to JSON")
+                logger.error(
+                    f"Failed to serialize question '{question.question_id}' to JSON"
+                )
                 logger.error(f"Error type: {type(e).__name__}")
                 logger.error(f"Error message: {str(e)}")
 
@@ -230,18 +304,17 @@ def _save_specific_tournament_to_file(tournament_to_save: SimulatedTournament, s
         raise original_error
 
 
-
 if __name__ == "__main__":
-    # main(
-    #     pro_path="input_data/pro_forecasts_q1.csv",
-    #     bot_path="input_data/bot_forecasts_q1.csv",
-    #     quarterly_cup_path=None, # "local/quarterly_cup_forecats_before_cp_reveal_time_q1.csv",
-    #     output_folder="local/q1_2025_simulations/",
-    # )
-
     main(
-        pro_path="input_data/pro_forecasts_q2.csv",
-        bot_path="input_data/bot_forecasts_q2.csv",
-        quarterly_cup_path=None,
-        output_folder="local/q2_2025_simulations/",
+        pro_path="input_data/pro_forecasts_q1.csv",
+        bot_path="input_data/bot_forecasts_q1.csv",
+        quarterly_cup_path=None,  # "local/quarterly_cup_forecats_before_cp_reveal_time_q1.csv",
+        output_folder="local/q1_2025_simulations/",
     )
+
+    # main(
+    #     pro_path="input_data/pro_forecasts_q2.csv",
+    #     bot_path="input_data/bot_forecasts_q2.csv",
+    #     quarterly_cup_path=None,
+    #     output_folder="local/q2_2025_simulations/",
+    # )

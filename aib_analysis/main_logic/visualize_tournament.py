@@ -136,6 +136,7 @@ def display_tournament_stats(tournament: SimulatedTournament) -> None:
     )
 
     # Display statistics
+    st.write("*Note that if tournaments are loaded only from jsons with only scores, then all stats will not include questions/forecasts from annulled/ambiguous questions. Stats will be off since you cannot score annulled questions.*")
     st.write("### Basic Statistics")
     st.write(f"Number of forecasts: {num_forecasts}")
     st.write(f"Number of users: {num_users}")
