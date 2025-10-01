@@ -323,7 +323,16 @@ def create_team_tournament(
     team_2: list[User] | Literal["all"],
     aggregate_name_1: str,
     aggregate_name_2: str,
+    use_spot_scores: bool = True,
 ) -> SimulatedTournament:
+    """
+    Aggregates the forecasts of all users in each tournament.
+    Then creates a new set of questions/forecasts based on the overlap between the two tournaments.
+    Rescores the forecasts for this new set of questions/forecasts.
+    """
+    if not use_spot_scores:
+        raise NotImplementedError("Not implemented")
+
     if team_1 == "all":
         team_1 = tournament_1.users
     if team_2 == "all":
@@ -354,7 +363,9 @@ def create_team_tournament(
     t2_agg_tournament = SimulatedTournament(
         forecasts=t2_forecasts, name=f"{tournament_2.name} ({aggregate_name_2})"
     )
-    return combine_tournaments(t1_agg_tournament, t2_agg_tournament)
+
+    combined_tournament = combine_tournaments(t1_agg_tournament, t2_agg_tournament)
+    return combined_tournament
 
 
 class Bin(BaseModel):
