@@ -160,15 +160,6 @@ def main(
         folder=output_folder,
         counter_override=number_to_use,
     )
-    combined_comparison_bot_pro_tournament = combine_tournaments(
-        comparison_vs_bot__teams, comparison_vs_pros__teams
-    )
-    save_tournament(
-        combined_comparison_bot_pro_tournament,
-        "comparison_vs_bot_vs_pro__teams.json",
-        folder=output_folder,
-        counter_override=number_to_use,
-    )
 
     # ------------------- Quarterly Cup -------------------
     if quarterly_cup_path is None:
@@ -336,12 +327,12 @@ if __name__ == "__main__":
     #     output_folder="local/q3_2024_simulations/",
     # )
 
-    main(
-        pro_path="local/private_input_data/pro_forecasts_q4.csv",
-        bot_path="local/private_input_data/bot_forecasts_q4.csv",
-        quarterly_cup_path=None,
-        output_folder="local/q4_2024_simulations/",
-    )
+    # main(
+    #     pro_path="local/private_input_data/pro_forecasts_q4.csv",
+    #     bot_path="local/private_input_data/bot_forecasts_q4.csv",
+    #     quarterly_cup_path=None,
+    #     output_folder="local/q4_2024_simulations/",
+    # )
 
     # main(
     #     pro_path="input_data/pro_forecasts_q1.csv",
@@ -350,9 +341,9 @@ if __name__ == "__main__":
     #     output_folder="local/q1_2025_simulations/",
     # )
 
-    # main(
-    #     pro_path="input_data/pro_forecasts_q2.csv",
-    #     bot_path="input_data/bot_forecasts_q2.csv",
-    #     quarterly_cup_path=None,
-    #     output_folder="local/q2_2025_simulations/",
-    # )
+    main(
+        pro_path="input_data/pro_forecasts_q2.csv",
+        bot_path="input_data/bot_forecasts_q2.csv",
+        quarterly_cup_path=None,
+        output_folder="local/q2_2025_simulations/",
+    )
