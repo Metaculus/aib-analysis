@@ -29,8 +29,8 @@ def main(tournaments_folder: str):
     all_files_in_folder.sort()
     files_grouped_by_first_number = {}
     for file in all_files_in_folder:
-        first_character = file[0]
-        first_number = int(first_character)
+        first_number = file.split("_")[0]
+        first_number = int(first_number)
         files_grouped_by_first_number.setdefault(first_number, []).append(file)
 
     with st.expander("Groups"):
