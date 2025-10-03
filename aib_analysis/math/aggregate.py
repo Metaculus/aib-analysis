@@ -151,6 +151,7 @@ def aggregate_forecasts(
         user=aggregate_user,
         prediction=aggregated_forecast,
         prediction_time=forecasts[0].prediction_time,
+        end_time=None,
         forecasts_inputted=forecasts,
     )
 
