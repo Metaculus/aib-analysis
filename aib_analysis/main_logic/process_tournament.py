@@ -56,16 +56,13 @@ def combine_tournaments(
 
     combined_questions: list[Question] = tournament_1.questions + tournament_2.questions
 
-    # Check if any question titles overlap between tournaments
-    t1_titles = {q.question_text.lower().strip() for q in tournament_1.questions}
-    t2_titles = {q.question_text.lower().strip() for q in tournament_2.questions}
-    if not t1_titles & t2_titles:
-        raise ValueError("No overlapping question titles found between tournaments")
-
     matching_hash_mapping: dict[str, list[Question]] = {}
     for question in combined_questions:
         tournamnet_matching_hash = question.get_hash_for_tournament_matching()
         matching_hash_mapping.setdefault(tournamnet_matching_hash, []).append(question)
+
+    if not any(len(questions) > 1 for questions in matching_hash_mapping.values()):
+        raise ValueError("No matches found between tournaments")
 
     log_title_mapping_inconsistencies(tournament_1, tournament_2)
 
@@ -230,12 +227,17 @@ def _validate_and_pair_tournament_questions(
 
 def constrain_question_types(
     tournament: SimulatedTournament, question_types: list[QuestionType]
-) -> SimulatedTournament:
+) -> SimulatedTournament | None:
     filtered_forecasts = []
     for forecast in tournament.forecasts:
         if forecast.question.type in question_types:
             filtered_forecasts.append(forecast)
-    return SimulatedTournament(forecasts=filtered_forecasts, name=f"{tournament.name} ({', '.join([qt.name for qt in question_types])})")
+
+    if len(filtered_forecasts) == 0:
+        return None
+
+    final_tournament = SimulatedTournament(forecasts=filtered_forecasts, name=f"{tournament.name} ({', '.join([qt.name for qt in question_types])})")
+    return final_tournament
 
 
 def smart_remove_questions_from_tournament(
@@ -323,7 +325,16 @@ def create_team_tournament(
     team_2: list[User] | Literal["all"],
     aggregate_name_1: str,
     aggregate_name_2: str,
+    use_spot_scores: bool = True,
 ) -> SimulatedTournament:
+    """
+    Aggregates the forecasts of all users in each tournament.
+    Then creates a new set of questions/forecasts based on the overlap between the two tournaments.
+    Rescores the forecasts for this new set of questions/forecasts.
+    """
+    if not use_spot_scores:
+        raise NotImplementedError("Not implemented")
+
     if team_1 == "all":
         team_1 = tournament_1.users
     if team_2 == "all":
@@ -354,7 +365,9 @@ def create_team_tournament(
     t2_agg_tournament = SimulatedTournament(
         forecasts=t2_forecasts, name=f"{tournament_2.name} ({aggregate_name_2})"
     )
-    return combine_tournaments(t1_agg_tournament, t2_agg_tournament)
+
+    combined_tournament = combine_tournaments(t1_agg_tournament, t2_agg_tournament)
+    return combined_tournament
 
 
 class Bin(BaseModel):

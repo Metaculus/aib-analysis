@@ -31,7 +31,8 @@ class Forecast(BaseModel):
     question: Question
     user: User
     prediction: ForecastType
-    prediction_time: datetime
+    prediction_time: datetime # Same as forecast start time
+    end_time: datetime | None = None
     _id: str | None = None
     model_config = ConfigDict(frozen=True)
 
@@ -42,7 +43,7 @@ class Forecast(BaseModel):
             id += f"Q{self.question.question_id}_"
             id += f"F{self.prediction_time.strftime('%Y-%m-%d_%H-%M-%S_%f')}_"
             if self.prediction:
-                id += f"P{sum(self.prediction)}"
+                id += f"P{round(sum(self.prediction), 3)}"
             else:
                 id += f"P{None}"
             self._id = id
@@ -67,7 +68,6 @@ class Forecast(BaseModel):
             score=score_value,
             type=ScoreType.SPOT_BASELINE,
             forecast=self,
-            users_used_in_scoring=None,
         )
 
     def get_spot_peer_score(
@@ -95,7 +95,6 @@ class Forecast(BaseModel):
             score=score_value,
             type=ScoreType.SPOT_PEER,
             forecast=self,
-            users_used_in_scoring=[f.user for f in other_users_forecasts],
         )
 
     def _error_if_need_zero_point(self) -> None:
@@ -151,7 +150,7 @@ class Forecast(BaseModel):
             self.id,
             self.question.question_id,
             self.user.name,
-            self.prediction,
+            tuple(self.prediction) if self.prediction is not None else None,
             self.prediction_time,
         )
         return hash(hash_tuple)
@@ -161,7 +160,6 @@ class Score(BaseModel):
     score: float
     type: ScoreType
     forecast: Forecast
-    users_used_in_scoring: list[User] | None  # Empty if baseline
     model_config = ConfigDict(frozen=True)
 
     @property
@@ -342,7 +340,7 @@ class User(BaseModel):
 
     @property
     def is_metac_bot(self) -> bool:
-        return "metac-" in self.name.lower()
+        return "metac-" in self.name.lower() or "mf-bot-" in self.name.lower()
 
 
 class Leaderboard(BaseModel):

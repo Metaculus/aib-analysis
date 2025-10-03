@@ -8,5 +8,5 @@ sys.path.append(top_level_dir)
 from aib_analysis.front_end import main
 
 if __name__ == "__main__":
-    tournament_path = "local/q1_2025_simulations/"
+    tournament_path = "local/quarterly_overview/"
     main(tournament_path)

@@ -15,40 +15,39 @@ from aib_analysis.data_structures.data_models import (
 from aib_analysis.data_structures.simulated_tournament import (
     SimulatedTournament,
 )
-from aib_analysis.math.stats import MeanHypothesisCalculator
-from aib_analysis.process_tournament import (
+from aib_analysis.main_logic.process_tournament import (
     calculate_calibration_curve,
     constrain_question_types,
     find_question_titles_unique_to_first_tournament,
     get_leaderboard,
 )
+from aib_analysis.math.stats import MeanHypothesisCalculator
 
 logger = logging.getLogger(__name__)
-
 
 def display_tournament_and_variations(
     tournament: SimulatedTournament, name: str, divide_into_types: bool = False
 ):
-    _display_individual_tournament(tournament, name)
+    display_individual_tournament(tournament, name)
     if divide_into_types:
         binary_combined_tournament = constrain_question_types(
             tournament, [QuestionType.BINARY]
         )
-        _display_individual_tournament(binary_combined_tournament, f"{name} (Binary)")
+        display_individual_tournament(binary_combined_tournament, f"{name} (Binary)")
         multiple_choice_combined_tournament = constrain_question_types(
             tournament, [QuestionType.MULTIPLE_CHOICE]
         )
-        _display_individual_tournament(
+        display_individual_tournament(
             multiple_choice_combined_tournament, f"{name} (Multiple Choice)"
         )
         numeric_combined_tournament = constrain_question_types(
             tournament, [QuestionType.NUMERIC]
         )
-        _display_individual_tournament(numeric_combined_tournament, f"{name} (Numeric)")
+        display_individual_tournament(numeric_combined_tournament, f"{name} (Numeric)")
 
 
-def _display_individual_tournament(tournament: SimulatedTournament, name: str):
-    st.subheader(f"{name} Tournament")
+def display_individual_tournament(tournament: SimulatedTournament, name: str):
+    st.subheader(f"{name}")
 
     # Display tournament statistics
     with st.expander(f"{name} Spot Peer Leaderboard"):
@@ -137,6 +136,7 @@ def display_tournament_stats(tournament: SimulatedTournament) -> None:
     )
 
     # Display statistics
+    st.write("*Note that if tournaments are loaded only from jsons with only scores, then all stats will not include questions/forecasts from annulled/ambiguous questions. Stats will be off since you cannot score annulled questions.*")
     st.write("### Basic Statistics")
     st.write(f"Number of forecasts: {num_forecasts}")
     st.write(f"Number of users: {num_users}")
@@ -528,7 +528,7 @@ def display_unique_questions(tournament_1: SimulatedTournament, tournament_2: Si
     t1_name = tournament_1.name if tournament_1.name else "First Tournament"
     t2_name = tournament_2.name if tournament_2.name else "Second Tournament"
 
-    st.subheader(f"Questions titles in {t1_name} but not in {t2_name}")
-    with st.expander(f"Questions titles in {t1_name} but not in {t2_name}"):
+    st.subheader(f"Questions titles in \"{t1_name}\" but not in \"{t2_name}\"")
+    with st.expander(f"Questions titles in \"{t1_name}\" but not in \"{t2_name}\""):
         unique_questions = find_question_titles_unique_to_first_tournament(tournament_1, tournament_2)
         display_questions(unique_questions, tournament_1)

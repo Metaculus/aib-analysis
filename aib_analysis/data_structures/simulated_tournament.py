@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import logging
 
-from pydantic import BaseModel, PrivateAttr, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, model_validator
 from typing_extensions import Self
 
 from aib_analysis.data_structures.custom_types import (
     AnnulledAmbiguousResolutionType,
-    QuestionType,
 )
 from aib_analysis.data_structures.data_models import (
     Forecast,
@@ -22,8 +21,45 @@ logger = logging.getLogger(__name__)
 
 
 class SimulatedTournament(BaseModel):
+    """
+    This class is used to simulate a tournament.
+
+    You can initialize with a series of scores or forecasts (not both), and
+    it will fill in all the other properties for you on initialization
+    (including scores)
+    """
     name: str | None = None
-    forecasts: list[Forecast]
+    forecasts: list[Forecast] = Field(default_factory=list)
+    scores_cache: dict[str, Score] = Field(default_factory=dict) # score_id -> Score
+
+    @model_validator(mode="after")
+    def initialize_tournament(self) -> Self:
+        logger.info(f"Initializing tournament {self.name}")
+
+        if len(self.scores_cache) > 0 and len(self.forecasts) == 0:
+            # TODO: There might be problems with this clause if not every forecast has a score
+            scores = list(self.scores_cache.values())
+            forecasts = [score.forecast for score in scores]
+            unique_forecasts = list(set(tuple(forecasts)))
+            self.forecasts = unique_forecasts
+
+        self._remove_log_scale_questions()
+        self._initialize_spot_forecast_cache()
+        self._initialize_user_and_question_caches()
+        if len(self.scores_cache) == 0:
+            self._initialize_scores_cache()
+
+        logger.info(
+            f"Finished initializing scoring caches for {len(self.scores)} scores"
+        )
+
+        self._validate_no_duplicate_questions()
+        self._validate_one_user_question_per_spot_score()
+        self._validate_num_scores_match_num_spot_forecasts()
+
+        self._log_if_less_than_half_users_forecasted()
+        self._log_if_weights_are_too_low()
+        return self
 
     @property
     def users(self) -> list[User]:
@@ -37,8 +73,8 @@ class SimulatedTournament(BaseModel):
 
     @property
     def scores(self) -> list[Score]:
-        assert self._scores_cache is not None, "Scores cache is not initialized"
-        return list(self._scores_cache.values())
+        assert self.scores_cache is not None, "Scores cache is not initialized"
+        return list(self.scores_cache.values())
 
     @property
     def spot_forecasts(self) -> list[Forecast]:
@@ -52,7 +88,6 @@ class SimulatedTournament(BaseModel):
 
     _user_cache: dict[str, User] = PrivateAttr(default_factory=dict) # user_name -> User
     _question_cache: dict[int, Question] = PrivateAttr(default_factory=dict) # question_id -> Question
-    _scores_cache: dict[str, Score] = PrivateAttr(default_factory=dict) # score_id -> Score
 
     _spot_forecasts_cache: dict[str, Forecast] = PrivateAttr(default_factory=dict) # forecast_id -> Forecast
     _question_to_spot_forecasts_cache: dict[int, list[Forecast]] = PrivateAttr(
@@ -123,26 +158,6 @@ class SimulatedTournament(BaseModel):
         assert len(scores) == 1, "Expected exactly for question for user if spot score"
         return scores[0]
 
-    @model_validator(mode="after")
-    def initialize_tournament(self) -> Self:
-        logger.info(f"Initializing tournament {self.name}")
-        self._remove_log_scale_questions()
-        self._initialize_spot_forecast_cache()
-        self._initialize_user_and_question_caches()
-        self._initialize_scores_cache()
-
-        logger.info(
-            f"Finished initializing scoring caches for {len(self.scores)} scores"
-        )
-
-        self._validate_no_duplicate_questions()
-        self._validate_one_user_question_per_spot_score()
-        self._validate_num_scores_match_num_spot_forecasts()
-
-        self._log_if_less_than_half_users_forecasted()
-        self._log_if_weights_are_too_low()
-        return self
-
     def _remove_log_scale_questions(self) -> None:
         non_log_scale_forecasts = [
             forecast
@@ -161,6 +176,8 @@ class SimulatedTournament(BaseModel):
             user_name = forecast.user.name
             spot_time = question.spot_scoring_time
             if forecast.prediction_time >= spot_time:
+                continue
+            if forecast.end_time and forecast.end_time < spot_time:
                 continue
             key = (user_name, question.question_id)
             current = spot_forecasts.get(key)
@@ -194,7 +211,7 @@ class SimulatedTournament(BaseModel):
                 continue
             new_scores = self._calculate_spot_scores_for_forecast(forecast)
             all_scores.extend(new_scores)
-        self._scores_cache = {score.id: score for score in all_scores}
+        self.scores_cache = {score.id: score for score in all_scores}
 
     def _calculate_spot_scores_for_forecast(
         self, forecast_to_score: Forecast
