@@ -247,21 +247,28 @@ def save_tournament(
         binary_combined_tournament = constrain_question_types(
             tournament_to_save, [QuestionType.BINARY]
         )
+
+        if binary_combined_tournament is not None:
+            _save_specific_tournament_to_file(
+                binary_combined_tournament, f"{save_path}__binary.json"
+            )
+
         multiple_choice_combined_tournament = constrain_question_types(
             tournament_to_save, [QuestionType.MULTIPLE_CHOICE]
         )
+
+        if multiple_choice_combined_tournament is not None:
+            _save_specific_tournament_to_file(
+                multiple_choice_combined_tournament, f"{save_path}__multiple_choice.json"
+            )
+
         numeric_combined_tournament = constrain_question_types(
             tournament_to_save, [QuestionType.NUMERIC]
         )
-        _save_specific_tournament_to_file(
-            binary_combined_tournament, f"{save_path}__binary.json"
-        )
-        _save_specific_tournament_to_file(
-            multiple_choice_combined_tournament, f"{save_path}__multiple_choice.json"
-        )
-        _save_specific_tournament_to_file(
-            numeric_combined_tournament, f"{save_path}__numeric.json"
-        )
+        if numeric_combined_tournament is not None:
+            _save_specific_tournament_to_file(
+                numeric_combined_tournament, f"{save_path}__numeric.json"
+            )
 
 
 def _save_specific_tournament_to_file(
@@ -320,12 +327,12 @@ def _save_specific_tournament_to_file(
 
 
 if __name__ == "__main__":
-    # main(
-    #     pro_path="local/private_input_data/pro_forecasts_q3.csv",
-    #     bot_path="local/private_input_data/bot_forecasts_q3.csv",
-    #     quarterly_cup_path=None,
-    #     output_folder="local/q3_2024_simulations/",
-    # )
+    main(
+        pro_path="local/private_input_data/pro_forecasts_q3.csv",
+        bot_path="local/private_input_data/bot_forecasts_q3.csv",
+        quarterly_cup_path=None,
+        output_folder="local/q3_2024_simulations/",
+    )
 
     # main(
     #     pro_path="local/private_input_data/pro_forecasts_q4.csv",
@@ -341,9 +348,9 @@ if __name__ == "__main__":
     #     output_folder="local/q1_2025_simulations/",
     # )
 
-    main(
-        pro_path="input_data/pro_forecasts_q2.csv",
-        bot_path="input_data/bot_forecasts_q2.csv",
-        quarterly_cup_path=None,
-        output_folder="local/q2_2025_simulations/",
-    )
+    # main(
+    #     pro_path="input_data/pro_forecasts_q2.csv",
+    #     bot_path="input_data/bot_forecasts_q2.csv",
+    #     quarterly_cup_path=None,
+    #     output_folder="local/q2_2025_simulations/",
+    # )
