@@ -227,12 +227,17 @@ def _validate_and_pair_tournament_questions(
 
 def constrain_question_types(
     tournament: SimulatedTournament, question_types: list[QuestionType]
-) -> SimulatedTournament:
+) -> SimulatedTournament | None:
     filtered_forecasts = []
     for forecast in tournament.forecasts:
         if forecast.question.type in question_types:
             filtered_forecasts.append(forecast)
-    return SimulatedTournament(forecasts=filtered_forecasts, name=f"{tournament.name} ({', '.join([qt.name for qt in question_types])})")
+
+    if len(filtered_forecasts) == 0:
+        return None
+
+    final_tournament = SimulatedTournament(forecasts=filtered_forecasts, name=f"{tournament.name} ({', '.join([qt.name for qt in question_types])})")
+    return final_tournament
 
 
 def smart_remove_questions_from_tournament(
