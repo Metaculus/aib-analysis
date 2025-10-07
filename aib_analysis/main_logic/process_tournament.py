@@ -1,4 +1,6 @@
+import copy
 import logging
+import os
 from datetime import timedelta, timezone
 from typing import Literal
 
@@ -236,7 +238,10 @@ def constrain_question_types(
     if len(filtered_forecasts) == 0:
         return None
 
-    final_tournament = SimulatedTournament(forecasts=filtered_forecasts, name=f"{tournament.name} ({', '.join([qt.name for qt in question_types])})")
+    final_tournament = SimulatedTournament(
+        forecasts=filtered_forecasts,
+        name=f"{tournament.name} ({', '.join([qt.name for qt in question_types])})",
+    )
     return final_tournament
 
 
@@ -274,11 +279,15 @@ def smart_remove_questions_from_tournament(
     initial_questions_count = len(tournament.questions)
     num_questions_removed = initial_questions_count - len(final_questions_to_include)
     if num_questions_removed != len(questions_to_exclude):
-        logger.warning(f"{len(questions_to_exclude)} questions were supposed to be removed from tournament. Instead, {num_questions_removed} removals were made.")
+        logger.warning(
+            f"{len(questions_to_exclude)} questions were supposed to be removed from tournament. Instead, {num_questions_removed} removals were made."
+        )
 
     for matches_with_current_question in all_matches_in_current_tournament:
         if len(matches_with_current_question) > 1:
-            logger.warning(f"Question {current_question.url} has multiple matches with questions to exclude: {matches_with_current_question}")
+            logger.warning(
+                f"Question {current_question.url} has multiple matches with questions to exclude: {matches_with_current_question}"
+            )
 
     filtered_forecasts = [
         forecast
@@ -463,3 +472,110 @@ def find_question_titles_unique_to_first_tournament(
     return [
         q for q in tournament_1.questions if q.question_text not in question_titles_2
     ]
+
+
+counter = 0
+
+
+def save_tournament(
+    tournament_to_save: SimulatedTournament,
+    file_name: str,
+    divide_into_types: bool = False,
+    folder: str = "local/cache/",
+    counter_override: int | None = None,
+):
+    global counter
+    if counter_override is None:
+        counter += 1
+        count_to_use = counter
+    else:
+        count_to_use = counter_override
+    non_json_name = file_name.replace(".json", "")
+    save_path = f"{folder}{count_to_use}_{non_json_name}"
+    logger.info(f"Saving tournament {count_to_use} of {non_json_name}")
+    os.makedirs(folder, exist_ok=True)
+
+    _save_specific_tournament_to_file(tournament_to_save, f"{save_path}.json")
+
+    if divide_into_types:
+        binary_combined_tournament = constrain_question_types(
+            tournament_to_save, [QuestionType.BINARY]
+        )
+
+        if binary_combined_tournament is not None:
+            _save_specific_tournament_to_file(
+                binary_combined_tournament, f"{save_path}__binary.json"
+            )
+
+        multiple_choice_combined_tournament = constrain_question_types(
+            tournament_to_save, [QuestionType.MULTIPLE_CHOICE]
+        )
+
+        if multiple_choice_combined_tournament is not None:
+            _save_specific_tournament_to_file(
+                multiple_choice_combined_tournament,
+                f"{save_path}__multiple_choice.json",
+            )
+
+        numeric_combined_tournament = constrain_question_types(
+            tournament_to_save, [QuestionType.NUMERIC]
+        )
+        if numeric_combined_tournament is not None:
+            _save_specific_tournament_to_file(
+                numeric_combined_tournament, f"{save_path}__numeric.json"
+            )
+
+
+def _save_specific_tournament_to_file(
+    tournament_to_save: SimulatedTournament, save_path: str
+):
+    modified_tournament = copy.deepcopy(tournament_to_save)
+    modified_tournament.forecasts = []
+    SimulatedTournament.model_validate(modified_tournament)
+
+    try:
+        with open(save_path, "w") as f:
+            f.write(modified_tournament.model_dump_json(indent=4))
+    except Exception as original_error:
+        # Provide more detailed error information
+        logger.error(
+            f"Failed to serialize tournament '{modified_tournament.name}' to JSON"
+        )
+        logger.error(f"Error type: {type(original_error).__name__}")
+        logger.error(f"Error message: {str(original_error)}")
+        logger.error(f"Number of scores: {len(modified_tournament.scores)}")
+        logger.error(
+            f"Number of spot forecasts: {len(modified_tournament.spot_forecasts)}"
+        )
+        logger.error(f"Number of forecasts: {len(modified_tournament.forecasts)}")
+        logger.error(f"Number of questions: {len(modified_tournament.questions)}")
+        logger.error(f"Number of users: {len(modified_tournament.users)}")
+
+        for question in modified_tournament.questions:
+            try:
+                pydantic_json = question.model_dump_json()
+            except Exception as e:
+                logger.error(
+                    f"Failed to serialize question '{question.question_id}' to JSON"
+                )
+                logger.error(f"Error type: {type(e).__name__}")
+                logger.error(f"Error message: {str(e)}")
+
+        for forecast in modified_tournament.forecasts:
+            try:
+                pydantic_json = forecast.model_dump_json()
+            except Exception as e:
+                logger.error(f"Failed to serialize forecast '{forecast.id}' to JSON")
+                logger.error(f"Error type: {type(e).__name__}")
+                logger.error(f"Error message: {str(e)}")
+                logger.error(f"Forecast: {forecast}")
+
+        for score in modified_tournament.scores:
+            try:
+                pydantic_json = score.model_dump_json()
+            except Exception as e:
+                logger.error(f"Failed to serialize score '{score.id}' to JSON")
+                logger.error(f"Error type: {type(e).__name__}")
+                logger.error(f"Error message: {str(e)}")
+
+        raise original_error

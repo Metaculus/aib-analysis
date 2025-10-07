@@ -19,9 +19,9 @@ from aib_analysis.data_structures.simulated_tournament import (
 from aib_analysis.main_logic.load_tournament import load_tournament
 from aib_analysis.main_logic.process_tournament import (
     combine_tournaments,
-    constrain_question_types,
     create_team_tournament,
     get_best_forecasters_from_tournament,
+    save_tournament,
     smart_remove_questions_from_tournament,
 )
 from conftest import initialize_logging
@@ -219,111 +219,6 @@ def grab_tournament_data(
 ) -> SimulatedTournament:
     return load_tournament(path, user_type, tournament_name)
 
-
-counter = 0
-
-
-def save_tournament(
-    tournament_to_save: SimulatedTournament,
-    file_name: str,
-    divide_into_types: bool = False,
-    folder: str = "local/cache/",
-    counter_override: int | None = None,
-):
-    global counter
-    if counter_override is None:
-        counter += 1
-        count_to_use = counter
-    else:
-        count_to_use = counter_override
-    non_json_name = file_name.replace(".json", "")
-    save_path = f"{folder}{count_to_use}_{non_json_name}"
-    logger.info(f"Saving tournament {count_to_use} of {non_json_name}")
-    os.makedirs(folder, exist_ok=True)
-
-    _save_specific_tournament_to_file(tournament_to_save, f"{save_path}.json")
-
-    if divide_into_types:
-        binary_combined_tournament = constrain_question_types(
-            tournament_to_save, [QuestionType.BINARY]
-        )
-
-        if binary_combined_tournament is not None:
-            _save_specific_tournament_to_file(
-                binary_combined_tournament, f"{save_path}__binary.json"
-            )
-
-        multiple_choice_combined_tournament = constrain_question_types(
-            tournament_to_save, [QuestionType.MULTIPLE_CHOICE]
-        )
-
-        if multiple_choice_combined_tournament is not None:
-            _save_specific_tournament_to_file(
-                multiple_choice_combined_tournament, f"{save_path}__multiple_choice.json"
-            )
-
-        numeric_combined_tournament = constrain_question_types(
-            tournament_to_save, [QuestionType.NUMERIC]
-        )
-        if numeric_combined_tournament is not None:
-            _save_specific_tournament_to_file(
-                numeric_combined_tournament, f"{save_path}__numeric.json"
-            )
-
-
-def _save_specific_tournament_to_file(
-    tournament_to_save: SimulatedTournament, save_path: str
-):
-    modified_tournament = copy.deepcopy(tournament_to_save)
-    modified_tournament.forecasts = []
-    SimulatedTournament.model_validate(modified_tournament)
-
-    try:
-        with open(save_path, "w") as f:
-            f.write(modified_tournament.model_dump_json(indent=4))
-    except Exception as original_error:
-        # Provide more detailed error information
-        logger.error(
-            f"Failed to serialize tournament '{modified_tournament.name}' to JSON"
-        )
-        logger.error(f"Error type: {type(original_error).__name__}")
-        logger.error(f"Error message: {str(original_error)}")
-        logger.error(f"Number of scores: {len(modified_tournament.scores)}")
-        logger.error(
-            f"Number of spot forecasts: {len(modified_tournament.spot_forecasts)}"
-        )
-        logger.error(f"Number of forecasts: {len(modified_tournament.forecasts)}")
-        logger.error(f"Number of questions: {len(modified_tournament.questions)}")
-        logger.error(f"Number of users: {len(modified_tournament.users)}")
-
-        for question in modified_tournament.questions:
-            try:
-                pydantic_json = question.model_dump_json()
-            except Exception as e:
-                logger.error(
-                    f"Failed to serialize question '{question.question_id}' to JSON"
-                )
-                logger.error(f"Error type: {type(e).__name__}")
-                logger.error(f"Error message: {str(e)}")
-
-        for forecast in modified_tournament.forecasts:
-            try:
-                pydantic_json = forecast.model_dump_json()
-            except Exception as e:
-                logger.error(f"Failed to serialize forecast '{forecast.id}' to JSON")
-                logger.error(f"Error type: {type(e).__name__}")
-                logger.error(f"Error message: {str(e)}")
-                logger.error(f"Forecast: {forecast}")
-
-        for score in modified_tournament.scores:
-            try:
-                pydantic_json = score.model_dump_json()
-            except Exception as e:
-                logger.error(f"Failed to serialize score '{score.id}' to JSON")
-                logger.error(f"Error type: {type(e).__name__}")
-                logger.error(f"Error message: {str(e)}")
-
-        raise original_error
 
 
 if __name__ == "__main__":
