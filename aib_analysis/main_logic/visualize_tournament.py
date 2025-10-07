@@ -25,6 +25,7 @@ from aib_analysis.math.stats import MeanHypothesisCalculator
 
 logger = logging.getLogger(__name__)
 
+
 def display_tournament_and_variations(
     tournament: SimulatedTournament, name: str, divide_into_types: bool = False
 ):
@@ -33,17 +34,24 @@ def display_tournament_and_variations(
         binary_combined_tournament = constrain_question_types(
             tournament, [QuestionType.BINARY]
         )
-        display_individual_tournament(binary_combined_tournament, f"{name} (Binary)")
+        if binary_combined_tournament is not None:
+            display_individual_tournament(
+                binary_combined_tournament, f"{name} (Binary)"
+            )
         multiple_choice_combined_tournament = constrain_question_types(
             tournament, [QuestionType.MULTIPLE_CHOICE]
         )
-        display_individual_tournament(
-            multiple_choice_combined_tournament, f"{name} (Multiple Choice)"
-        )
+        if multiple_choice_combined_tournament is not None:
+            display_individual_tournament(
+                multiple_choice_combined_tournament, f"{name} (Multiple Choice)"
+            )
         numeric_combined_tournament = constrain_question_types(
             tournament, [QuestionType.NUMERIC]
         )
-        display_individual_tournament(numeric_combined_tournament, f"{name} (Numeric)")
+        if numeric_combined_tournament is not None:
+            display_individual_tournament(
+                numeric_combined_tournament, f"{name} (Numeric)"
+            )
 
 
 def display_individual_tournament(tournament: SimulatedTournament, name: str):
@@ -84,15 +92,11 @@ def display_bot_v_pro_hypothesis_test(
         for entry in entries:
             try:
                 observations = [s.score for s in entry.scores]
-                equal_to_hypothesis_test = (
-                    MeanHypothesisCalculator.test_if_mean_is_equal_to_than_hypothesis_mean(
-                        observations, hypothesis_mean, confidence_level
-                    )
+                equal_to_hypothesis_test = MeanHypothesisCalculator.test_if_mean_is_equal_to_than_hypothesis_mean(
+                    observations, hypothesis_mean, confidence_level
                 )
-                greater_than_hypothesis_test = (
-                    MeanHypothesisCalculator.test_if_mean_is_greater_than_hypothesis_mean(
-                        observations, hypothesis_mean, confidence_level
-                    )
+                greater_than_hypothesis_test = MeanHypothesisCalculator.test_if_mean_is_greater_than_hypothesis_mean(
+                    observations, hypothesis_mean, confidence_level
                 )
                 st.write(f"## {entry.user.name}")
                 st.write(f"### Equal to {hypothesis_mean}")
@@ -136,7 +140,9 @@ def display_tournament_stats(tournament: SimulatedTournament) -> None:
     )
 
     # Display statistics
-    st.write("*Note that if tournaments are loaded only from jsons with only scores, then all stats will not include questions/forecasts from annulled/ambiguous questions. Stats will be off since you cannot score annulled questions.*")
+    st.write(
+        "*Note that if tournaments are loaded only from jsons with only scores, then all stats will not include questions/forecasts from annulled/ambiguous questions. Stats will be off since you cannot score annulled questions.*"
+    )
     st.write("### Basic Statistics")
     st.write(f"Number of forecasts: {num_forecasts}")
     st.write(f"Number of users: {num_users}")
@@ -236,7 +242,9 @@ def display_forecasts(tournament: SimulatedTournament):
     )
 
 
-def display_questions(questions: list[Question],tournament: SimulatedTournament | None = None):
+def display_questions(
+    questions: list[Question], tournament: SimulatedTournament | None = None
+):
     data = []
     for question in questions:
         datum = {"url": question.url, **question.model_dump()}
@@ -262,7 +270,10 @@ def display_leaderboard(leaderboard: Leaderboard):
     confidence_level = 0.95
     _display_average_scores_plot(leaderboard, confidence_level)
     _display_leaderboard_table(leaderboard, confidence_level)
-    _display_score_histogram_by_user(leaderboard.all_scores, title="All Users Scores Histogram (overlay, not stacked)")
+    _display_score_histogram_by_user(
+        leaderboard.all_scores,
+        title="All Users Scores Histogram (overlay, not stacked)",
+    )
 
 
 def _display_leaderboard_table(leaderboard: Leaderboard, confidence_level: float):
@@ -384,7 +395,6 @@ def _display_average_scores_plot(
     st.plotly_chart(fig, use_container_width=True, key=plot_key)
 
 
-
 def _hex_to_rgba(hex_color: str, alpha: float) -> str:
     """Convert hex color (e.g. #1f77b4) to rgba string with given alpha."""
     hex_color = hex_color.lstrip("#")
@@ -491,10 +501,14 @@ def display_calibration_curve(tournament: SimulatedTournament) -> None:
     st.plotly_chart(fig, use_container_width=True, key=plot_key)
 
 
-def _display_score_histogram_by_user(scores: list[Score], title: str | None = None) -> None:
+def _display_score_histogram_by_user(
+    scores: list[Score], title: str | None = None
+) -> None:
     score_types = set([s.type for s in scores])
     if len(score_types) > 1:
-        raise ValueError("Cannot display score histogram by user for multiple score types")
+        raise ValueError(
+            "Cannot display score histogram by user for multiple score types"
+        )
     fig = go.Figure()
 
     # Group scores by user
@@ -507,28 +521,25 @@ def _display_score_histogram_by_user(scores: list[Score], title: str | None = No
 
     # Add a trace for each user
     for user_name, user_score_list in user_scores.items():
-        fig.add_trace(go.Histogram(
-            x=user_score_list,
-            name=user_name,
-            opacity=0.7
-        ))
+        fig.add_trace(go.Histogram(x=user_score_list, name=user_name, opacity=0.7))
 
     if title is not None:
         fig.update_layout(title=title)
-    fig.update_layout(
-        xaxis_title="Score",
-        yaxis_title="Count",
-        barmode="overlay"
-    )
+    fig.update_layout(xaxis_title="Score", yaxis_title="Count", barmode="overlay")
     random_number = random.randint(0, 1000000)
     plot_key = f"{random_number}"
     st.plotly_chart(fig, use_container_width=True, key=plot_key)
 
-def display_unique_questions(tournament_1: SimulatedTournament, tournament_2: SimulatedTournament) -> None:
+
+def display_unique_questions(
+    tournament_1: SimulatedTournament, tournament_2: SimulatedTournament
+) -> None:
     t1_name = tournament_1.name if tournament_1.name else "First Tournament"
     t2_name = tournament_2.name if tournament_2.name else "Second Tournament"
 
-    st.subheader(f"Questions titles in \"{t1_name}\" but not in \"{t2_name}\"")
-    with st.expander(f"Questions titles in \"{t1_name}\" but not in \"{t2_name}\""):
-        unique_questions = find_question_titles_unique_to_first_tournament(tournament_1, tournament_2)
+    st.subheader(f'Questions titles in "{t1_name}" but not in "{t2_name}"')
+    with st.expander(f'Questions titles in "{t1_name}" but not in "{t2_name}"'):
+        unique_questions = find_question_titles_unique_to_first_tournament(
+            tournament_1, tournament_2
+        )
         display_questions(unique_questions, tournament_1)

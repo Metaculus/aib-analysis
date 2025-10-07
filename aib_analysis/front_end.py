@@ -21,9 +21,19 @@ from conftest import initialize_logging
 logger = logging.getLogger(__name__)
 
 
-def main(tournaments_folder: str):
+def main(tournaments_folder: str | None = None):
     initialize_logging()
     st.title("AI Benchmarking Analysis")
+
+    tournaments_folder = st.text_input("Tournaments folder", value=tournaments_folder, on_change=lambda: st.rerun())
+
+    if not tournaments_folder:
+        st.write("No tournaments folder selected")
+        folder_options = [f"local/{folder}" for folder in os.listdir("local/")]
+        folder_options.extend([f"local/minibench/{folder}" for folder in os.listdir("local/minibench/")])
+        folder_options.sort()
+        st.write("- " + "\n- ".join(folder_options))
+        return
 
     all_files_in_folder = os.listdir(tournaments_folder)
     all_files_in_folder.sort()
@@ -77,6 +87,4 @@ def grab_tournament_data(
     return tournament
 
 if __name__ == "__main__":
-    # Run this script via `streamlit run front_end.py`
-    tournaments_folder = "local/q1_2025_simulations/"
-    main(tournaments_folder)
+    main(None)
