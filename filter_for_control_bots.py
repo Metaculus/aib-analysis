@@ -9,10 +9,14 @@ control_bots = [
 ]
 def main() -> None:
     input_file = "local/archived_scores/bots_score_data_q4.csv"
+    pro_file = "local/archived_scores/pros_score_data_q4.csv"
     output_file = "local/bots_score_data_q4_control.csv"
+
+    pro_question_titles: list[str] = list(pd.read_csv(pro_file)["question_title"].unique())
 
     df = pd.read_csv(input_file)
     df = df[df["forecaster"].isin(control_bots)]
+    df = df[df["question_title"].isin(pro_question_titles)]
     df.to_csv(output_file, index=False)
 
     pass
