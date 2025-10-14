@@ -34,9 +34,9 @@ def main(
     bot_path: str,
     quarterly_cup_path: str | None,
     output_folder: str,
+    bot_team_size: int = 10,
 ):
     initialize_logging()
-    bot_team_size = 10
 
     pro_tournament = grab_tournament_data(pro_path, UserType.PRO, "Pro Tournament")
     save_tournament(pro_tournament, "pro_tournament.json", folder=output_folder)
@@ -222,12 +222,12 @@ def grab_tournament_data(
 
 
 if __name__ == "__main__":
-    main(
-        pro_path="local/private_input_data/pro_forecasts_q3.csv",
-        bot_path="local/private_input_data/bot_forecasts_q3.csv",
-        quarterly_cup_path=None,
-        output_folder="local/q3_2024_simulations/",
-    )
+    # main(
+    #     pro_path="local/private_input_data/pro_forecasts_q3.csv",
+    #     bot_path="local/private_input_data/bot_forecasts_q3.csv",
+    #     quarterly_cup_path=None,
+    #     output_folder="local/q3_2024_simulations/",
+    # )
 
     # main(
     #     pro_path="local/private_input_data/pro_forecasts_q4.csv",
@@ -249,3 +249,12 @@ if __name__ == "__main__":
     #     quarterly_cup_path=None,
     #     output_folder="local/q2_2025_simulations/",
     # )
+
+    main(
+        pro_path="input_data/pro_forecasts_q2.csv",
+        bot_path="input_data/bot_forecasts_q2.csv",
+        quarterly_cup_path=None,
+        output_folder="local/q2_2025_simulations_team_size_1/",
+        bot_team_size=1,
+    )
+
