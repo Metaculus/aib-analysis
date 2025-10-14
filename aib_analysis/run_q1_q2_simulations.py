@@ -6,11 +6,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
 sys.path.append(top_level_dir)
 
-from aib_analysis.data_structures.data_models import (
-    QuestionType,
-    User,
-    UserType,
-)
+from aib_analysis.data_structures.data_models import User, UserType
 from aib_analysis.data_structures.simulated_tournament import (
     SimulatedTournament,
 )
@@ -18,16 +14,14 @@ from aib_analysis.main_logic.load_tournament import load_tournament
 from aib_analysis.main_logic.process_tournament import (
     combine_tournaments,
     create_team_tournament,
+    create_weighted_q3_spot_forecast_tourn,
     get_best_forecasters_from_tournament,
     save_tournament,
     smart_remove_questions_from_tournament,
-    create_weighted_q3_spot_forecast_tourn,
 )
 from conftest import initialize_logging
 
 logger = logging.getLogger(__name__)
-
-
 
 
 def main(
@@ -39,7 +33,9 @@ def main(
 ):
     initialize_logging()
     is_q3 = "q3" in output_folder.lower()
+    is_q4 = "q4" in output_folder.lower()
 
+    # ----------------------- Pros and Bot Tournaments -----------------------
     pro_tournament = grab_tournament_data(pro_path, UserType.PRO, "Pro Tournament")
     save_tournament(pro_tournament, "pro_tournament.json", folder=output_folder)
 
@@ -65,7 +61,7 @@ def main(
     )  # Do this early so we can error out if we don't have right comparison bot users
 
     bot_tournament_wo_pro_questions = smart_remove_questions_from_tournament(
-        bot_tournament, pro_tournament.questions
+        tournament=bot_tournament, questions_to_exclude=pro_tournament.questions
     )
     save_tournament(
         bot_tournament_wo_pro_questions,
@@ -73,6 +69,8 @@ def main(
         divide_into_types=True,
         folder=output_folder,
     )
+
+    # ------------------------- Subdivisions of Bot Tournament -------------------------
 
     metac_bot_users = [user for user in bot_tournament.users if user.is_metac_bot]
     metac_bot_forecasts = [
@@ -108,7 +106,12 @@ def main(
         folder=output_folder,
     )
 
-    pro_with_bot_tourn = combine_tournaments(pro_tournament, bot_tournament)
+    # ------------------------- Combine Pro and Bot Tournaments -------------------------
+
+    use_pro_weights = False if is_q3 or is_q4 else True
+    pro_with_bot_tourn = combine_tournaments(
+        pro_tournament, bot_tournament, use_tourn_1_weights=use_pro_weights
+    )
     save_tournament(
         pro_with_bot_tourn,
         "pro_with_bot_tourn__no_teams.json",
@@ -121,12 +124,13 @@ def main(
         bot_tournament_wo_pro_questions, bot_team_size
     )
     pro_v_bot_tournament__teams = create_team_tournament(
-        pro_tournament,
-        bot_tournament,
+        tournament_1=pro_tournament,
+        tournament_2=bot_tournament,
         team_1=pro_team,
         team_2=bot_team_for_pro_comparison,
         aggregate_name_1="Pro Team",
         aggregate_name_2="Bot Team",
+        use_tourn_1_weights=use_pro_weights,
     )
     save_tournament(
         pro_v_bot_tournament__teams,
@@ -138,12 +142,13 @@ def main(
     # ------------------- Control/comparison Bots -------------------
     number_to_use = 99
     comparison_vs_bot__teams = create_team_tournament(
-        pro_with_bot_tourn,
-        pro_with_bot_tourn,
+        tournament_1=pro_with_bot_tourn,
+        tournament_2=pro_with_bot_tourn,
         team_1=comparison_bot_users,
         team_2=bot_team_for_pro_comparison,
         aggregate_name_1="Comparison Team",
         aggregate_name_2="Bot Team",
+        use_tourn_1_weights=use_pro_weights,
     )
     save_tournament(
         comparison_vs_bot__teams,
@@ -152,12 +157,13 @@ def main(
         counter_override=number_to_use,
     )
     comparison_vs_pros__teams = create_team_tournament(
-        pro_with_bot_tourn,
-        pro_with_bot_tourn,
+        tournament_1=pro_with_bot_tourn,
+        tournament_2=pro_with_bot_tourn,
         team_1=comparison_bot_users,
         team_2=pro_team,
         aggregate_name_1="Comparison Team",
         aggregate_name_2="Pro Team",
+        use_tourn_1_weights=use_pro_weights,
     )
     save_tournament(
         comparison_vs_pros__teams,
@@ -190,12 +196,13 @@ def main(
         bot_tournament_wo_cup_questions, bot_team_size
     )
     cup_vs_bot_teams = create_team_tournament(
-        cup_tournament,
-        bot_tournament,
+        tournament_1=cup_tournament,
+        tournament_2=bot_tournament,
         team_1="all",
         team_2=bot_team_for_cup_comparison,
         aggregate_name_1="Cup Team (All forecasters)",
         aggregate_name_2="Bot Team",
+        use_tourn_1_weights=use_pro_weights,
     )
     save_tournament(cup_vs_bot_teams, "cup_vs_bot_teams.json", folder=output_folder)
 
@@ -226,12 +233,12 @@ def grab_tournament_data(
 
 
 if __name__ == "__main__":
-    # main(
-    #     pro_path="local/private_input_data/pro_forecasts_q3.csv",
-    #     bot_path="local/private_input_data/bot_forecasts_q3.csv",
-    #     quarterly_cup_path=None,
-    #     output_folder="local/q3_2024_simulations/",
-    # )
+    main(
+        pro_path="local/private_input_data/pro_forecasts_q3.csv",
+        bot_path="local/private_input_data/bot_forecasts_q3.csv",
+        quarterly_cup_path=None,
+        output_folder="local/q3_2024_simulations/",
+    )
 
     # main(
     #     pro_path="local/private_input_data/pro_forecasts_q4.csv",
@@ -240,13 +247,13 @@ if __name__ == "__main__":
     #     output_folder="local/q4_2024_simulations/",
     # )
 
-    main(
-        pro_path="local/private_input_data/pro_forecasts_q4.csv",
-        bot_path="local/private_input_data/bot_forecasts_q4.csv",
-        quarterly_cup_path=None,
-        output_folder="local/q4_2024_simulations_team_size_1/",
-        bot_team_size=1,
-    )
+    # main(
+    #     pro_path="local/private_input_data/pro_forecasts_q4.csv",
+    #     bot_path="local/private_input_data/bot_forecasts_q4.csv",
+    #     quarterly_cup_path=None,
+    #     output_folder="local/q4_2024_simulations_team_size_1/",
+    #     bot_team_size=1,
+    # )
 
     # main(
     #     pro_path="input_data/pro_forecasts_q1.csv",

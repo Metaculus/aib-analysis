@@ -173,7 +173,7 @@ class TestCombineTournaments:
         tournament2 = SimulatedTournament(forecasts=[forecast2_1, forecast2_3])
 
         # Combine tournaments
-        combined = combine_tournaments(tournament1, tournament2)
+        combined = combine_tournaments(tournament1, tournament2, use_tourn_1_weights=True)
 
         # Only question1 should be in the combined tournament
         assert len(combined.questions) == 1
@@ -198,7 +198,7 @@ class TestCombineTournaments:
         bot_forecasts = bot_tournament.forecasts
         pro_users = pro_tournament.users
         bot_users = bot_tournament.users
-        combined_tournament = combine_tournaments(pro_tournament, bot_tournament)
+        combined_tournament = combine_tournaments(pro_tournament, bot_tournament, use_tourn_1_weights=True)
         assert len(combined_tournament.questions) == 98
         assert len(combined_tournament.forecasts) < len(pro_forecasts) + len(
             bot_forecasts
