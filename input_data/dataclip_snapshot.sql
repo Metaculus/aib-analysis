@@ -43,7 +43,7 @@ WHERE q.title NOT ILIKE '%[practice]%'
 -- AND p.default_project_id = 3349 -- Q3 AIB BOT Tournament
 -- AND p.default_project_id = 32506 -- Q4 AIB BOT Tournament
 -- AND p.default_project_id = 32627 -- Q1 AIB BOT Tournament
-AND p.default_project_id = 32721 -- Q2 AIB BOT Tournament
+-- AND p.default_project_id = 32721 -- Q2 AIB BOT Tournament
 -- AND p.default_project_id = 32813 -- Fall 2025 AIB BOT Tournament
 
 -- AND p.default_project_id = 3345 -- Q3 AIB PRO Tournament
@@ -51,8 +51,12 @@ AND p.default_project_id = 32721 -- Q2 AIB BOT Tournament
 -- AND p.default_project_id = 32631 -- Q1 AIB PRO Tournament
 -- AND p.default_project_id = 32761 -- Q2 AIB PRO Tournament
 
---AND p.default_project_id = 32630 -- Q1 Quarterly Cup
+-- AND p.default_project_id = 32827 -- MiniBench sept 1
+-- AND p.default_project_id = 32830 -- MiniBench Sept 15
 
-AND u.is_bot = true
+--AND p.default_project_id = 32630 -- Q1 Quarterly Cup
+AND p.default_project_id = 32726 -- Summer Metaculus Cup
+
+AND u.is_bot = false
 -- AND f.start_time < q.cp_reveal_time -- If for quarterly cup
 ORDER BY f.start_time DESC;
