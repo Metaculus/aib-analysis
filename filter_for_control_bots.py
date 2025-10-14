@@ -16,7 +16,7 @@ def main() -> None:
 
     df = pd.read_csv(input_file)
     df = df[df["forecaster"].isin(control_bots)]
-    df = df[df["question_title"].isin(pro_question_titles)]
+    # df = df[df["question_title"].isin(pro_question_titles)]
     df.to_csv(output_file, index=False)
 
     pass
