@@ -43,7 +43,9 @@ def get_leaderboard(
 
 
 def combine_tournaments(
-    tournament_1: SimulatedTournament, tournament_2: SimulatedTournament
+    tournament_1: SimulatedTournament,
+    tournament_2: SimulatedTournament,
+    use_tourn_1_weights: bool,
 ) -> SimulatedTournament:
     logger.info(f"Combining tournaments {tournament_1.name} and {tournament_2.name}")
 
@@ -84,7 +86,7 @@ def combine_tournaments(
         if len(question_match) < 2:
             continue
         new_forecasts = _squash_questions_and_get_their_forecasts(
-            question_match, tournament_1, tournament_2
+            question_match, tournament_1, tournament_2, use_tourn_1_weights
         )
         combined_forecasts.extend(new_forecasts)
 
@@ -151,6 +153,7 @@ def _squash_questions_and_get_their_forecasts(
     questions: list[Question],
     tournament_1: SimulatedTournament,
     tournament_2: SimulatedTournament,
+    use_tourn_1_weights: bool,
 ) -> list[Forecast]:
     question_t1, question_t2 = _validate_and_pair_tournament_questions(
         questions, tournament_1, tournament_2
@@ -162,10 +165,14 @@ def _squash_questions_and_get_their_forecasts(
     t2_forecasts = tournament_2.question_to_forecasts(question_t2.question_id)
     forecasts_to_use: list[Forecast] = t1_forecasts + t2_forecasts
 
-    max_weight = max(question_t1.weight, question_t2.weight)
+    if use_tourn_1_weights:
+        squashed_weight = question_t1.weight
+    else:
+        squashed_weight = question_t2.weight
+
     if question_t1.weight != question_t2.weight:
         logger.warning(
-            f"Question weights are different: {question_t1.weight} != {question_t2.weight}. Using the max of the two weights ({max_weight})."
+            f"Question weights are different: {question_t1.weight} != {question_t2.weight}. Using tournament 1 weights are set to {use_tourn_1_weights} (this is tournament {tournament_1.name})."
         )
 
     max_spot_scoring_time = max(
@@ -191,7 +198,7 @@ def _squash_questions_and_get_their_forecasts(
         update={
             "notes": f"Combined {question_t1.url} (QID:{question_t1.question_id}) and {question_t2.url} (QID:{question_t2.question_id})\nQ1 Notes: {question_t1.notes}\nQ2 Notes: {question_t2.notes}",
             "project": f"{question_t1.project} and {question_t2.project}",
-            "weight": max_weight,
+            "weight": squashed_weight,
             "spot_scoring_time": max(
                 question_t1.spot_scoring_time, question_t2.spot_scoring_time
             ),
@@ -334,6 +341,7 @@ def create_team_tournament(
     team_2: list[User] | Literal["all"],
     aggregate_name_1: str,
     aggregate_name_2: str,
+    use_tourn_1_weights: bool,
     use_spot_scores: bool = True,
 ) -> SimulatedTournament:
     """
@@ -375,7 +383,7 @@ def create_team_tournament(
         forecasts=t2_forecasts, name=f"{tournament_2.name} ({aggregate_name_2})"
     )
 
-    combined_tournament = combine_tournaments(t1_agg_tournament, t2_agg_tournament)
+    combined_tournament = combine_tournaments(t1_agg_tournament, t2_agg_tournament, use_tourn_1_weights=use_tourn_1_weights)
     return combined_tournament
 
 
@@ -679,19 +687,41 @@ def create_weighted_q3_spot_forecast_tourn(
     ####### CREATE QUESTION WEIGHTS #########
 
     # Combine both lists of tuples
-    all_questions = (
+    all_question_tuples = (
         bot_scope_questions
         + bot_sum_to_1_questions
         + bot_increasing_questions
         + bot_similar_questions
         + bot_conditional_pair
     )
+    all_weighted_post_ids = [
+        post_id
+        for tuple_questions in all_question_tuples
+        for post_id in tuple_questions
+    ]
+    tournament_post_ids = [question.post_id for question in tournament.questions]
+    assert len(set(all_weighted_post_ids)) == len(
+        all_weighted_post_ids
+    ), "All weighted post ids must be unique"
+    assert len(set(tournament_post_ids)) == len(
+        tournament_post_ids
+    ), "All tournament post ids must be unique"
+    weighted_ids_not_in_tournament = set(all_weighted_post_ids) - set(
+        tournament_post_ids
+    )
+    assert (
+        len(weighted_ids_not_in_tournament) == 0
+    ), f"All weighted post ids must be in the tournament. weighted ids not in tournament: {weighted_ids_not_in_tournament}"
+    union_of_post_ids = set(tournament_post_ids) | set(all_weighted_post_ids)
+    assert len(union_of_post_ids) == len(
+        tournament_post_ids
+    ), "There should be no post ids not contained in the tournament id set"
 
     # Create an empty list to store the data
     data: dict[int, float] = {}
 
     # Process each tuple
-    for tuple_questions in all_questions:
+    for tuple_questions in all_question_tuples:
         # Calculate the weight for each question in the tuple
         weight = np.log2(1 + len(tuple_questions)) / (1 + len(tuple_questions))
 
@@ -713,7 +743,13 @@ def create_weighted_q3_spot_forecast_tourn(
     new_forecasts = []
     for forecast in tournament.spot_forecasts:
         question = forecast.question
-        weight = data[question.post_id]
+        try:
+            weight = data[question.post_id]
+        except KeyError:
+            logger.warning(
+                f"Question {question.post_id} ({question.url}) not found in data"
+            )
+            weight = 1.0
         new_forecast = forecast.model_copy(
             update={"question": question.model_copy(update={"weight": weight})}
         )
