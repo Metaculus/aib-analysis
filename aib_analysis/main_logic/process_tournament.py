@@ -579,3 +579,143 @@ def _save_specific_tournament_to_file(
                 logger.error(f"Error message: {str(e)}")
 
         raise original_error
+
+
+def create_weighted_q3_spot_forecast_tourn(
+    tournament: SimulatedTournament,
+) -> SimulatedTournament:
+    """
+    Relationships between questions are entered as tuples. These relationships
+    will be used to perform logical consistency checks.
+
+    Weights are assigned to questions based on relationships. This is a way to
+    deal with correlations between questions.
+    """
+
+    # Scope sensitity list of tuples where the first entry should equal the sum of the others
+    bot_scope_questions = [
+        (26019, 26017, 26018),  # Starship launches
+        (26098, 26096, 26097),  # SENSEX
+        (26159, 26158, 26157),  # Geomagnetic storm July 28
+        (26194, 26195, 26196),  # measles cases
+        (26006, 26005, 26004),  # Trump lead over Biden
+        (26642, 26643, 26644),  # spanish wikipedia
+        (26700, 26701, 26702),  # market cap cryptocurrencies
+        (27261, 27262, 27263),  # Geomagnetic storm Sept 11
+    ]
+
+    # Sum of each tuple should logically equal 1
+    bot_sum_to_1_questions = [
+        (25952, 25953, 25954),  # French PM party July 30
+        (25957, 25958, 25959),  # Tour de France winner
+        (26570, 26571, 26572, 26573),  # Warhammer
+        (26574, 26575, 26576, 26577),  # H5 cases in US
+        (26671, 26670, 26669),  # DOES NOT SUM TO EXACTLY 1 PM France Aug 31
+        (27748, 27747, 27746, 27749),  # Speed Chess
+        (27488, 27489, 27490, 27491, 27492, 27493),  # August CPI
+        (27932, 27933, 27934, 27935),  # Chinese youth unemployment
+        (27484, 27485, 27486, 27487),  # Fed rate cut Sept meeting
+        (28045, 28044, 28043, 28042),  # Afd vote share
+        (28038, 28039, 28040, 28041),  # Major Atlantic hurricanes
+        (26776, 26777, 26778, 26779),  # Seattle-Tacoma-Bellevu Air Quality
+    ]
+
+    # parent, child, if_yes, if_no
+    bot_conditional_pair = [(26917, 26918, 26919, 26920)]  # israel lebanon conflict
+
+    # CDFs - Logically the probability of each successive question must not decrease
+    bot_increasing_questions = [
+        (26981, 26982, 26983, 26984, 26985, 26986),  # aircraft ADIZ
+        (26977, 26978, 26979, 26980),  # hurricane energy
+        (27548, 27547, 27546, 27545),  # mpox CDC risk level
+        (28306, 28305, 28304, 28303, 28302),  # Gas prices in US Sept 30
+    ]
+
+    bot_repeated_questions = [
+        (26646, 26021),  # mens 100m dash record
+        (26555, 27021),  # USA gold silver
+        (26210, 26917),  # israel invade lebanon
+        (26781, 26304),  # ruto
+        (26100, 27136),  # rfk drop out
+        (25956, 27158),  # democrat brokered convention
+        (26102, 27022),  # astronauts NOT EXACT REPEAT
+        (26022, 27085),  # arrest warrants NOT EXACT REPEAT
+        (26235, 27281),  # Buffett Indicator
+        (26390, 27789),  # Bubble Magnificent 7
+        (26024, 27161),  # QB Bo Nix starting for Broncos
+        (26302, 27282),  # riots
+        (25955, 27157),  # armed forces death US, China, Japan
+        (26958, 27640),  # Youtube banned in Russia
+        (25936, 27141),  # Crimean bridge attack
+    ]
+
+    bot_similar_questions = [
+        (26915, 26916),  # harris favorability
+        (26913, 26914),  # trump favorability
+        (26193, 27733),  # debate on Sept 10
+        (27886, 27968),  # Taylor Swift awards
+        (27723, 27637),  # Best Rock VMAs
+        (
+            27583,
+            27582,
+            27584,
+            27602,
+            27603,
+            27604,
+        ),  # mpox Zambia, US, Angola, Russia, Japan, Mexico
+        (26306, 26838),  # Richest people 250th > $10.2, 500th > 6.2
+        (27887, 27969),  # Emmys Outstanding Limited or Anthology Series
+        (28206, 28207, 28208, 28209, 28210),  # LMSYS leaderboard
+        (28154, 28336),  # Nigeria Edo gubernatorial election
+        (26407, 27897),  # Second Russian mobilization wave
+        (27539, 26215),  # Nuclear weapons used
+        (27606, 27607, 27608, 27609, 27610),  # Ukranian forces capture
+        (26387, 27788),  # Will Tesla increase deliveries in Q3 2024
+        (26821, 26959),  # VP debate
+        (26212, 26213, 26214),  # number of dairy cow herds with H5N1
+        (26639, 26640, 26641),  # Presidential debate 0, 1, or 2+
+    ]
+
+    ####### CREATE QUESTION WEIGHTS #########
+
+    # Combine both lists of tuples
+    all_questions = (
+        bot_scope_questions
+        + bot_sum_to_1_questions
+        + bot_increasing_questions
+        + bot_similar_questions
+        + bot_conditional_pair
+    )
+
+    # Create an empty list to store the data
+    data: dict[int, float] = {}
+
+    # Process each tuple
+    for tuple_questions in all_questions:
+        # Calculate the weight for each question in the tuple
+        weight = np.log2(1 + len(tuple_questions)) / (1 + len(tuple_questions))
+
+        # Add each question and its weight to the data list
+        for post_id in tuple_questions:
+            data[post_id] = weight
+
+    # Process each tuple
+    for tuple_questions in bot_repeated_questions:
+        # 1st iteration has weight 1, 2nd has weight 1/2, 3rd weight 1/3....
+        count = 1
+
+        # Add each question and its weight to the data list
+        for post_id in tuple_questions:
+            weight = 1 / count
+            data[post_id] = weight
+            count += 1
+
+    new_forecasts = []
+    for forecast in tournament.spot_forecasts:
+        question = forecast.question
+        weight = data[question.post_id]
+        new_forecast = forecast.model_copy(
+            update={"question": question.model_copy(update={"weight": weight})}
+        )
+        new_forecasts.append(new_forecast)
+    return SimulatedTournament(name=tournament.name, forecasts=new_forecasts)
