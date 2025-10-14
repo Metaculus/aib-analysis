@@ -25,7 +25,7 @@ def main(tournaments_folder: str | None = None):
     initialize_logging()
     st.title("AI Benchmarking Analysis")
 
-    tournaments_folder = st.text_input("Tournaments folder", value=tournaments_folder, on_change=lambda: st.rerun())
+    tournaments_folder = st.text_input("Tournaments folder", value=tournaments_folder)
 
     if not tournaments_folder:
         st.write("No tournaments folder selected")

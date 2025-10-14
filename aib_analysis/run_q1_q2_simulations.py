@@ -1,5 +1,3 @@
-import copy
-import json
 import logging
 import os
 import sys
@@ -23,10 +21,13 @@ from aib_analysis.main_logic.process_tournament import (
     get_best_forecasters_from_tournament,
     save_tournament,
     smart_remove_questions_from_tournament,
+    create_weighted_q3_spot_forecast_tourn,
 )
 from conftest import initialize_logging
 
 logger = logging.getLogger(__name__)
+
+
 
 
 def main(
@@ -37,6 +38,7 @@ def main(
     bot_team_size: int = 10,
 ):
     initialize_logging()
+    is_q3 = "q3" in output_folder.lower()
 
     pro_tournament = grab_tournament_data(pro_path, UserType.PRO, "Pro Tournament")
     save_tournament(pro_tournament, "pro_tournament.json", folder=output_folder)
@@ -44,10 +46,13 @@ def main(
     bot_tournament_full = grab_tournament_data(
         bot_path, UserType.BOT, "Bot Tournament Full"
     )
-    bot_tournament = SimulatedTournament(
-        name="Bot Tournament (Only spot forecasts)",
-        forecasts=bot_tournament_full.spot_forecasts,
-    )
+    if is_q3:
+        bot_tournament = create_weighted_q3_spot_forecast_tourn(bot_tournament_full)
+    else:
+        bot_tournament = SimulatedTournament(
+            name="Bot Tournament (Only spot forecasts)",
+            forecasts=bot_tournament_full.spot_forecasts,
+        )
     save_tournament(
         bot_tournament,
         "bot_tournament.json",
@@ -220,7 +225,6 @@ def grab_tournament_data(
     return load_tournament(path, user_type, tournament_name)
 
 
-
 if __name__ == "__main__":
     # main(
     #     pro_path="local/private_input_data/pro_forecasts_q3.csv",
@@ -236,6 +240,14 @@ if __name__ == "__main__":
     #     output_folder="local/q4_2024_simulations/",
     # )
 
+    main(
+        pro_path="local/private_input_data/pro_forecasts_q4.csv",
+        bot_path="local/private_input_data/bot_forecasts_q4.csv",
+        quarterly_cup_path=None,
+        output_folder="local/q4_2024_simulations_team_size_1/",
+        bot_team_size=1,
+    )
+
     # main(
     #     pro_path="input_data/pro_forecasts_q1.csv",
     #     bot_path="input_data/bot_forecasts_q1.csv",
@@ -250,11 +262,10 @@ if __name__ == "__main__":
     #     output_folder="local/q2_2025_simulations/",
     # )
 
-    main(
-        pro_path="input_data/pro_forecasts_q2.csv",
-        bot_path="input_data/bot_forecasts_q2.csv",
-        quarterly_cup_path=None,
-        output_folder="local/q2_2025_simulations_team_size_1/",
-        bot_team_size=1,
-    )
-
+    # main(
+    #     pro_path="input_data/pro_forecasts_q2.csv",
+    #     bot_path="input_data/bot_forecasts_q2.csv",
+    #     quarterly_cup_path=None,
+    #     output_folder="local/q2_2025_simulations_team_size_1/",
+    #     bot_team_size=1,
+    # )
