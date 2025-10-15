@@ -233,25 +233,25 @@ def grab_tournament_data(
 
 
 if __name__ == "__main__":
+    # main(
+    #     pro_path="local/private_input_data/pro_forecasts_q3.csv",
+    #     bot_path="local/private_input_data/bot_forecasts_q3.csv",
+    #     quarterly_cup_path=None,
+    #     output_folder="local/q3_2024_simulations/",
+    # )
+
     main(
-        pro_path="local/private_input_data/pro_forecasts_q3.csv",
-        bot_path="local/private_input_data/bot_forecasts_q3.csv",
+        pro_path="local/private_input_data/pro_forecasts_q4.csv",
+        bot_path="local/private_input_data/bot_forecasts_q4.csv",
         quarterly_cup_path=None,
-        output_folder="local/q3_2024_simulations/",
+        output_folder="local/q4_2024_simulations/",
     )
 
     # main(
     #     pro_path="local/private_input_data/pro_forecasts_q4.csv",
     #     bot_path="local/private_input_data/bot_forecasts_q4.csv",
     #     quarterly_cup_path=None,
-    #     output_folder="local/q4_2024_simulations/",
-    # )
-
-    # main(
-    #     pro_path="local/private_input_data/pro_forecasts_q4.csv",
-    #     bot_path="local/private_input_data/bot_forecasts_q4.csv",
-    #     quarterly_cup_path=None,
-    #     output_folder="local/q4_2024_simulations_team_size_1/",
+    #     output_folder="local/q4_2024_simulations_partial_w_bad_question/",
     #     bot_team_size=1,
     # )
 

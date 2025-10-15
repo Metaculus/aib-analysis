@@ -76,7 +76,7 @@ def main(tournaments_folder: str | None = None):
     st.write("---")
     st.info("Contact ben [at] metaculus [.com] with any questions about this data")
 
-@st.cache_data(show_spinner="Loading tournament...") # Pausing caching since this may be the cause of reruns?
+# @st.cache_data(show_spinner="Loading tournament...") # Pausing caching since this may be the cause of reruns?
 def grab_tournament_data(
     folder: str, file: str,
 ) -> SimulatedTournament:
