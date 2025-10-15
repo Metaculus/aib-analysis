@@ -4,10 +4,12 @@ import logging
 
 from pydantic import BaseModel, model_validator
 from typing_extensions import Self
+from enum import Enum
 
 from aib_analysis.data_structures.data_models import Question
 
 logger = logging.getLogger(__name__)
+
 
 
 class ProblemQuestion(BaseModel):
@@ -120,7 +122,7 @@ class ProblemManager:
         if cls._question_list_fully_matches_a_problem_question(
             questions,
             cls._q1_bot_v_pro_inconsistencies_to_force_match
-            + cls._q1_bot_v_pro_inconsistencies_to_force_match
+            + cls._q1_bot_v_cup_inconsistencies_to_force_match
             + cls._q2_bot_v_pro_inconsistencies_to_force_match,
         ):
             return True

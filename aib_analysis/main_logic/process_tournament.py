@@ -19,6 +19,7 @@ from aib_analysis.data_structures.data_models import (
     User,
 )
 from aib_analysis.data_structures.problem_questions import ProblemManager
+from aib_analysis.data_structures.problem_questions_2 import ProblemManager2
 from aib_analysis.data_structures.simulated_tournament import (
     SimulatedTournament,
 )
@@ -41,7 +42,6 @@ def get_leaderboard(
             )
     return Leaderboard(entries=entries, type=score_type)
 
-
 def combine_tournaments(
     tournament_1: SimulatedTournament,
     tournament_2: SimulatedTournament,
@@ -58,40 +58,40 @@ def combine_tournaments(
             "Both tournaments have some of the same users. This is currently not supported."
         )
 
-    combined_questions: list[Question] = tournament_1.questions + tournament_2.questions
-
-    matching_hash_mapping: dict[str, list[Question]] = {}
-    for question in combined_questions:
-        tournamnet_matching_hash = question.get_hash_for_tournament_matching()
-        matching_hash_mapping.setdefault(tournamnet_matching_hash, []).append(question)
-
-    if not any(len(questions) > 1 for questions in matching_hash_mapping.values()):
-        raise ValueError("No matches found between tournaments")
-
     log_title_mapping_inconsistencies(tournament_1, tournament_2)
 
-    combined_forecasts: list[Forecast] = []
-    hash_matches = list(matching_hash_mapping.values())
-    prequalified_matches = (
-        ProblemManager.find_prequalified_matches_for_tournament_matching(
-            combined_questions
-        )
-    )
-    all_matches = hash_matches + prequalified_matches
+    matching_questions: dict[str, list[Question]] = {}
+    for question_1 in tournament_1.questions:
+        for question_2 in tournament_2.questions:
+            hash_1 = question_1.get_hash_for_tournament_matching()
+            hash_2 = question_2.get_hash_for_tournament_matching()
+            hashes_match = hash_1 == hash_2
 
-    if len(all_matches) == 0:
+            should_be_forced_matched = ProblemManager2.should_be_forced_matched(question_1, question_2)
+
+            if hashes_match or should_be_forced_matched:
+                hash_already_used = matching_questions.get(hash_1, None) is not None
+                if hash_already_used:
+                    existing_questions = matching_questions[hash_1]
+                    existing_urls = [question.url for question in existing_questions]
+                    raise ValueError(f"Question hash already had a question mapping. Existing questions: {existing_urls}. New match found: {question_1.url} and {question_2.url}")
+
+                matching_questions[hash_1] = [question_1, question_2]
+
+    if len(matching_questions) == 0:
         raise ValueError("No matches found between tournaments")
 
-    for question_match in all_matches:
-        if len(question_match) < 2:
-            continue
+    combined_forecasts: list[Forecast] = []
+    for question_match in matching_questions.values():
+        if len(question_match) != 2:
+            raise ValueError(f"Found {len(question_match)} questions in a match. Expected 2. {question_match}")
         new_forecasts = _squash_questions_and_get_their_forecasts(
             question_match, tournament_1, tournament_2, use_tourn_1_weights
         )
         combined_forecasts.extend(new_forecasts)
 
     return SimulatedTournament(
-        forecasts=combined_forecasts, name=f"{tournament_1.name} + {tournament_2.name}"
+        forecasts=combined_forecasts, name=f"{tournament_1.name} x {tournament_2.name}"
     )
 
 
@@ -694,6 +694,8 @@ def create_weighted_q3_spot_forecast_tourn(
         + bot_similar_questions
         + bot_conditional_pair
     )
+
+    # Do sanity checks
     all_weighted_post_ids = [
         post_id
         for tuple_questions in all_question_tuples

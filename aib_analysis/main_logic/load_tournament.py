@@ -31,10 +31,6 @@ def load_tournament(
     user_cache: dict[str, User] = {}
 
     dataframe = pd.read_csv(forecast_file_path, low_memory=False)
-    questions_to_remove = [
-        "On December 31, 2024, will exactly 4 US states have Waymo's rider-only ride-hailing service available to the general public?"
-    ] # Q4 weird question in both pro and bot tournaments
-    dataframe = dataframe[~dataframe["question_title"].isin(questions_to_remove)]
     assert isinstance(dataframe, pd.DataFrame)
 
     logger.info(f"Loaded {len(dataframe)} forecast rows")
