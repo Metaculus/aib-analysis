@@ -8,6 +8,10 @@ from aib_analysis.data_structures.data_models import Question
 
 logger = logging.getLogger(__name__)
 
+"""
+Second version of problem question management
+"""
+
 
 class Tournament(Enum):
     Q3_2024 = "q3_2024"
@@ -18,7 +22,8 @@ class Tournament(Enum):
     Fall_2025 = "fall_2025"
 
 
-class ProblemQuestion2(BaseModel):
+class ProblemQuestion(BaseModel):
+
     question_text: str
     question_1_url: str
     question_2_url: str
@@ -41,9 +46,9 @@ class ProblemQuestion2(BaseModel):
         return self
 
 
-force_match_questions: list[ProblemQuestion2] = [
+force_match_questions: list[ProblemQuestion] = [
     # Q1 2025
-    ProblemQuestion2(
+    ProblemQuestion(
         question_text="How many Grammy awards will Taylor Swift win in 2025?",
         question_1_url="https://www.metaculus.com/questions/31797/",
         question_2_url="https://www.metaculus.com/questions/31865/",
@@ -51,7 +56,7 @@ force_match_questions: list[ProblemQuestion2] = [
         proposed_action="Keep since resolution is same",
         tournament=Tournament.Q1_2025,
     ),
-    ProblemQuestion2(
+    ProblemQuestion(
         question_text="Which party will win the 2nd highest number of seats in the 2025 German federal election?",
         question_1_url="https://www.metaculus.com/questions/35002/",
         question_2_url="https://www.metaculus.com/questions/34940/",
@@ -60,7 +65,7 @@ force_match_questions: list[ProblemQuestion2] = [
         tournament=Tournament.Q1_2025,
     ),
     # Q1 2025 vs Cup
-    ProblemQuestion2(
+    ProblemQuestion(
         question_text="What will the total number of Tesla vehicle deliveries be for Q1 2025?",
         question_1_url="https://www.metaculus.com/questions/35589/",
         question_2_url="https://www.metaculus.com/questions/35888/",
@@ -68,7 +73,7 @@ force_match_questions: list[ProblemQuestion2] = [
         proposed_action="Force match",
         tournament=Tournament.Q1_2025_VS_CUP,
     ),
-    ProblemQuestion2(
+    ProblemQuestion(
         question_text="How many earthquakes of magnitude ≥ 4 will happen near Santorini, Greece in the first week of March, 2025?",
         question_1_url="https://www.metaculus.com/questions/34862/",
         question_2_url="https://www.metaculus.com/questions/34968/",
@@ -84,7 +89,7 @@ force_match_questions: list[ProblemQuestion2] = [
     #     ],
     #     notes="Titles mismatch. One resolves Mar 10 while ther other March 8"
     # ),
-    ProblemQuestion2(
+    ProblemQuestion(
         question_text="What will be the IMDb rating of Severance's second season finale?",
         question_1_url="https://www.metaculus.com/questions/35318/",
         question_2_url="https://www.metaculus.com/questions/35470/",
@@ -94,10 +99,7 @@ force_match_questions: list[ProblemQuestion2] = [
     ),
 ]
 
-questions_to_remove_from_comparison: list[ProblemQuestion2] = []
-
-
-class ProblemManager2:
+class ProblemManager:
 
     @classmethod
     def should_be_forced_matched(
@@ -108,19 +110,11 @@ class ProblemManager2:
         )
 
     @classmethod
-    def remove_question_pairing_from_comparison(
-        cls, question_1: Question, question_2: Question
-    ) -> bool:
-        return cls._pair_matches_problem_question_in_list(
-            question_1, question_2, questions_to_remove_from_comparison
-        )
-
-    @classmethod
     def _pair_matches_problem_question_in_list(
         cls,
         question_1: Question,
         question_2: Question,
-        problem_question_list: list[ProblemQuestion2],
+        problem_question_list: list[ProblemQuestion],
     ) -> bool:
         for problem_question in problem_question_list:
             url_1 = problem_question.question_1_url
@@ -142,7 +136,8 @@ def title_matched_questions_are_problematic(
 ) -> bool:
     assert len(title_matched_questions) > 1
     assert (
-        len(set([q.question_text for q in title_matched_questions])) == 1
+        len(set([q.question_text.lower().strip() for q in title_matched_questions]))
+        == 1
     ), "When matching question titles, question titles must be the same"
 
     warning_message: str = ""

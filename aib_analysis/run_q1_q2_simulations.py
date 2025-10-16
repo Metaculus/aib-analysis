@@ -240,12 +240,12 @@ if __name__ == "__main__":
     #     output_folder="local/q3_2024_simulations/",
     # )
 
-    # main(
-    #     pro_path="local/private_input_data/pro_forecasts_q4.csv",
-    #     bot_path="local/private_input_data/bot_forecasts_q4.csv",
-    #     quarterly_cup_path=None,
-    #     output_folder="local/q4_2024_simulations/",
-    # )
+    main(
+        pro_path="local/private_input_data/pro_forecasts_q4.csv",
+        bot_path="local/private_input_data/bot_forecasts_q4.csv",
+        quarterly_cup_path=None,
+        output_folder="local/q4_2024_simulations/",
+    )
 
     # main(
     #     pro_path="local/private_input_data/pro_forecasts_q4.csv",
@@ -255,12 +255,12 @@ if __name__ == "__main__":
     #     bot_team_size=1,
     # )
 
-    main(
-        pro_path="input_data/pro_forecasts_q1.csv",
-        bot_path="input_data/bot_forecasts_q1.csv",
-        quarterly_cup_path=None,  # "local/quarterly_cup_forecats_before_cp_reveal_time_q1.csv",
-        output_folder="local/q1_2025_simulations/",
-    )
+    # main(
+    #     pro_path="input_data/pro_forecasts_q1.csv",
+    #     bot_path="input_data/bot_forecasts_q1.csv",
+    #     quarterly_cup_path=None,  # "local/quarterly_cup_forecats_before_cp_reveal_time_q1.csv",
+    #     output_folder="local/q1_2025_simulations/",
+    # )
 
     # main(
     #     pro_path="input_data/pro_forecasts_q2.csv",

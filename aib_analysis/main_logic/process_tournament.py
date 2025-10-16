@@ -18,14 +18,14 @@ from aib_analysis.data_structures.data_models import (
     ScoreType,
     User,
 )
-from aib_analysis.data_structures.problem_questions_2 import ProblemManager2
+from aib_analysis.data_structures.problem_questions import (
+    ProblemManager,
+    title_matched_questions_are_problematic,
+)
 from aib_analysis.data_structures.simulated_tournament import (
     SimulatedTournament,
 )
 from aib_analysis.math.aggregate import create_aggregated_user_at_spot_time
-from aib_analysis.data_structures.problem_questions_2 import (
-    title_matched_questions_are_problematic,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def combine_tournaments(
             hash_2 = question_2.get_hash_for_tournament_matching()
             hashes_match = hash_1 == hash_2
 
-            should_be_forced_matched = ProblemManager2.should_be_forced_matched(
+            should_be_forced_matched = ProblemManager.should_be_forced_matched(
                 question_1, question_2
             )
 
@@ -245,7 +245,7 @@ def smart_remove_questions_from_tournament(
                     f"Question {current_question.url} is in the list of questions to exclude. Removing it from the tournament."
                 )
                 matches_with_current_question.append(question_to_exclude)
-            elif ProblemManager2.should_be_forced_matched(
+            elif ProblemManager.should_be_forced_matched(
                 current_question, question_to_exclude
             ):
                 logger.debug(
