@@ -70,6 +70,8 @@ def display_individual_tournament(tournament: SimulatedTournament, name: str):
         display_forecasts(tournament)
     with st.expander(f"{name} Questions"):
         display_questions(tournament.questions, tournament)
+    with st.expander(f"{name} Scores"):
+        display_scores(tournament.scores)
     # with st.expander(f"{name} Calibration Curve"):
     #     display_calibration_curve(tournament)
 
@@ -101,9 +103,13 @@ def display_bot_v_pro_hypothesis_test(
                 st.write(f"## {entry.user.name}")
                 st.write(f"### Equal to {hypothesis_mean}")
                 st.write(f"**P-value**: {equal_to_hypothesis_test.p_value:.5f}")
+                st.write(f"**Shapiro test passes**: {equal_to_hypothesis_test.shapiro_test_passes}")
+                st.write(f"**N > 30**: {len(observations) > 30} (N = {len(observations)})")
                 st.write(equal_to_hypothesis_test.written_conclusion)
                 st.write(f"### Greater than {hypothesis_mean}")
                 st.write(f"**P-value**: {greater_than_hypothesis_test.p_value:.5f}")
+                st.write(f"**Shapiro test passes**: {greater_than_hypothesis_test.shapiro_test_passes}")
+                st.write(f"**N > 30**: {len(observations) > 30} (N = {len(observations)})")
                 st.write(greater_than_hypothesis_test.written_conclusion)
             except Exception as e:
                 st.write(f"Error: {e}")
@@ -265,6 +271,19 @@ def display_questions(
     df = pd.DataFrame(data)
     st.dataframe(df, use_container_width=True)
 
+def display_scores(scores: list[Score]):
+    st.write(f"**Number of scores**: {len(scores)}")
+    data = []
+    for score in scores:
+        data.append({
+            "score": score.score,
+            "type": score.type.value,
+            "user": score.forecast.user.name,
+            "url": score.forecast.question.url,
+            "question_text": score.forecast.question.question_text,
+        })
+    df = pd.DataFrame(data)
+    st.dataframe(df, use_container_width=True)
 
 def display_leaderboard(leaderboard: Leaderboard):
     confidence_level = 0.95

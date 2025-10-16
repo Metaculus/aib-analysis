@@ -140,12 +140,14 @@ def _squash_questions_and_get_their_forecasts(
 
     if use_tourn_1_weights:
         squashed_weight = question_t1.weight
+        tournament_name = tournament_1.name
     else:
         squashed_weight = question_t2.weight
+        tournament_name = tournament_2.name
 
     if question_t1.weight != question_t2.weight:
         logger.warning(
-            f"Question weights are different: {question_t1.weight} != {question_t2.weight}. Using tournament 1 weights are set to {use_tourn_1_weights} (this is tournament {tournament_1.name})."
+            f"Question weights are different: {question_t1.weight} != {question_t2.weight}. Using weight {squashed_weight} from {tournament_name}."
         )
 
     max_spot_scoring_time = max(

@@ -1,8 +1,13 @@
-from aib_analysis.math.stats import ConfidenceIntervalCalculator, MeanHypothesisCalculator, ObservationStats
+from aib_analysis.math.stats import (
+    ConfidenceIntervalCalculator,
+    MeanHypothesisCalculator,
+    ObservationStats,
+)
 
 import pytest
 
 # NOTE: tests were copied from forecasting-tools stats testing
+
 
 class TestConfidenceInterval:
 
@@ -244,7 +249,6 @@ class TestMeanStatCalculator:
         assert hypothesis_test.p_value == pytest.approx(0.0396, 0.01)
         assert hypothesis_test.hypothesis_rejected == False
 
-
     def test_mean_is_equal_to_hypothesis_mean(self) -> None:
         # https://ecampusontario.pressbooks.pub/introstats/chapter/8-7-hypothesis-tests-for-a-population-mean-with-unknown-population-standard-deviation/
         hypothesis_mean = 3.78
@@ -260,7 +264,10 @@ class TestMeanStatCalculator:
         )
 
         hypothesis_test = MeanHypothesisCalculator._test_if_mean_is_equal_to_than_hypothesis_mean_w_observation_stats(
-            observation_stats, hypothesis_mean, confidence
+            observation_stats,
+            hypothesis_mean,
+            shapiro_test_passes=None,
+            confidence=confidence,
         )
 
         assert hypothesis_test.p_value == pytest.approx(0.0244, 0.01)
