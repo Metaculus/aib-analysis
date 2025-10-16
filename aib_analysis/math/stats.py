@@ -1,10 +1,12 @@
+from typing import Literal
+
 import numpy as np
 import scipy.stats as stats
 from pydantic import BaseModel
 from scipy.stats import shapiro, t
 
 
-class ConfidenceInterval(BaseModel):
+class TBasedConfidenceInterval(BaseModel):
     mean: float
     margin_of_error: float
     standard_deviation: float
@@ -18,17 +20,63 @@ class ConfidenceInterval(BaseModel):
         return self.mean + self.margin_of_error
 
 
+class BootstrapConfidenceInterval(BaseModel):
+    mean: float
+    lower_bound: float
+    upper_bound: float
+
+
+class ConfidenceInterval(BaseModel):
+    t_based_confidence_interval: TBasedConfidenceInterval
+    bootstrap_confidence_interval: BootstrapConfidenceInterval
+    default_confidence_interval: Literal["t_based", "bootstrap"] = "t_based"
+
+    @property
+    def lower_bound(self) -> float:
+        return self._get_correct_interval().lower_bound
+
+    @property
+    def upper_bound(self) -> float:
+        return self._get_correct_interval().upper_bound
+
+    @property
+    def mean(self) -> float:
+        return self._get_correct_interval().mean
+
+    def _get_correct_interval(
+        self,
+    ) -> TBasedConfidenceInterval | BootstrapConfidenceInterval:
+        if (
+            self.default_confidence_interval == "t_based"
+            and self.t_based_confidence_interval is not None
+        ):
+            return self.t_based_confidence_interval
+        elif (
+            self.default_confidence_interval == "bootstrap"
+            and self.bootstrap_confidence_interval is not None
+        ):
+            return self.bootstrap_confidence_interval
+        else:
+            raise ValueError(
+                f"Invalid default confidence interval: {self.default_confidence_interval}"
+            )
+
+
 class ConfidenceIntervalCalculator:
+    DEFAULT_NUM_BOOTSTRAPS = 9999
 
     @classmethod
     def confidence_interval_from_observations(
-        cls, observations: list[float], confidence: float = 0.9
+        cls,
+        observations: list[float],
+        confidence: float = 0.9,
+        num_bootstraps: int = DEFAULT_NUM_BOOTSTRAPS,
     ) -> ConfidenceInterval:
         """
         This solves the following stats problem:
         'estimating population mean with unknown population standard deviation'
 
-        Requirements
+        Requirements for T-based confidence interval:
         - Simple random sample
         - Either the sample is from a normally distributed population or n >30
         - Observations are independent
@@ -48,8 +96,17 @@ class ConfidenceIntervalCalculator:
         sample_mean = np.mean(observations)
         sample_std = np.std(observations, ddof=1)
 
-        return cls.confidence_interval_from_mean_and_std(
+        t_based_confidence_interval = cls.confidence_interval_from_mean_and_std(
             float(sample_mean), float(sample_std), sample_size, confidence
+        )
+        bootstrap_confidence_interval = (
+            cls.bootstrap_confidence_interval_from_observations(
+                observations, confidence
+            )
+        )
+        return ConfidenceInterval(
+            t_based_confidence_interval=t_based_confidence_interval,
+            bootstrap_confidence_interval=bootstrap_confidence_interval,
         )
 
     @classmethod
@@ -59,16 +116,58 @@ class ConfidenceIntervalCalculator:
         sample_std: float,
         sample_size: int,
         confidence: float,
-    ) -> ConfidenceInterval:
+    ) -> TBasedConfidenceInterval:
         standard_error = sample_std / np.sqrt(sample_size)
         alpha = 1 - confidence
         critical_value = t.ppf(1 - alpha / 2, sample_size - 1)
         margin_of_error = critical_value * standard_error
 
-        return ConfidenceInterval(
+        return TBasedConfidenceInterval(
             mean=float(sample_mean),
             margin_of_error=margin_of_error,
             standard_deviation=float(sample_std),
+        )
+
+    @classmethod
+    def bootstrap_confidence_interval_from_observations(
+        cls,
+        observations: list[float],
+        confidence: float,
+        num_bootstraps: int = DEFAULT_NUM_BOOTSTRAPS,
+    ) -> BootstrapConfidenceInterval:
+        statistics: list[float] = []
+        for _ in range(num_bootstraps):
+            percentage_to_sample = 1.0
+            sample = np.random.choice(
+                observations,
+                size=int(len(observations) * percentage_to_sample),
+                replace=True,
+            )
+            statistic = np.mean(sample)
+            statistics.append(float(statistic))
+
+        alpha = 1 - confidence
+
+        ordered = sorted(statistics)
+        lower = np.percentile(ordered, (alpha / 2) * 100)
+        upper = np.percentile(ordered, (1 - alpha / 2) * 100)
+        mean = np.mean(observations)
+
+        # Visualize the distribution of the bootstrap statistics if needed
+        # import matplotlib.pyplot as plt
+        # import streamlit as st
+
+        # fig, ax = plt.subplots()
+        # ax.hist(statistics, bins=30)
+        # ax.set_xlabel('Bootstrap Statistics')
+        # ax.set_ylabel('Frequency')
+        # ax.set_title('Distribution of Bootstrap Statistics')
+        # st.pyplot(fig)
+
+        return BootstrapConfidenceInterval(
+            mean=float(mean),
+            lower_bound=float(lower),
+            upper_bound=float(upper),
         )
 
 
@@ -77,6 +176,7 @@ class HypothesisTest(BaseModel):
     hypothesis_rejected: bool
     written_conclusion: str | None = None
     shapiro_test_passes: bool | None
+    interval_type: Literal["t_based", "bootstrap"]
 
 
 class ObservationStats(BaseModel):
@@ -187,6 +287,7 @@ class MeanHypothesisCalculator:
             hypothesis_rejected=hypothesis_rejected,
             written_conclusion=written_conclusion,
             shapiro_test_passes=shapiro_test_passes,
+            interval_type="t_based",
         )
 
     @classmethod
@@ -218,6 +319,7 @@ class MeanHypothesisCalculator:
             hypothesis_rejected=hypothesis_rejected,
             written_conclusion=written_conclusion,
             shapiro_test_passes=shapiro_test_passes,
+            interval_type="t_based",
         )
 
 
