@@ -21,7 +21,11 @@ from aib_analysis.main_logic.process_tournament import (
     find_question_titles_unique_to_first_tournament,
     get_leaderboard,
 )
-from aib_analysis.math.stats import MeanHypothesisCalculator
+from aib_analysis.math.stats import (
+    MeanHypothesisCalculator,
+    HypothesisTest,
+    ConfidenceIntervalCalculator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -100,19 +104,47 @@ def display_bot_v_pro_hypothesis_test(
                 greater_than_hypothesis_test = MeanHypothesisCalculator.test_if_mean_is_greater_than_hypothesis_mean(
                     observations, hypothesis_mean, confidence_level
                 )
+                confidence_interval = (
+                    ConfidenceIntervalCalculator.confidence_interval_from_observations(
+                        observations, confidence_level
+                    )
+                )
+                bootstrap_ci = confidence_interval.bootstrap_confidence_interval
+                t_based_ci = confidence_interval.t_based_confidence_interval
+
                 st.write(f"## {entry.user.name}")
                 st.write(f"### Equal to {hypothesis_mean}")
-                st.write(f"**P-value**: {equal_to_hypothesis_test.p_value:.5f}")
-                st.write(f"**Shapiro test passes**: {equal_to_hypothesis_test.shapiro_test_passes}")
-                st.write(f"**N > 30**: {len(observations) > 30} (N = {len(observations)})")
-                st.write(equal_to_hypothesis_test.written_conclusion)
+                _display_hypothesis_sub_section(equal_to_hypothesis_test, observations)
                 st.write(f"### Greater than {hypothesis_mean}")
-                st.write(f"**P-value**: {greater_than_hypothesis_test.p_value:.5f}")
-                st.write(f"**Shapiro test passes**: {greater_than_hypothesis_test.shapiro_test_passes}")
-                st.write(f"**N > 30**: {len(observations) > 30} (N = {len(observations)})")
-                st.write(greater_than_hypothesis_test.written_conclusion)
+                _display_hypothesis_sub_section(
+                    greater_than_hypothesis_test, observations
+                )
+                st.write(f"### Confidence Intervals")
+                if t_based_ci is not None:
+                    st.write(
+                        f"T-based Confidence Interval: "
+                        f"{t_based_ci.lower_bound:.5f} - "
+                        f"{t_based_ci.upper_bound:.5f}"
+                    )
+                if bootstrap_ci is not None:
+                    st.write(
+                        f"Bootstrap Confidence Interval: "
+                        f"{bootstrap_ci.lower_bound:.5f} - "
+                        f"{bootstrap_ci.upper_bound:.5f}"
+                    )
+
             except Exception as e:
                 st.write(f"Error: {e}")
+
+
+def _display_hypothesis_sub_section(
+    hypothesis_test: HypothesisTest, observations: list[float]
+):
+    st.write(f"**P-value**: {hypothesis_test.p_value:.5f}")
+    st.write(f"**Shapiro test passes**: {hypothesis_test.shapiro_test_passes}")
+    st.write(f"**N > 30**: {len(observations) > 30} (N = {len(observations)})")
+    st.write(f"**Interval Type**: {hypothesis_test.interval_type}")
+    st.write(hypothesis_test.written_conclusion)
 
 
 def display_tournament_stats(tournament: SimulatedTournament) -> None:
@@ -271,19 +303,23 @@ def display_questions(
     df = pd.DataFrame(data)
     st.dataframe(df, use_container_width=True)
 
+
 def display_scores(scores: list[Score]):
     st.write(f"**Number of scores**: {len(scores)}")
     data = []
     for score in scores:
-        data.append({
-            "score": score.score,
-            "type": score.type.value,
-            "user": score.forecast.user.name,
-            "url": score.forecast.question.url,
-            "question_text": score.forecast.question.question_text,
-        })
+        data.append(
+            {
+                "score": score.score,
+                "type": score.type.value,
+                "user": score.forecast.user.name,
+                "url": score.forecast.question.url,
+                "question_text": score.forecast.question.question_text,
+            }
+        )
     df = pd.DataFrame(data)
     st.dataframe(df, use_container_width=True)
+
 
 def display_leaderboard(leaderboard: Leaderboard):
     confidence_level = 0.95
@@ -304,24 +340,44 @@ def _display_leaderboard_table(leaderboard: Leaderboard, confidence_level: float
         bottom_n_scores = entry.bottom_n_scores(num_to_display)
         try:
             confidence_interval = entry.get_confidence_interval(confidence_level)
-            upper_bound = confidence_interval.upper_bound
-            lower_bound = confidence_interval.lower_bound
+            t_based_confidence_interval = (
+                confidence_interval.t_based_confidence_interval
+            )
+            if t_based_confidence_interval is not None:
+                t_based_upper_bound = t_based_confidence_interval.upper_bound
+                t_based_lower_bound = t_based_confidence_interval.lower_bound
+            else:
+                t_based_upper_bound = None
+                t_based_lower_bound = None
+            bootstrap_confidence_interval = (
+                confidence_interval.bootstrap_confidence_interval
+            )
+            if bootstrap_confidence_interval is not None:
+                bootstrap_upper_bound = bootstrap_confidence_interval.upper_bound
+                bootstrap_lower_bound = bootstrap_confidence_interval.lower_bound
+            else:
+                bootstrap_upper_bound = None
+                bootstrap_lower_bound = None
         except Exception as e:
             logger.debug(
                 f"Failed to get confidence interval for entry {entry.user.name}: {e}"
             )
-            upper_bound = None
-            lower_bound = None
+            t_based_upper_bound = None
+            t_based_lower_bound = None
+            bootstrap_upper_bound = None
+            bootstrap_lower_bound = None
         data.append(
             {
                 "rank": i + 1,
                 "user": entry.user.name,
-                "user_type": entry.user.type.value,
                 "sum_of_scores": entry.sum_of_scores,
                 "average_score": entry.average_score,
-                "average_upper_bound": upper_bound,
-                "average_lower_bound": lower_bound,
+                "avg_lower_bound_t_based": t_based_lower_bound,
+                "avg_upper_bound_t_based": t_based_upper_bound,
+                "avg_lower_bound_bootstrap": bootstrap_lower_bound,
+                "avg_upper_bound_bootstrap": bootstrap_upper_bound,
                 "num_questions_with_scores": entry.question_count,
+                "user_type": entry.user.type.value,
                 "aggregated_users": [user.name for user in entry.user.aggregated_users],
                 "random_sample_of_scores": [
                     score.display_score_and_question()
