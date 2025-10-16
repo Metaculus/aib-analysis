@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from numpy import true_divide
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 from typing_extensions import Self
 
@@ -15,7 +16,9 @@ from aib_analysis.data_structures.data_models import (
     ScoreType,
     User,
 )
-from aib_analysis.data_structures.problem_questions import ProblemManager
+from aib_analysis.data_structures.problem_questions_2 import (
+    title_matched_questions_are_problematic,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +31,10 @@ class SimulatedTournament(BaseModel):
     it will fill in all the other properties for you on initialization
     (including scores)
     """
+
     name: str | None = None
     forecasts: list[Forecast] = Field(default_factory=list)
-    scores_cache: dict[str, Score] = Field(default_factory=dict) # score_id -> Score
+    scores_cache: dict[str, Score] = Field(default_factory=dict)  # score_id -> Score
 
     @model_validator(mode="after")
     def initialize_tournament(self) -> Self:
@@ -53,7 +57,7 @@ class SimulatedTournament(BaseModel):
             f"Finished initializing scoring caches for {len(self.scores)} scores"
         )
 
-        self._validate_no_duplicate_questions()
+        self._validate_no_duplicates_or_inconsistencies()
         self._validate_one_user_question_per_spot_score()
         self._validate_num_scores_match_num_spot_forecasts()
 
@@ -86,12 +90,18 @@ class SimulatedTournament(BaseModel):
         ), "Spot forecasts cache is not initialized"
         return list(self._spot_forecasts_cache.values())
 
-    _user_cache: dict[str, User] = PrivateAttr(default_factory=dict) # user_name -> User
-    _question_cache: dict[int, Question] = PrivateAttr(default_factory=dict) # question_id -> Question
+    _user_cache: dict[str, User] = PrivateAttr(
+        default_factory=dict
+    )  # user_name -> User
+    _question_cache: dict[int, Question] = PrivateAttr(
+        default_factory=dict
+    )  # question_id -> Question
 
-    _spot_forecasts_cache: dict[str, Forecast] = PrivateAttr(default_factory=dict) # forecast_id -> Forecast
+    _spot_forecasts_cache: dict[str, Forecast] = PrivateAttr(
+        default_factory=dict
+    )  # forecast_id -> Forecast
     _question_to_spot_forecasts_cache: dict[int, list[Forecast]] = PrivateAttr(
-        default_factory=dict # question_id -> list[Forecast]
+        default_factory=dict  # question_id -> list[Forecast]
     )
 
     def question_to_spot_forecasts(self, question_id: int) -> list[Forecast]:
@@ -165,8 +175,12 @@ class SimulatedTournament(BaseModel):
             if not forecast.question.is_log_scale
         ]
         if not (len(non_log_scale_forecasts) == len(self.forecasts)):
-            non_log_scaled_questions = [question for question in self.questions if question.is_log_scale]
-            logger.warning(f"Removed {len(self.forecasts) - len(non_log_scale_forecasts)} log scale forecasts and {len(self.questions) - len(non_log_scaled_questions)} log scale questions")
+            non_log_scaled_questions = [
+                question for question in self.questions if question.is_log_scale
+            ]
+            logger.warning(
+                f"Removed {len(self.forecasts) - len(non_log_scale_forecasts)} log scale forecasts and {len(self.questions) - len(non_log_scaled_questions)} log scale questions"
+            )
         self.forecasts = non_log_scale_forecasts
 
     def _initialize_spot_forecast_cache(self) -> None:
@@ -276,7 +290,6 @@ class SimulatedTournament(BaseModel):
         assert len(self.forecasts) > 0, "No forecasts found"
         assert len(spot_forecasts) > 0, "No spot forecasts found"
 
-
     def _validate_spot_forecasters_equal_forecasters(self) -> None:
         for question in self.questions:
             forecasts = self.question_to_forecasts(question.question_id)
@@ -292,36 +305,16 @@ class SimulatedTournament(BaseModel):
                 num_of_forecasts >= num_of_spot_forecasts
             ), f"Number of forecasts ({num_of_forecasts}) and number of spot forecasts ({num_of_spot_forecasts}) do not match for question {question.question_id} ({question.url})"
 
-    def _validate_no_duplicate_questions(self) -> None:
+    def _validate_no_duplicates_or_inconsistencies(self) -> None:
         question_text_map: dict[str, list[Question]] = {}
         for question in self.questions:
             question_text_map.setdefault(question.question_text, []).append(question)
 
-        duplicate_warning_messages = []
-        for question_text, questions in question_text_map.items():
+        for _, questions in question_text_map.items():
             assert len(questions) > 0
             if len(questions) == 1:
                 continue
-            if ProblemManager.dont_log_in_duplicate_detection_within_tournament(
-                questions
-            ):
-                logger.info(
-                    f"Duplicate question is prequalified for q1 bot tournament: {[q.url for q in questions]}"
-                )
-                continue
-            error_message = "# Duplicates for question text: " + question_text + "\n"
-            error_message += Question.question_comparison_table(questions)
-            duplicate_warning_messages.append(error_message)
-
-        if len(duplicate_warning_messages) > 0:
-            combined_error_message = "\n\n".join(duplicate_warning_messages)
-            logger.warning(
-                f"Duplicate question texts found in questions: \n{combined_error_message}"
-            )
-
-        tournament_matching_hashes = [question.get_hash_for_tournament_matching() for question in self.questions]
-        if len(tournament_matching_hashes) != len(set(tournament_matching_hashes)):
-            logger.warning(f"Duplicate tournament matching hashes found in questions (questions are too similar on their core fields). num unique hashes: {len(set(tournament_matching_hashes))}, num hashes: {len(tournament_matching_hashes)}, num questions: {len(self.questions)}")
+            title_matched_questions_are_problematic(questions, log_results=True)
 
         question_ids = [question.question_id for question in self.questions]
         if len(question_ids) != len(set(question_ids)):
@@ -347,7 +340,9 @@ class SimulatedTournament(BaseModel):
                     f"Question {question.question_id} ({question.url}) has only "
                     f"{len(forecasts_for_question)} forecasts out of {total_users} participants"
                 )
-                logger.debug(f"Question {question.question_id} ({question.url}) has only {len(forecasts_for_question)} forecasts out of {total_users} participants")
+                logger.debug(
+                    f"Question {question.question_id} ({question.url}) has only {len(forecasts_for_question)} forecasts out of {total_users} participants"
+                )
                 questions_with_too_few_forecasts.append(question)
 
         if len(questions_with_too_few_forecasts) > 0:
