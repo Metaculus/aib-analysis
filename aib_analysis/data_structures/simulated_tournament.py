@@ -16,7 +16,7 @@ from aib_analysis.data_structures.data_models import (
     ScoreType,
     User,
 )
-from aib_analysis.data_structures.problem_questions_2 import (
+from aib_analysis.data_structures.problem_questions import (
     title_matched_questions_are_problematic,
 )
 
