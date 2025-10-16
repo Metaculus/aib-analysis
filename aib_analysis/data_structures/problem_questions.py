@@ -152,8 +152,8 @@ def title_matched_questions_are_problematic(
     elif len(non_annulled_questions) == 1:
         unique_projects = list(set([q.project for q in title_matched_questions]))
         if len(unique_projects) > 1:
-            warning_message = f"Same-titles questions appear from both projects, but are not matched: {[q.url for q in title_matched_questions]}"
-            log_comparison_table = True
+            warning_message = f"[No action needed] Same-titles questions appear from both projects, but are not matched. Not much we can do to match them if leaderboards are finalized.: {[q.url for q in title_matched_questions]}"
+            log_comparison_table = False
     elif len(non_annulled_questions) == 2:
         project_name_1 = non_annulled_questions[0].project
         project_name_2 = non_annulled_questions[1].project
@@ -168,7 +168,7 @@ def title_matched_questions_are_problematic(
                 f"Identical questions found in same tournament: {[q.url for q in title_matched_questions]}"
             )  # Probably triggered by combining two tournaments with different teams.
         elif from_same_tournament and not hashes_match:
-            warning_message = f"Same-titled non-annulled questions found in same tournament. Could be mistake or testing scope sensitivity: {[q.url for q in title_matched_questions]}"
+            warning_message = f"[Probably fine] Same-titled non-annulled questions found in same tournament. Could be mistake or testing scope sensitivity: {[q.url for q in title_matched_questions]}"
         elif not from_same_tournament and hashes_match:
             pass  # The questions are intended to be matched.
     elif len(non_annulled_questions) > 2:
@@ -201,6 +201,10 @@ def title_matched_questions_are_problematic(
 
 """
 TODO: Record these in some way:
+
+Q4 Remove from comparison
+| URL | https://www.metaculus.com/questions/30994/ | https://www.metaculus.com/questions/31033/ |
+One was incorrectly marked as "No" When it should be "ambiguous"
 
 Q2 Remove from comparison
     ProblemQuestion(

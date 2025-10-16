@@ -76,6 +76,7 @@ class HypothesisTest(BaseModel):
     p_value: float
     hypothesis_rejected: bool
     written_conclusion: str | None = None
+    shapiro_test_passes: bool | None
 
 
 class ObservationStats(BaseModel):
@@ -109,9 +110,13 @@ class MeanHypothesisCalculator:
         assert 0 < confidence < 1, "Confidence must be between 0 and 1"
         test_normality_assumption(len(observations), observations)
         observation_stats = cls._get_observation_stats(observations)
-        return cls._test_if_mean_is_greater_w_observation_stats(
-            observation_stats, hypothesis_mean, confidence
+        result = cls._test_if_mean_is_greater_w_observation_stats(
+            observation_stats,
+            hypothesis_mean,
+            shapiro_test_passes=shapiro_test_passes(observations),
+            confidence=confidence,
         )
+        return result
 
     @classmethod
     def test_if_mean_is_equal_to_than_hypothesis_mean(
@@ -132,9 +137,13 @@ class MeanHypothesisCalculator:
         assert 0 < confidence < 1, "Confidence must be between 0 and 1"
         test_normality_assumption(len(observations), observations)
         observation_stats = cls._get_observation_stats(observations)
-        return cls._test_if_mean_is_equal_to_than_hypothesis_mean_w_observation_stats(
-            observation_stats, hypothesis_mean, confidence
+        result = cls._test_if_mean_is_equal_to_than_hypothesis_mean_w_observation_stats(
+            observation_stats,
+            hypothesis_mean,
+            shapiro_test_passes=shapiro_test_passes(observations),
+            confidence=confidence,
         )
+        return result
 
     @classmethod
     def _get_observation_stats(cls, observations: list[float]) -> ObservationStats:
@@ -153,6 +162,7 @@ class MeanHypothesisCalculator:
         cls,
         observation_stats: ObservationStats,
         hypothesis_mean: float,
+        shapiro_test_passes: bool | None,
         confidence: float = 0.95,
     ) -> HypothesisTest:
         test_normality_assumption(observation_stats.count)
@@ -176,6 +186,7 @@ class MeanHypothesisCalculator:
             p_value=p_value,
             hypothesis_rejected=hypothesis_rejected,
             written_conclusion=written_conclusion,
+            shapiro_test_passes=shapiro_test_passes,
         )
 
     @classmethod
@@ -183,6 +194,7 @@ class MeanHypothesisCalculator:
         cls,
         observation_stats: ObservationStats,
         hypothesis_mean: float,
+        shapiro_test_passes: bool | None,
         confidence: float = 0.95,
     ) -> HypothesisTest:
         test_normality_assumption(observation_stats.count)
@@ -205,7 +217,13 @@ class MeanHypothesisCalculator:
             p_value=p_value,
             hypothesis_rejected=hypothesis_rejected,
             written_conclusion=written_conclusion,
+            shapiro_test_passes=shapiro_test_passes,
         )
+
+
+def shapiro_test_passes(observations: list[float]) -> bool:
+    _, normality_pvalue = shapiro(observations)
+    return normality_pvalue > 0.05
 
 
 def test_normality_assumption(
@@ -214,10 +232,8 @@ def test_normality_assumption(
     if sample_size < 2:
         raise ValueError("Not enough data for T-based confidence interval")
 
-    if sample_size < 30 and observations:
-        _, normality_pvalue = shapiro(observations)
-        if normality_pvalue < 0.05:
+    if observations and sample_size < 30:
+        if not shapiro_test_passes(observations):
             raise ValueError(
                 "Data fails normality assumption for T-based confidence interval"
             )
-
