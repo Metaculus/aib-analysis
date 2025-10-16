@@ -42,6 +42,7 @@ def get_leaderboard(
             )
     return Leaderboard(entries=entries, type=score_type)
 
+
 def combine_tournaments(
     tournament_1: SimulatedTournament,
     tournament_2: SimulatedTournament,
@@ -67,14 +68,18 @@ def combine_tournaments(
             hash_2 = question_2.get_hash_for_tournament_matching()
             hashes_match = hash_1 == hash_2
 
-            should_be_forced_matched = ProblemManager2.should_be_forced_matched(question_1, question_2)
+            should_be_forced_matched = ProblemManager2.should_be_forced_matched(
+                question_1, question_2
+            )
 
             if hashes_match or should_be_forced_matched:
                 hash_already_used = matching_questions.get(hash_1, None) is not None
                 if hash_already_used:
                     existing_questions = matching_questions[hash_1]
                     existing_urls = [question.url for question in existing_questions]
-                    raise ValueError(f"Question hash already had a question mapping. Existing questions: {existing_urls}. New match found: {question_1.url} and {question_2.url}")
+                    raise ValueError(
+                        f"Question hash already had a question mapping. Existing questions: {existing_urls}. New match found: {question_1.url} and {question_2.url}"
+                    )
 
                 matching_questions[hash_1] = [question_1, question_2]
 
@@ -84,7 +89,9 @@ def combine_tournaments(
     combined_forecasts: list[Forecast] = []
     for question_match in matching_questions.values():
         if len(question_match) != 2:
-            raise ValueError(f"Found {len(question_match)} questions in a match. Expected 2. {question_match}")
+            raise ValueError(
+                f"Found {len(question_match)} questions in a match. Expected 2. {question_match}"
+            )
         new_forecasts = _squash_questions_and_get_their_forecasts(
             question_match, tournament_1, tournament_2, use_tourn_1_weights
         )
@@ -105,48 +112,120 @@ def log_title_mapping_inconsistencies(
         cleaned_question_text = question.question_text.lower().strip()
         question_text_mapping.setdefault(cleaned_question_text, []).append(question)
 
+    warning_message = ""
     for _, title_matched_questions in question_text_mapping.items():
         if len(title_matched_questions) < 2:
             continue
 
-        if ProblemManager.dont_log_in_tournament_matching(title_matched_questions):
+        non_annulled_questions = [
+            q for q in title_matched_questions if not q.is_annulled_or_ambiguous
+        ]
+
+        log_comparison_table = False
+        if len(non_annulled_questions) == 0:
             logger.info(
-                f"Prequalified Mismatch for tournament matching: {[q.url for q in title_matched_questions]}"
+                f"Matching question titles found, but all are annulled: {[q.url for q in title_matched_questions]}"
             )
-            continue
+        elif len(non_annulled_questions) == 1:
+            unique_projects = list(set([q.project for q in title_matched_questions]))
+            if len(unique_projects) > 1:
+                warning_message = (
+                    f"Same-titles questions appear from both projects, but are not matched: {[q.url for q in title_matched_questions]}"
+                )
+                log_comparison_table = True
+        elif len(non_annulled_questions) == 2:
+            project_name_1 = non_annulled_questions[0].project
+            project_name_2 = non_annulled_questions[1].project
+            hash_1 = non_annulled_questions[0].get_hash_for_tournament_matching()
+            hash_2 = non_annulled_questions[1].get_hash_for_tournament_matching()
 
-        hashes = [q.get_hash_for_tournament_matching() for q in title_matched_questions]
-        if all(hash == hashes[0] for hash in hashes):
-            continue
+            from_same_tournament = project_name_1 == project_name_2
+            hashes_match = hash_1 == hash_2
 
-        some_questions_in_t1 = any(
-            q in tournament_1.questions for q in title_matched_questions
-        )
-        some_questions_in_t2 = any(
-            q in tournament_2.questions for q in title_matched_questions
-        )
+            if from_same_tournament and hashes_match:
+                logger.debug(
+                    f"Identical questions found in same tournament: {[q.url for q in title_matched_questions]}"
+                ) # Probably triggered by combining two tournaments with different teams.
+            elif from_same_tournament and not hashes_match:
+                warning_message = (
+                    f"Same-titled non-annulled questions found in same tournament. Could be mistake or testing scope sensitivity: {[q.url for q in title_matched_questions]}"
+                )
+            elif not from_same_tournament and hashes_match:
+                pass  # The questions are intended to be matched.
+        elif len(non_annulled_questions) > 2:
+            unique_hashes = list(set([q.get_hash_for_tournament_matching() for q in non_annulled_questions]))
+            only_2_questions_match = len(unique_hashes) == len(non_annulled_questions) - 1
 
-        if some_questions_in_t1 and some_questions_in_t2:
+            if only_2_questions_match:
+                warning_message = (
+                    f"[Probably fine] Matching question titles found, but more than 2 are non-annulled. Only 2 of the questions have matching hashes which shouldn't cause problems.: {[q.url for q in title_matched_questions]}"
+                )
+            else:
+                warning_message = (
+                    f"Matching question titles found, but more than 2 are non-annulled: {[q.url for q in title_matched_questions]}"
+                )
+                log_comparison_table = True
+
+        if log_comparison_table:
             question_comparison_table = Question.question_comparison_table(
                 title_matched_questions, tournament_1.questions, tournament_2.questions
             )
-            logger.warning(
-                f"\n# Text-matched questions have different tournament-matching hashes "
-                "(NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):\n"
-                f"{question_comparison_table}"
-            )
-        else:
-            if ProblemManager.dont_log_in_duplicate_detection_within_tournament(
-                title_matched_questions
-            ):
-                logger.info(
-                    f"Prequalified duplicate within tournament: {[q.url for q in title_matched_questions]}"
-                )
-                continue
-            urls = [q.url for q in title_matched_questions]
-            logger.warning(
-                f"During combining touranments, found duplicate question title in same tournament: {urls}"
-            )
+            warning_message += f"\nQuestion comparison table:\n{question_comparison_table}"
+            logger.warning(warning_message)
+
+
+# def log_title_mapping_inconsistencies(
+#     tournament_1: SimulatedTournament,
+#     tournament_2: SimulatedTournament,
+# ) -> None:
+#     question_text_mapping: dict[str, list[Question]] = {}
+#     combined_questions: list[Question] = tournament_1.questions + tournament_2.questions
+#     for question in combined_questions:
+#         cleaned_question_text = question.question_text.lower().strip()
+#         question_text_mapping.setdefault(cleaned_question_text, []).append(question)
+
+#     for _, title_matched_questions in question_text_mapping.items():
+#         if len(title_matched_questions) < 2:
+#             continue
+
+#         if ProblemManager.dont_log_in_tournament_matching(title_matched_questions):
+#             logger.info(
+#                 f"Prequalified Mismatch for tournament matching: {[q.url for q in title_matched_questions]}"
+#             )
+#             continue
+
+#         hashes = [q.get_hash_for_tournament_matching() for q in title_matched_questions]
+#         if all(hash == hashes[0] for hash in hashes):
+#             continue
+
+#         some_questions_in_t1 = any(
+#             q in tournament_1.questions for q in title_matched_questions
+#         )
+#         some_questions_in_t2 = any(
+#             q in tournament_2.questions for q in title_matched_questions
+#         )
+
+#         if some_questions_in_t1 and some_questions_in_t2:
+#             question_comparison_table = Question.question_comparison_table(
+#                 title_matched_questions, tournament_1.questions, tournament_2.questions
+#             )
+#             logger.warning(
+#                 f"\n# Text-matched questions have different tournament-matching hashes "
+#                 "(NOTE: If more than 2 questions are in this list then a question pair that matches will still be combined):\n"
+#                 f"{question_comparison_table}"
+#             )
+#         else:
+#             if ProblemManager.dont_log_in_duplicate_detection_within_tournament(
+#                 title_matched_questions
+#             ):
+#                 logger.info(
+#                     f"Prequalified duplicate within tournament: {[q.url for q in title_matched_questions]}"
+#                 )
+#                 continue
+#             urls = [q.url for q in title_matched_questions]
+#             logger.warning(
+#                 f"During combining touranments, found duplicate question title in same tournament: {urls}"
+#             )
 
 
 def _squash_questions_and_get_their_forecasts(
@@ -383,7 +462,9 @@ def create_team_tournament(
         forecasts=t2_forecasts, name=f"{tournament_2.name} ({aggregate_name_2})"
     )
 
-    combined_tournament = combine_tournaments(t1_agg_tournament, t2_agg_tournament, use_tourn_1_weights=use_tourn_1_weights)
+    combined_tournament = combine_tournaments(
+        t1_agg_tournament, t2_agg_tournament, use_tourn_1_weights=use_tourn_1_weights
+    )
     return combined_tournament
 
 

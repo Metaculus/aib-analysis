@@ -94,6 +94,8 @@ force_match_questions: list[ProblemQuestion2] = [
     ),
 ]
 
+questions_to_remove_from_comparison: list[ProblemQuestion2] = []
+
 
 class ProblemManager2:
 
@@ -101,7 +103,26 @@ class ProblemManager2:
     def should_be_forced_matched(
         cls, question_1: Question, question_2: Question
     ) -> bool:
-        for problem_question in force_match_questions:
+        return cls._pair_matches_problem_question_in_list(
+            question_1, question_2, force_match_questions
+        )
+
+    @classmethod
+    def remove_question_pairing_from_comparison(
+        cls, question_1: Question, question_2: Question
+    ) -> bool:
+        return cls._pair_matches_problem_question_in_list(
+            question_1, question_2, questions_to_remove_from_comparison
+        )
+
+    @classmethod
+    def _pair_matches_problem_question_in_list(
+        cls,
+        question_1: Question,
+        question_2: Question,
+        problem_question_list: list[ProblemQuestion2],
+    ) -> bool:
+        for problem_question in problem_question_list:
             url_1 = problem_question.question_1_url
             url_2 = problem_question.question_2_url
 
