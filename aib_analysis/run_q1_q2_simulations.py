@@ -154,6 +154,7 @@ def main(
         comparison_vs_bot__teams,
         "comparison_vs_bot__teams.json",
         folder=output_folder,
+        divide_into_types=True,
         counter_override=number_to_use,
     )
     comparison_vs_pros__teams = create_team_tournament(
@@ -169,6 +170,7 @@ def main(
         comparison_vs_pros__teams,
         "comparison_vs_pro__teams.json",
         folder=output_folder,
+        divide_into_types=True,
         counter_override=number_to_use,
     )
 
@@ -246,14 +248,6 @@ if __name__ == "__main__":
         quarterly_cup_path=None,
         output_folder="local/q4_2024_simulations/",
     )
-
-    # main(
-    #     pro_path="local/private_input_data/pro_forecasts_q4.csv",
-    #     bot_path="local/private_input_data/bot_forecasts_q4.csv",
-    #     quarterly_cup_path=None,
-    #     output_folder="local/q4_2024_simulations_partial_w_bad_question/",
-    #     bot_team_size=1,
-    # )
 
     # main(
     #     pro_path="input_data/pro_forecasts_q1.csv",

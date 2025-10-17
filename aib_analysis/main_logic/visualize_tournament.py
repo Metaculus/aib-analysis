@@ -97,6 +97,7 @@ def display_bot_v_pro_hypothesis_test(
             raise ValueError(f"Expected 2 entries, got {len(entries)}")
         for entry in entries:
             try:
+                assert all([s.type == ScoreType.SPOT_PEER for s in entry.scores])
                 observations = [s.score for s in entry.scores]
                 equal_to_hypothesis_test = MeanHypothesisCalculator.test_if_mean_is_equal_to_than_hypothesis_mean(
                     observations, hypothesis_mean, confidence_level
@@ -120,18 +121,22 @@ def display_bot_v_pro_hypothesis_test(
                     greater_than_hypothesis_test, observations
                 )
                 st.write(f"### Confidence Intervals")
+                st.write(f"Observed Mean: {confidence_interval.mean:.5f}")
+                st.write(f"Hypothesis Mean: {hypothesis_mean:.5f}")
+                percentage_confidence_level = confidence_level * 100
                 if t_based_ci is not None:
                     st.write(
-                        f"T-based Confidence Interval: "
-                        f"{t_based_ci.lower_bound:.5f} - "
+                        f"T-based {percentage_confidence_level}% Confidence Interval: "
+                        f"{t_based_ci.lower_bound:.5f} to "
                         f"{t_based_ci.upper_bound:.5f}"
                     )
                 if bootstrap_ci is not None:
                     st.write(
-                        f"Bootstrap Confidence Interval: "
-                        f"{bootstrap_ci.lower_bound:.5f} - "
+                        f"Bootstrap {percentage_confidence_level}% Confidence Interval: "
+                        f"{bootstrap_ci.lower_bound:.5f} to "
                         f"{bootstrap_ci.upper_bound:.5f}"
                     )
+                st.write(f"--------------------------------")
 
             except Exception as e:
                 st.write(f"Error: {e}")
@@ -144,7 +149,7 @@ def _display_hypothesis_sub_section(
     st.write(f"**Shapiro test passes**: {hypothesis_test.shapiro_test_passes}")
     st.write(f"**N > 30**: {len(observations) > 30} (N = {len(observations)})")
     st.write(f"**Interval Type**: {hypothesis_test.interval_type}")
-    st.write(hypothesis_test.written_conclusion)
+    st.write(f"**Conclusion**: {hypothesis_test.written_conclusion}")
 
 
 def display_tournament_stats(tournament: SimulatedTournament) -> None:
@@ -333,13 +338,22 @@ def display_leaderboard(leaderboard: Leaderboard):
 
 def _display_leaderboard_table(leaderboard: Leaderboard, confidence_level: float):
     data = []
-    for i, entry in enumerate(leaderboard.entries_via_sum_of_scores()):
+    entries = leaderboard.entries_via_sum_of_scores()
+    include_bootstrap = len(entries) <= 10
+    for i, entry in enumerate(entries):
         num_to_display = min(5, entry.question_count)
         random_sample_of_scores = entry.randomly_sample_scores(num_to_display)
         top_n_scores = entry.top_n_scores(num_to_display)
         bottom_n_scores = entry.bottom_n_scores(num_to_display)
         try:
-            confidence_interval = entry.get_confidence_interval(confidence_level)
+            confidence_interval = entry.get_confidence_interval(
+                confidence_level,
+                num_bootstraps=(
+                    ConfidenceIntervalCalculator.DEFAULT_NUM_BOOTSTRAPS
+                    if include_bootstrap
+                    else None
+                ),
+            )
             t_based_confidence_interval = (
                 confidence_interval.t_based_confidence_interval
             )

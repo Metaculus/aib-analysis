@@ -68,6 +68,7 @@ def combine_tournaments(
         for question_2 in tournament_2.questions:
             hash_1 = question_1.get_hash_for_tournament_matching()
             hash_2 = question_2.get_hash_for_tournament_matching()
+            dictionary_key = f"{hash_1}_{hash_2}"
             hashes_match = hash_1 == hash_2
 
             should_be_forced_matched = ProblemManager.should_be_forced_matched(
@@ -75,15 +76,15 @@ def combine_tournaments(
             )
 
             if hashes_match or should_be_forced_matched:
-                hash_already_used = matching_questions.get(hash_1, None) is not None
+                hash_already_used = matching_questions.get(dictionary_key, None) is not None
                 if hash_already_used:
-                    existing_questions = matching_questions[hash_1]
+                    existing_questions = matching_questions[dictionary_key]
                     existing_urls = [question.url for question in existing_questions]
                     raise ValueError(
                         f"Question hash already had a question mapping. Existing questions: {existing_urls}. New match found: {question_1.url} and {question_2.url}"
                     )
 
-                matching_questions[hash_1] = [question_1, question_2]
+                matching_questions[dictionary_key] = [question_1, question_2]
 
     if len(matching_questions) == 0:
         raise ValueError("No matches found between tournaments")
@@ -147,7 +148,7 @@ def _squash_questions_and_get_their_forecasts(
 
     if question_t1.weight != question_t2.weight:
         logger.warning(
-            f"Question weights are different: {question_t1.weight} != {question_t2.weight}. Using weight {squashed_weight} from {tournament_name}."
+            f'Question weights are different: {question_t1.weight} != {question_t2.weight}. Using weight {squashed_weight} from "{tournament_name}".'
         )
 
     max_spot_scoring_time = max(
