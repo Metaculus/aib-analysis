@@ -56,7 +56,6 @@ def main(
         metac_bot_tournament, "metac_bot_tournament.json", folder=output_folder
     )
 
-    # Display regular participants
     regular_participant_users = [
         user for user in bot_tournament.users if not user.is_metac_bot
     ]

@@ -33,7 +33,7 @@ def load_tournament(
     dataframe = pd.read_csv(forecast_file_path, low_memory=False)
     question_to_remove = [
         "Will the same presidential candidate win Michigan and Wisconsin in the 2024 election?"
-    ]
+    ] # This question in Q4 has no scores in the Metaculus database due to mis-configuration (and we don't want to update a finalized tourn).
     dataframe = dataframe[~dataframe["question_title"].isin(question_to_remove)]
     assert isinstance(dataframe, pd.DataFrame)
 

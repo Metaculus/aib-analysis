@@ -28,7 +28,7 @@ class BootstrapConfidenceInterval(BaseModel):
 
 class ConfidenceInterval(BaseModel):
     t_based_confidence_interval: TBasedConfidenceInterval
-    bootstrap_confidence_interval: BootstrapConfidenceInterval
+    bootstrap_confidence_interval: BootstrapConfidenceInterval | None
     default_confidence_interval: Literal["t_based", "bootstrap"] = "t_based"
 
     @property
@@ -48,7 +48,6 @@ class ConfidenceInterval(BaseModel):
     ) -> TBasedConfidenceInterval | BootstrapConfidenceInterval:
         if (
             self.default_confidence_interval == "t_based"
-            and self.t_based_confidence_interval is not None
         ):
             return self.t_based_confidence_interval
         elif (
@@ -70,7 +69,7 @@ class ConfidenceIntervalCalculator:
         cls,
         observations: list[float],
         confidence: float = 0.9,
-        num_bootstraps: int = DEFAULT_NUM_BOOTSTRAPS,
+        num_bootstraps: int | None = None,
     ) -> ConfidenceInterval:
         """
         This solves the following stats problem:
@@ -99,11 +98,15 @@ class ConfidenceIntervalCalculator:
         t_based_confidence_interval = cls.confidence_interval_from_mean_and_std(
             float(sample_mean), float(sample_std), sample_size, confidence
         )
-        bootstrap_confidence_interval = (
-            cls.bootstrap_confidence_interval_from_observations(
-                observations, confidence
+        if num_bootstraps is not None:
+            bootstrap_confidence_interval = (
+                cls.bootstrap_confidence_interval_from_observations(
+                    observations, confidence, num_bootstraps
+                )
             )
-        )
+        else:
+            bootstrap_confidence_interval = None
+
         return ConfidenceInterval(
             t_based_confidence_interval=t_based_confidence_interval,
             bootstrap_confidence_interval=bootstrap_confidence_interval,
@@ -279,9 +282,11 @@ class MeanHypothesisCalculator:
 
         hypothesis_rejected = p_value < alpha
         if hypothesis_rejected:
-            written_conclusion = f"We reject the null hypothesis (the population mean is less than or equal to {hypothesis_mean}) with {confidence*100:.2f}% confidence since at the {alpha*100:.2f}% level of significance, the sample data do, in fact, give enough evidence to conclude that the population mean is greater than {hypothesis_mean}. If the null hypothesis is true, then there is a {p_value*100:.2f}% probability that the sample (observed) mean would be observed at {average} or more. Since the mean value observed in the sample was {average} we can reject the null hypothesis. This also means there is sufficient evidence to support the alternative hypothesis that the population mean is greater than {hypothesis_mean}. The sample consisted of {count} observations."
+            written_conclusion = f"We reject the null hypothesis (the population mean is less than or equal to {hypothesis_mean}) with {confidence*100:.2f}% confidence since at the {alpha*100:.2f}% level of significance, the sample data do, in fact, give enough evidence to conclude that the population mean is greater than {hypothesis_mean}. Since the mean value observed in the sample was {average} we can reject the null hypothesis. This also means there is sufficient evidence to support the alternative hypothesis that the population mean is greater than {hypothesis_mean}. The sample consisted of {count} observations."
+            # TODO: Add the correct version of this sentence back:  If the null hypothesis is true, then there is a {p_value*100:.2f}% probability that the sample (observed) mean would be observed at {average} or more
         else:
-            written_conclusion = f"We fail to reject the null hypothesis (the population mean is less than or equal to {hypothesis_mean}) since at the {alpha*100:.2f}% level of significance, the sample data do not give enough evidence to conclude that the population mean is greater than {hypothesis_mean}. If the null hypothesis is true, then there is a {p_value*100:.2f}% probability that the sample (observed) mean would be observed at {average} or more. Thus there is not enough evidence to suggest that the population mean is greater than {hypothesis_mean}. The sample consisted of {count} observations."
+            written_conclusion = f"We fail to reject the null hypothesis (the population mean is less than or equal to {hypothesis_mean}) since at the {alpha*100:.2f}% level of significance, the sample data do not give enough evidence to conclude that the population mean is greater than {hypothesis_mean}.  Thus there is not enough evidence to suggest that the population mean is greater than {hypothesis_mean}. The sample consisted of {count} observations."
+            # TODO: Add the correct version of this sentence back: If the null hypothesis is true, then there is a {p_value*100:.2f}% probability that the sample (observed) mean would be observed at {average} or more.
         return HypothesisTest(
             p_value=p_value,
             hypothesis_rejected=hypothesis_rejected,
