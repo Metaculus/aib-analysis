@@ -29,15 +29,26 @@ def main(
     bot_path: str,
     quarterly_cup_path: str | None,
     output_folder: str,
-    bot_team_size: int = 10,
 ):
     initialize_logging()
+
+    local_counter: int = 0
+    def next_count() -> int:
+        nonlocal local_counter
+        local_counter += 1
+        return local_counter
+    
     is_q3 = "q3" in output_folder.lower()
     is_q4 = "q4" in output_folder.lower()
 
     # ----------------------- Pros and Bot Tournaments -----------------------
     pro_tournament = grab_tournament_data(pro_path, UserType.PRO, "Pro Tournament")
-    save_tournament(pro_tournament, "pro_tournament.json", folder=output_folder)
+    save_tournament(
+        pro_tournament,
+        "pro_tournament.json",
+        folder=output_folder,
+        counter_override=next_count(),
+    )
 
     bot_tournament_full = grab_tournament_data(
         bot_path, UserType.BOT, "Bot Tournament Full"
@@ -54,6 +65,7 @@ def main(
         "bot_tournament.json",
         divide_into_types=True,
         folder=output_folder,
+        counter_override=next_count(),
     )
 
     comparison_bot_users = get_comparison_bot_users(
@@ -68,6 +80,7 @@ def main(
         "bot_tournament_without_pro_questions.json",
         divide_into_types=True,
         folder=output_folder,
+        counter_override=next_count(),
     )
 
     # ------------------------- Subdivisions of Bot Tournament -------------------------
@@ -84,7 +97,10 @@ def main(
         forecasts=metac_bot_forecasts,
     )
     save_tournament(
-        metac_bot_tournament, "metac_bot_tournament.json", folder=output_folder
+        metac_bot_tournament,
+        "metac_bot_tournament.json",
+        folder=output_folder,
+        counter_override=next_count(),
     )
 
     # Display regular participants
@@ -104,6 +120,7 @@ def main(
         regular_participant_tournament,
         "regular_participant_tournament.json",
         folder=output_folder,
+        counter_override=next_count(),
     )
 
     # ------------------------- Combine Pro and Bot Tournaments -------------------------
@@ -117,27 +134,39 @@ def main(
         "pro_with_bot_tourn__no_teams.json",
         divide_into_types=True,
         folder=output_folder,
+        counter_override=next_count(),
     )
 
-    pro_team = pro_tournament.users
-    bot_team_for_pro_comparison = get_best_forecasters_from_tournament(
-        bot_tournament_wo_pro_questions, bot_team_size
-    )
-    pro_v_bot_tournament__teams = create_team_tournament(
-        tournament_1=pro_tournament,
-        tournament_2=bot_tournament,
-        team_1=pro_team,
-        team_2=bot_team_for_pro_comparison,
-        aggregate_name_1="Pro Team",
-        aggregate_name_2="Bot Team",
-        use_tourn_1_weights=use_pro_weights,
-    )
-    save_tournament(
-        pro_v_bot_tournament__teams,
-        "pro_vs_bot_tournament__teams.json",
-        divide_into_types=True,
-        folder=output_folder,
-    )
+    team_comparison_counter = next_count()
+    for bot_team_size in [1, 3, 5, 10, 20, 30]:
+        pro_team = pro_tournament.users
+        bot_team_for_pro_comparison = get_best_forecasters_from_tournament(
+            bot_tournament_wo_pro_questions, bot_team_size
+        )
+        pro_v_bot_tournament__teams = create_team_tournament(
+            tournament_1=pro_tournament,
+            tournament_2=bot_tournament,
+            team_1=pro_team,
+            team_2=bot_team_for_pro_comparison,
+            aggregate_name_1="Pro Team",
+            aggregate_name_2="Bot Team",
+            use_tourn_1_weights=use_pro_weights,
+        )
+        save_tournament(
+            pro_v_bot_tournament__teams,
+            f"pro_vs_bot_tournament__teams_size_{bot_team_size}.json",
+            divide_into_types=False,
+            folder=output_folder,
+            counter_override=team_comparison_counter,
+        )
+        if bot_team_size == 10:
+            save_tournament(
+                pro_v_bot_tournament__teams,
+                "pro_vs_bot_tournament__teams_size_10.json",
+                divide_into_types=True,
+                folder=output_folder,
+                counter_override=next_count(),
+            )
 
     # ------------------- Control/comparison Bots -------------------
     number_to_use = 99
@@ -182,7 +211,10 @@ def main(
         quarterly_cup_path, UserType.BOT, "Quarterly Cup"
     )
     save_tournament(
-        cup_tournament, "spot_scores_for_quarterly_cup.json", folder=output_folder
+        cup_tournament,
+        "spot_scores_for_quarterly_cup.json",
+        folder=output_folder,
+        counter_override=next_count(),
     )
 
     bot_tournament_wo_cup_questions = smart_remove_questions_from_tournament(
@@ -192,6 +224,7 @@ def main(
         bot_tournament_wo_cup_questions,
         "bot_tournament_wo_cup_questions.json",
         folder=output_folder,
+        counter_override=next_count(),
     )
 
     bot_team_for_cup_comparison = get_best_forecasters_from_tournament(
@@ -206,7 +239,12 @@ def main(
         aggregate_name_2="Bot Team",
         use_tourn_1_weights=use_pro_weights,
     )
-    save_tournament(cup_vs_bot_teams, "cup_vs_bot_teams.json", folder=output_folder)
+    save_tournament(
+        cup_vs_bot_teams,
+        "cup_vs_bot_teams.json",
+        folder=output_folder,
+        counter_override=next_count(),
+    )
 
 
 def get_comparison_bot_users(bot_tournament: SimulatedTournament) -> list[User]:
@@ -242,12 +280,12 @@ if __name__ == "__main__":
     #     output_folder="local/q3_2024_simulations/",
     # )
 
-    main(
-        pro_path="local/private_input_data/pro_forecasts_q4.csv",
-        bot_path="local/private_input_data/bot_forecasts_q4.csv",
-        quarterly_cup_path=None,
-        output_folder="local/q4_2024_simulations/",
-    )
+    # main(
+    #     pro_path="local/private_input_data/pro_forecasts_q4.csv",
+    #     bot_path="local/private_input_data/bot_forecasts_q4.csv",
+    #     quarterly_cup_path=None,
+    #     output_folder="local/q4_2024_simulations/",
+    # )
 
     # main(
     #     pro_path="input_data/pro_forecasts_q1.csv",
@@ -261,12 +299,4 @@ if __name__ == "__main__":
     #     bot_path="input_data/bot_forecasts_q2.csv",
     #     quarterly_cup_path=None,
     #     output_folder="local/q2_2025_simulations/",
-    # )
-
-    # main(
-    #     pro_path="input_data/pro_forecasts_q2.csv",
-    #     bot_path="input_data/bot_forecasts_q2.csv",
-    #     quarterly_cup_path=None,
-    #     output_folder="local/q2_2025_simulations_team_size_1/",
-    #     bot_team_size=1,
     # )
