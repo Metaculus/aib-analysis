@@ -26,6 +26,11 @@ def main(
     output_folder: str,
 ):
     initialize_logging()
+    local_counter: int = 0
+    def next_count() -> int:
+        nonlocal local_counter
+        local_counter += 1
+        return local_counter
 
     bot_tournament_full = grab_tournament_data(
         bot_path, UserType.BOT, "Bot Tournament Full"
@@ -39,6 +44,7 @@ def main(
         "bot_tournament.json",
         divide_into_types=True,
         folder=output_folder,
+        counter_override=next_count(),
     )
 
     metac_bot_users = [user for user in bot_tournament.users if user.is_metac_bot]
@@ -53,7 +59,10 @@ def main(
         forecasts=metac_bot_forecasts,
     )
     save_tournament(
-        metac_bot_tournament, "metac_bot_tournament.json", folder=output_folder
+        metac_bot_tournament,
+        "metac_bot_tournament.json",
+        folder=output_folder,
+        counter_override=next_count(),
     )
 
     regular_participant_users = [
@@ -72,6 +81,7 @@ def main(
         regular_participant_tournament,
         "regular_participant_tournament.json",
         folder=output_folder,
+        counter_override=next_count(),
     )
 
 

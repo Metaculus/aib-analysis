@@ -30,7 +30,8 @@ def main(tournaments_folder: str | None = None):
     if not tournaments_folder:
         st.write("No tournaments folder selected")
         folder_options = [f"local/{folder}" for folder in os.listdir("local/")]
-        folder_options.extend([f"local/minibench/{folder}" for folder in os.listdir("local/minibench/")])
+        if os.path.exists("local/minibench/"):
+            folder_options.extend([f"local/minibench/{folder}" for folder in os.listdir("local/minibench/")])
         folder_options.sort()
         st.write("- " + "\n- ".join(folder_options))
         return
@@ -49,7 +50,7 @@ def main(tournaments_folder: str | None = None):
             for file in files_grouped_by_first_number[first_number]:
                 st.write(f"- {file}")
 
-    hypothesis_test_tourns = [file for file in all_files_in_folder if "pro_vs_bot_tournament__teams.json" in file]
+    hypothesis_test_tourns = [file for file in all_files_in_folder if "pro_vs_bot_tournament__teams" in file]
 
     # Create selectbox for group selection
     group_options = [f"Group {first_number}" for first_number in files_grouped_by_first_number.keys()]
