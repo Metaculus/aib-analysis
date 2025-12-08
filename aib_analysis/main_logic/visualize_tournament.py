@@ -21,6 +21,9 @@ from aib_analysis.main_logic.process_tournament import (
     find_question_titles_unique_to_first_tournament,
     get_leaderboard,
 )
+from aib_analysis.data_structures.data_models import (
+    LeaderboardEntry,
+)
 from aib_analysis.math.stats import (
     MeanHypothesisCalculator,
     HypothesisTest,
@@ -418,6 +421,7 @@ def _display_average_scores_plot(
 ) -> None:
     """Display a plotly graph of average scores with error bars."""
     entries = []
+    score_type = leaderboard.type
 
     for entry in leaderboard.entries_via_sum_of_scores():
         try:
@@ -471,10 +475,11 @@ def _display_average_scores_plot(
         )
     )
 
+    friendly_score_type = score_type.value.replace('_', ' ').title()
     fig.update_layout(
-        title=f"Average Score with {confidence_level*100}% Confidence Intervals",
+        title=f"Average Score ({friendly_score_type}) with {confidence_level*100}% Confidence Intervals",
         xaxis_title="User",
-        yaxis_title="Average Score",
+        yaxis_title=f"Average Score ({friendly_score_type})",
         showlegend=False,
         height=600,
         xaxis=dict(tickangle=45),
@@ -632,3 +637,59 @@ def display_unique_questions(
             tournament_1, tournament_2
         )
         display_questions(unique_questions, tournament_1)
+
+
+def display_aggregate_comparison(team_comparison_tourns: list[SimulatedTournament]):
+    entries_to_graph: list[LeaderboardEntry] = []
+    for tournament in team_comparison_tourns:
+        bot_team_users = [user for user in tournament.users if user.name == "Bot Team"]
+        assert len(bot_team_users) == 1, f"Expected 1 bot team user, got {len(bot_team_users)}"
+        bot_team_user = bot_team_users[0]
+        leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
+        bot_entry = [entry for entry in leaderboard.entries if entry.user == bot_team_user][0]
+        entries_to_graph.append(bot_entry)
+    
+    st.subheader("Aggregate comparison")
+    with st.expander("Aggregate comparison"):
+        entries_to_graph = sorted(entries_to_graph, key=lambda x: len(x.user.aggregated_users))
+        
+        scores = [entry.average_score for entry in entries_to_graph]
+        confidence_intervals = [entry.get_confidence_interval(confidence_level=0.95) for entry in entries_to_graph]
+        lower_bounds = [ci.lower_bound for ci in confidence_intervals]
+        upper_bounds = [ci.upper_bound for ci in confidence_intervals]
+        
+        error_y_minus = [score - lower for score, lower in zip(scores, lower_bounds)]
+        error_y_plus = [upper - score for score, upper in zip(scores, upper_bounds)]
+        
+        team_sizes = [len(entry.user.aggregated_users) for entry in entries_to_graph]
+        
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=team_sizes,
+            y=scores,
+            mode='markers+lines',
+            name='Bot Team Score',
+            marker={'size': 10},
+            error_y={
+                'type': 'data',
+                'symmetric': False,
+                'array': error_y_plus,
+                'arrayminus': error_y_minus,
+                'visible': True
+            }
+        ))
+        
+        fig.update_layout(
+            title='Bot Team Performance vs Team Size',
+            xaxis_title='Team Size',
+            yaxis_title='Average Score',
+            hovermode='closest',
+            showlegend=True
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+
+        for entry in entries_to_graph:
+            st.write(f"- Bot Team Size: {len(entry.user.aggregated_users)} | Score: {entry.average_score:.3f}")
+
+        

@@ -15,6 +15,7 @@ from aib_analysis.main_logic.visualize_tournament import (
     display_bot_v_pro_hypothesis_test,
     display_individual_tournament,
     display_unique_questions,
+    display_aggregate_comparison,
 )
 from conftest import initialize_logging
 
@@ -50,7 +51,7 @@ def main(tournaments_folder: str | None = None):
             for file in files_grouped_by_first_number[first_number]:
                 st.write(f"- {file}")
 
-    hypothesis_test_tourns = [file for file in all_files_in_folder if "pro_vs_bot_tournament__teams" in file]
+    hypothesis_test_tourns_files = [file for file in all_files_in_folder if "pro_vs_bot_tournament__teams" in file]
 
     # Create selectbox for group selection
     group_options = [f"Group {first_number}" for first_number in files_grouped_by_first_number.keys()]
@@ -61,23 +62,27 @@ def main(tournaments_folder: str | None = None):
 
     # Display tournaments for the selected group
     files: list[str] = files_grouped_by_first_number[selected_group_number]
+    team_comparison_tourns: list[SimulatedTournament] = []
     for file in files:
         logger.info(f"Displaying tournament {file}")
         if file.endswith(".json"):
             tournament = grab_tournament_data(tournaments_folder, file)
             tournament_name = file[2:].replace(".json", "").replace("__", " | ").replace("_", " ").title()
-            if file in hypothesis_test_tourns:
+            if file in hypothesis_test_tourns_files:
                 display_bot_v_pro_hypothesis_test(tournament, f"Hypothesis test for {tournament_name}")
+                team_comparison_tourns.append(tournament)
             display_individual_tournament(tournament, tournament_name)
 
             if file == "7_pro_vs_bot_tournament__teams.json":
                 comparison_tournament = grab_tournament_data(tournaments_folder, "1_pro_tournament.json")
                 display_unique_questions(comparison_tournament, tournament)
 
+    if len(team_comparison_tourns) > 0:
+        display_aggregate_comparison(team_comparison_tourns)
+
     st.write("---")
     st.info("Contact ben [at] metaculus [.com] with any questions about this data")
 
-# @st.cache_data(show_spinner="Loading tournament...") # Pausing caching since this may be the cause of reruns?
 def grab_tournament_data(
     folder: str, file: str,
 ) -> SimulatedTournament:
