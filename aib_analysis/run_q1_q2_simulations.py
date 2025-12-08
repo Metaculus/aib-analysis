@@ -138,7 +138,10 @@ def main(
     )
 
     team_comparison_counter = next_count()
-    for bot_team_size in [1, 3, 5, 10, 20, 30]:
+    size_10_bot_team = None
+    for bot_team_size in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 30, 50, 100]:
+        if bot_team_size > len(bot_tournament.users):
+            continue
         pro_team = pro_tournament.users
         bot_team_for_pro_comparison = get_best_forecasters_from_tournament(
             bot_tournament_wo_pro_questions, bot_team_size
@@ -167,6 +170,7 @@ def main(
                 folder=output_folder,
                 counter_override=next_count(),
             )
+            size_10_bot_team = bot_team_for_pro_comparison
 
     # ------------------- Control/comparison Bots -------------------
     number_to_use = 99
@@ -174,7 +178,7 @@ def main(
         tournament_1=pro_with_bot_tourn,
         tournament_2=pro_with_bot_tourn,
         team_1=comparison_bot_users,
-        team_2=bot_team_for_pro_comparison,
+        team_2=size_10_bot_team,
         aggregate_name_1="Comparison Team",
         aggregate_name_2="Bot Team",
         use_tourn_1_weights=use_pro_weights,
@@ -273,30 +277,30 @@ def grab_tournament_data(
 
 
 if __name__ == "__main__":
-    # main(
-    #     pro_path="local/private_input_data/pro_forecasts_q3.csv",
-    #     bot_path="local/private_input_data/bot_forecasts_q3.csv",
-    #     quarterly_cup_path=None,
-    #     output_folder="local/q3_2024_simulations/",
-    # )
+    main(
+        pro_path="local/private_input_data/pro_forecasts_q3.csv",
+        bot_path="local/private_input_data/bot_forecasts_q3.csv",
+        quarterly_cup_path=None,
+        output_folder="local/q3_2024_simulations_teams_comparison/",
+    )
 
-    # main(
-    #     pro_path="local/private_input_data/pro_forecasts_q4.csv",
-    #     bot_path="local/private_input_data/bot_forecasts_q4.csv",
-    #     quarterly_cup_path=None,
-    #     output_folder="local/q4_2024_simulations/",
-    # )
+    main(
+        pro_path="local/private_input_data/pro_forecasts_q4.csv",
+        bot_path="local/private_input_data/bot_forecasts_q4.csv",
+        quarterly_cup_path=None,
+        output_folder="local/q4_2024_simulations_teams_comparison/",
+    )
 
-    # main(
-    #     pro_path="input_data/pro_forecasts_q1.csv",
-    #     bot_path="input_data/bot_forecasts_q1.csv",
-    #     quarterly_cup_path=None,  # "local/quarterly_cup_forecats_before_cp_reveal_time_q1.csv",
-    #     output_folder="local/q1_2025_simulations/",
-    # )
+    main(
+        pro_path="input_data/pro_forecasts_q1.csv",
+        bot_path="input_data/bot_forecasts_q1.csv",
+        quarterly_cup_path=None,  # "local/quarterly_cup_forecats_before_cp_reveal_time_q1.csv",
+        output_folder="local/q1_2025_simulations_teams_comparison/",
+    )
 
-    # main(
-    #     pro_path="input_data/pro_forecasts_q2.csv",
-    #     bot_path="input_data/bot_forecasts_q2.csv",
-    #     quarterly_cup_path=None,
-    #     output_folder="local/q2_2025_simulations/",
-    # )
+    main(
+        pro_path="input_data/pro_forecasts_q2.csv",
+        bot_path="input_data/bot_forecasts_q2.csv",
+        quarterly_cup_path=None,
+        output_folder="local/q2_2025_simulations_teams_comparison/",
+    )

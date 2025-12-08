@@ -429,7 +429,7 @@ class LeaderboardEntry(BaseModel):
 
     @property
     def question_count(self) -> int:
-        return len(set([score.forecast.question.question_id for score in self.scores]))
+        return len(set[int]([score.forecast.question.question_id for score in self.scores]))
 
     def top_n_scores(self, n: int) -> list[Score]:
         return sorted(self.scores, key=lambda x: x.score, reverse=True)[:n]
