@@ -21,9 +21,17 @@ from aib_analysis.main_logic.process_tournament import (
     find_question_titles_unique_to_first_tournament,
     get_leaderboard,
 )
-from aib_analysis.math.stats import MeanHypothesisCalculator
+from aib_analysis.data_structures.data_models import (
+    LeaderboardEntry,
+)
+from aib_analysis.math.stats import (
+    MeanHypothesisCalculator,
+    HypothesisTest,
+    ConfidenceIntervalCalculator,
+)
 
 logger = logging.getLogger(__name__)
+
 
 def display_tournament_and_variations(
     tournament: SimulatedTournament, name: str, divide_into_types: bool = False
@@ -33,17 +41,24 @@ def display_tournament_and_variations(
         binary_combined_tournament = constrain_question_types(
             tournament, [QuestionType.BINARY]
         )
-        display_individual_tournament(binary_combined_tournament, f"{name} (Binary)")
+        if binary_combined_tournament is not None:
+            display_individual_tournament(
+                binary_combined_tournament, f"{name} (Binary)"
+            )
         multiple_choice_combined_tournament = constrain_question_types(
             tournament, [QuestionType.MULTIPLE_CHOICE]
         )
-        display_individual_tournament(
-            multiple_choice_combined_tournament, f"{name} (Multiple Choice)"
-        )
+        if multiple_choice_combined_tournament is not None:
+            display_individual_tournament(
+                multiple_choice_combined_tournament, f"{name} (Multiple Choice)"
+            )
         numeric_combined_tournament = constrain_question_types(
             tournament, [QuestionType.NUMERIC]
         )
-        display_individual_tournament(numeric_combined_tournament, f"{name} (Numeric)")
+        if numeric_combined_tournament is not None:
+            display_individual_tournament(
+                numeric_combined_tournament, f"{name} (Numeric)"
+            )
 
 
 def display_individual_tournament(tournament: SimulatedTournament, name: str):
@@ -62,6 +77,8 @@ def display_individual_tournament(tournament: SimulatedTournament, name: str):
         display_forecasts(tournament)
     with st.expander(f"{name} Questions"):
         display_questions(tournament.questions, tournament)
+    with st.expander(f"{name} Scores"):
+        display_scores(tournament.scores)
     # with st.expander(f"{name} Calibration Curve"):
     #     display_calibration_curve(tournament)
 
@@ -83,26 +100,59 @@ def display_bot_v_pro_hypothesis_test(
             raise ValueError(f"Expected 2 entries, got {len(entries)}")
         for entry in entries:
             try:
+                assert all([s.type == ScoreType.SPOT_PEER for s in entry.scores])
                 observations = [s.score for s in entry.scores]
-                equal_to_hypothesis_test = (
-                    MeanHypothesisCalculator.test_if_mean_is_equal_to_than_hypothesis_mean(
-                        observations, hypothesis_mean, confidence_level
+                equal_to_hypothesis_test = MeanHypothesisCalculator.test_if_mean_is_equal_to_than_hypothesis_mean(
+                    observations, hypothesis_mean, confidence_level
+                )
+                greater_than_hypothesis_test = MeanHypothesisCalculator.test_if_mean_is_greater_than_hypothesis_mean(
+                    observations, hypothesis_mean, confidence_level
+                )
+                confidence_interval = (
+                    ConfidenceIntervalCalculator.confidence_interval_from_observations(
+                        observations, confidence_level
                     )
                 )
-                greater_than_hypothesis_test = (
-                    MeanHypothesisCalculator.test_if_mean_is_greater_than_hypothesis_mean(
-                        observations, hypothesis_mean, confidence_level
-                    )
-                )
+                bootstrap_ci = confidence_interval.bootstrap_confidence_interval
+                t_based_ci = confidence_interval.t_based_confidence_interval
+
                 st.write(f"## {entry.user.name}")
                 st.write(f"### Equal to {hypothesis_mean}")
-                st.write(f"**P-value**: {equal_to_hypothesis_test.p_value:.5f}")
-                st.write(equal_to_hypothesis_test.written_conclusion)
+                _display_hypothesis_sub_section(equal_to_hypothesis_test, observations)
                 st.write(f"### Greater than {hypothesis_mean}")
-                st.write(f"**P-value**: {greater_than_hypothesis_test.p_value:.5f}")
-                st.write(greater_than_hypothesis_test.written_conclusion)
+                _display_hypothesis_sub_section(
+                    greater_than_hypothesis_test, observations
+                )
+                st.write(f"### Confidence Intervals")
+                st.write(f"Observed Mean: {confidence_interval.mean:.5f}")
+                st.write(f"Hypothesis Mean: {hypothesis_mean:.5f}")
+                percentage_confidence_level = confidence_level * 100
+                if t_based_ci is not None:
+                    st.write(
+                        f"T-based {percentage_confidence_level}% Confidence Interval: "
+                        f"{t_based_ci.lower_bound:.5f} to "
+                        f"{t_based_ci.upper_bound:.5f}"
+                    )
+                if bootstrap_ci is not None:
+                    st.write(
+                        f"Bootstrap {percentage_confidence_level}% Confidence Interval: "
+                        f"{bootstrap_ci.lower_bound:.5f} to "
+                        f"{bootstrap_ci.upper_bound:.5f}"
+                    )
+                st.write(f"--------------------------------")
+
             except Exception as e:
                 st.write(f"Error: {e}")
+
+
+def _display_hypothesis_sub_section(
+    hypothesis_test: HypothesisTest, observations: list[float]
+):
+    st.write(f"**P-value**: {hypothesis_test.p_value:.5f}")
+    st.write(f"**Shapiro test passes**: {hypothesis_test.shapiro_test_passes}")
+    st.write(f"**N > 30**: {len(observations) > 30} (N = {len(observations)})")
+    st.write(f"**Interval Type**: {hypothesis_test.interval_type}")
+    st.write(f"**Conclusion**: {hypothesis_test.written_conclusion}")
 
 
 def display_tournament_stats(tournament: SimulatedTournament) -> None:
@@ -136,7 +186,9 @@ def display_tournament_stats(tournament: SimulatedTournament) -> None:
     )
 
     # Display statistics
-    st.write("*Note that if tournaments are loaded only from jsons with only scores, then all stats will not include questions/forecasts from annulled/ambiguous questions. Stats will be off since you cannot score annulled questions.*")
+    st.write(
+        "*Note that if tournaments are loaded only from jsons with only scores, then all stats will not include questions/forecasts from annulled/ambiguous questions. Stats will be off since you cannot score annulled questions.*"
+    )
     st.write("### Basic Statistics")
     st.write(f"Number of forecasts: {num_forecasts}")
     st.write(f"Number of users: {num_users}")
@@ -236,7 +288,9 @@ def display_forecasts(tournament: SimulatedTournament):
     )
 
 
-def display_questions(questions: list[Question],tournament: SimulatedTournament | None = None):
+def display_questions(
+    questions: list[Question], tournament: SimulatedTournament | None = None
+):
     data = []
     for question in questions:
         datum = {"url": question.url, **question.model_dump()}
@@ -258,40 +312,89 @@ def display_questions(questions: list[Question],tournament: SimulatedTournament 
     st.dataframe(df, use_container_width=True)
 
 
+def display_scores(scores: list[Score]):
+    st.write(f"**Number of scores**: {len(scores)}")
+    data = []
+    for score in scores:
+        data.append(
+            {
+                "score": score.score,
+                "type": score.type.value,
+                "user": score.forecast.user.name,
+                "url": score.forecast.question.url,
+                "question_text": score.forecast.question.question_text,
+            }
+        )
+    df = pd.DataFrame(data)
+    st.dataframe(df, use_container_width=True)
+
+
 def display_leaderboard(leaderboard: Leaderboard):
     confidence_level = 0.95
     _display_average_scores_plot(leaderboard, confidence_level)
     _display_leaderboard_table(leaderboard, confidence_level)
-    _display_score_histogram_by_user(leaderboard.all_scores, title="All Users Scores Histogram (overlay, not stacked)")
+    _display_score_histogram_by_user(
+        leaderboard.all_scores,
+        title="All Users Scores Histogram (overlay, not stacked)",
+    )
 
 
 def _display_leaderboard_table(leaderboard: Leaderboard, confidence_level: float):
     data = []
-    for i, entry in enumerate(leaderboard.entries_via_sum_of_scores()):
+    entries = leaderboard.entries_via_sum_of_scores()
+    include_bootstrap = len(entries) <= 10
+    for i, entry in enumerate(entries):
         num_to_display = min(5, entry.question_count)
         random_sample_of_scores = entry.randomly_sample_scores(num_to_display)
         top_n_scores = entry.top_n_scores(num_to_display)
         bottom_n_scores = entry.bottom_n_scores(num_to_display)
         try:
-            confidence_interval = entry.get_confidence_interval(confidence_level)
-            upper_bound = confidence_interval.upper_bound
-            lower_bound = confidence_interval.lower_bound
+            confidence_interval = entry.get_confidence_interval(
+                confidence_level,
+                num_bootstraps=(
+                    ConfidenceIntervalCalculator.DEFAULT_NUM_BOOTSTRAPS
+                    if include_bootstrap
+                    else None
+                ),
+            )
+            t_based_confidence_interval = (
+                confidence_interval.t_based_confidence_interval
+            )
+            if t_based_confidence_interval is not None:
+                t_based_upper_bound = t_based_confidence_interval.upper_bound
+                t_based_lower_bound = t_based_confidence_interval.lower_bound
+            else:
+                t_based_upper_bound = None
+                t_based_lower_bound = None
+            bootstrap_confidence_interval = (
+                confidence_interval.bootstrap_confidence_interval
+            )
+            if bootstrap_confidence_interval is not None:
+                bootstrap_upper_bound = bootstrap_confidence_interval.upper_bound
+                bootstrap_lower_bound = bootstrap_confidence_interval.lower_bound
+            else:
+                bootstrap_upper_bound = None
+                bootstrap_lower_bound = None
         except Exception as e:
             logger.debug(
                 f"Failed to get confidence interval for entry {entry.user.name}: {e}"
             )
-            upper_bound = None
-            lower_bound = None
+            t_based_upper_bound = None
+            t_based_lower_bound = None
+            bootstrap_upper_bound = None
+            bootstrap_lower_bound = None
         data.append(
             {
                 "rank": i + 1,
                 "user": entry.user.name,
-                "user_type": entry.user.type.value,
                 "sum_of_scores": entry.sum_of_scores,
                 "average_score": entry.average_score,
-                "average_upper_bound": upper_bound,
-                "average_lower_bound": lower_bound,
+                "avg_lower_bound_t_based": t_based_lower_bound,
+                "avg_upper_bound_t_based": t_based_upper_bound,
+                "avg_lower_bound_bootstrap": bootstrap_lower_bound,
+                "avg_upper_bound_bootstrap": bootstrap_upper_bound,
                 "num_questions_with_scores": entry.question_count,
+                "user_type": entry.user.type.value,
                 "aggregated_users": [user.name for user in entry.user.aggregated_users],
                 "random_sample_of_scores": [
                     score.display_score_and_question()
@@ -318,6 +421,7 @@ def _display_average_scores_plot(
 ) -> None:
     """Display a plotly graph of average scores with error bars."""
     entries = []
+    score_type = leaderboard.type
 
     for entry in leaderboard.entries_via_sum_of_scores():
         try:
@@ -371,10 +475,11 @@ def _display_average_scores_plot(
         )
     )
 
+    friendly_score_type = score_type.value.replace('_', ' ').title()
     fig.update_layout(
-        title=f"Average Score with {confidence_level*100}% Confidence Intervals",
+        title=f"Average Score ({friendly_score_type}) with {confidence_level*100}% Confidence Intervals",
         xaxis_title="User",
-        yaxis_title="Average Score",
+        yaxis_title=f"Average Score ({friendly_score_type})",
         showlegend=False,
         height=600,
         xaxis=dict(tickangle=45),
@@ -382,7 +487,6 @@ def _display_average_scores_plot(
     random_number = random.randint(0, 1000000)
     plot_key = f"{random_number}"
     st.plotly_chart(fig, use_container_width=True, key=plot_key)
-
 
 
 def _hex_to_rgba(hex_color: str, alpha: float) -> str:
@@ -491,10 +595,14 @@ def display_calibration_curve(tournament: SimulatedTournament) -> None:
     st.plotly_chart(fig, use_container_width=True, key=plot_key)
 
 
-def _display_score_histogram_by_user(scores: list[Score], title: str | None = None) -> None:
+def _display_score_histogram_by_user(
+    scores: list[Score], title: str | None = None
+) -> None:
     score_types = set([s.type for s in scores])
     if len(score_types) > 1:
-        raise ValueError("Cannot display score histogram by user for multiple score types")
+        raise ValueError(
+            "Cannot display score histogram by user for multiple score types"
+        )
     fig = go.Figure()
 
     # Group scores by user
@@ -507,28 +615,81 @@ def _display_score_histogram_by_user(scores: list[Score], title: str | None = No
 
     # Add a trace for each user
     for user_name, user_score_list in user_scores.items():
-        fig.add_trace(go.Histogram(
-            x=user_score_list,
-            name=user_name,
-            opacity=0.7
-        ))
+        fig.add_trace(go.Histogram(x=user_score_list, name=user_name, opacity=0.7))
 
     if title is not None:
         fig.update_layout(title=title)
-    fig.update_layout(
-        xaxis_title="Score",
-        yaxis_title="Count",
-        barmode="overlay"
-    )
+    fig.update_layout(xaxis_title="Score", yaxis_title="Count", barmode="overlay")
     random_number = random.randint(0, 1000000)
     plot_key = f"{random_number}"
     st.plotly_chart(fig, use_container_width=True, key=plot_key)
 
-def display_unique_questions(tournament_1: SimulatedTournament, tournament_2: SimulatedTournament) -> None:
+
+def display_unique_questions(
+    tournament_1: SimulatedTournament, tournament_2: SimulatedTournament
+) -> None:
     t1_name = tournament_1.name if tournament_1.name else "First Tournament"
     t2_name = tournament_2.name if tournament_2.name else "Second Tournament"
 
-    st.subheader(f"Questions titles in \"{t1_name}\" but not in \"{t2_name}\"")
-    with st.expander(f"Questions titles in \"{t1_name}\" but not in \"{t2_name}\""):
-        unique_questions = find_question_titles_unique_to_first_tournament(tournament_1, tournament_2)
+    st.subheader(f'Questions titles in "{t1_name}" but not in "{t2_name}"')
+    with st.expander(f'Questions titles in "{t1_name}" but not in "{t2_name}"'):
+        unique_questions = find_question_titles_unique_to_first_tournament(
+            tournament_1, tournament_2
+        )
         display_questions(unique_questions, tournament_1)
+
+
+def display_aggregate_comparison(team_comparison_tourns: list[SimulatedTournament]):
+    entries_to_graph: list[LeaderboardEntry] = []
+    for tournament in team_comparison_tourns:
+        bot_team_users = [user for user in tournament.users if user.name == "Bot Team"]
+        assert len(bot_team_users) == 1, f"Expected 1 bot team user, got {len(bot_team_users)}"
+        bot_team_user = bot_team_users[0]
+        leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
+        bot_entry = [entry for entry in leaderboard.entries if entry.user == bot_team_user][0]
+        entries_to_graph.append(bot_entry)
+    
+    st.subheader("Aggregate comparison")
+    with st.expander("Aggregate comparison"):
+        entries_to_graph = sorted(entries_to_graph, key=lambda x: len(x.user.aggregated_users))
+        
+        scores = [entry.average_score for entry in entries_to_graph]
+        confidence_intervals = [entry.get_confidence_interval(confidence_level=0.95) for entry in entries_to_graph]
+        lower_bounds = [ci.lower_bound for ci in confidence_intervals]
+        upper_bounds = [ci.upper_bound for ci in confidence_intervals]
+        
+        error_y_minus = [score - lower for score, lower in zip(scores, lower_bounds)]
+        error_y_plus = [upper - score for score, upper in zip(scores, upper_bounds)]
+        
+        team_sizes = [len(entry.user.aggregated_users) for entry in entries_to_graph]
+        
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=team_sizes,
+            y=scores,
+            mode='markers+lines',
+            name='Bot Team Score',
+            marker={'size': 10},
+            error_y={
+                'type': 'data',
+                'symmetric': False,
+                'array': error_y_plus,
+                'arrayminus': error_y_minus,
+                'visible': True
+            }
+        ))
+        
+        fig.update_layout(
+            title='Bot Team Performance vs Team Size',
+            xaxis_title='Team Size',
+            yaxis_title='Average Score',
+            hovermode='closest',
+            showlegend=True
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+
+        for entry in entries_to_graph:
+            st.write(f"- Bot Team Size: {len(entry.user.aggregated_users)} | Score: {entry.average_score:.3f}")
+
+        

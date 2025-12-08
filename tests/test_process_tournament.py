@@ -105,6 +105,7 @@ class TestLeaderboard:
         binary_tournament = constrain_question_types(
             bot_tournament, [QuestionType.BINARY]
         )
+        assert binary_tournament is not None
         leaderboard = get_leaderboard(binary_tournament, ScoreType.SPOT_PEER)
         entries = leaderboard.entries_via_sum_of_scores()
         assert entries[0].user.name == "manticAI"
@@ -122,6 +123,7 @@ class TestLeaderboard:
         multiple_choice_tournament = constrain_question_types(
             bot_tournament, [QuestionType.MULTIPLE_CHOICE]
         )
+        assert multiple_choice_tournament is not None
         leaderboard = get_leaderboard(multiple_choice_tournament, ScoreType.SPOT_PEER)
         entries = leaderboard.entries_via_sum_of_scores()
         assert entries[0].user.name == "metac-o1"
@@ -139,6 +141,7 @@ class TestLeaderboard:
         numeric_tournament = constrain_question_types(
             bot_tournament, [QuestionType.NUMERIC]
         )
+        assert numeric_tournament is not None
         leaderboard = get_leaderboard(numeric_tournament, ScoreType.SPOT_PEER)
         entries = leaderboard.entries_via_sum_of_scores()
         assert entries[0].user.name == "metac-o1-preview"
@@ -173,7 +176,7 @@ class TestCombineTournaments:
         tournament2 = SimulatedTournament(forecasts=[forecast2_1, forecast2_3])
 
         # Combine tournaments
-        combined = combine_tournaments(tournament1, tournament2)
+        combined = combine_tournaments(tournament1, tournament2, use_tourn_1_weights=True)
 
         # Only question1 should be in the combined tournament
         assert len(combined.questions) == 1
@@ -198,7 +201,7 @@ class TestCombineTournaments:
         bot_forecasts = bot_tournament.forecasts
         pro_users = pro_tournament.users
         bot_users = bot_tournament.users
-        combined_tournament = combine_tournaments(pro_tournament, bot_tournament)
+        combined_tournament = combine_tournaments(pro_tournament, bot_tournament, use_tourn_1_weights=True)
         assert len(combined_tournament.questions) == 98
         assert len(combined_tournament.forecasts) < len(pro_forecasts) + len(
             bot_forecasts
@@ -256,7 +259,7 @@ class TestCreateTeam:
 
         # Create team tournament with top 1 from each tournament
         team_tournament = create_team_tournament(
-            tournament1, tournament2, [user1], [user3], "Team1", "Team2"
+            tournament1, tournament2, [user1], [user3], "Team1", "Team2", use_tourn_1_weights=True
         )
 
         # Verify the combined tournament
@@ -297,7 +300,7 @@ class TestCreateTeam:
 
         # Create team tournament with all users from each tournament
         team_tournament = create_team_tournament(
-            tournament1, tournament2, "all", "all", "Team1", "Team2"
+            tournament1, tournament2, "all", "all", "Team1", "Team2", use_tourn_1_weights=True
         )
 
         # Verify the combined tournament
@@ -350,7 +353,7 @@ class TestCreateTeam:
         )
 
         with pytest.raises(ValueError):
-            create_team_tournament(tournament1, tournament2, "all", "all", "Team1", "Team2")
+            create_team_tournament(tournament1, tournament2, "all", "all", "Team1", "Team2", use_tourn_1_weights=True)
 
     def test_combine_pro_and_bot_tournament(
         self, bot_tournament: SimulatedTournament, pro_tournament: SimulatedTournament
@@ -366,6 +369,7 @@ class TestCreateTeam:
             team_2=team_2,
             aggregate_name_1=pro_team_name,
             aggregate_name_2=bot_team_name,
+            use_tourn_1_weights=True,
         )
         assert len(aggregate_tournament.users) == 2
         assert len(aggregate_tournament.questions) == 98
@@ -409,26 +413,31 @@ class TestCreateTeam:
 def test_constrain_question_types():
     tournament = make_tournament()
     binary_tournament = constrain_question_types(tournament, [QuestionType.BINARY])
+    assert binary_tournament is not None
     assert all(forecast.question.type == QuestionType.BINARY for forecast in binary_tournament.forecasts)
     assert all(question.type == QuestionType.BINARY for question in binary_tournament.questions)
     assert len(binary_tournament.forecasts) < len(tournament.forecasts)
 
     numeric_tournament = constrain_question_types(tournament, [QuestionType.NUMERIC])
+    assert numeric_tournament is not None
     assert all(forecast.question.type == QuestionType.NUMERIC for forecast in numeric_tournament.forecasts)
     assert all(question.type == QuestionType.NUMERIC for question in numeric_tournament.questions)
     assert len(numeric_tournament.forecasts) < len(tournament.forecasts)
 
     multiple_choice_tournament = constrain_question_types(tournament, [QuestionType.MULTIPLE_CHOICE])
+    assert multiple_choice_tournament is not None
     assert all(forecast.question.type == QuestionType.MULTIPLE_CHOICE for forecast in multiple_choice_tournament.forecasts)
     assert all(question.type == QuestionType.MULTIPLE_CHOICE for question in multiple_choice_tournament.questions)
     assert len(multiple_choice_tournament.forecasts) < len(tournament.forecasts)
 
     binary_and_numeric_tournament = constrain_question_types(tournament, [QuestionType.BINARY, QuestionType.NUMERIC])
+    assert binary_and_numeric_tournament is not None
     assert all(forecast.question.type == QuestionType.BINARY or forecast.question.type == QuestionType.NUMERIC for forecast in binary_and_numeric_tournament.forecasts)
     assert all(question.type == QuestionType.BINARY or question.type == QuestionType.NUMERIC for question in binary_and_numeric_tournament.questions)
     assert len(binary_and_numeric_tournament.forecasts) < len(tournament.forecasts)
 
     binary_and_multiple_choice_tournament = constrain_question_types(tournament, [QuestionType.BINARY, QuestionType.MULTIPLE_CHOICE])
+    assert binary_and_multiple_choice_tournament is not None
     assert all(forecast.question.type == QuestionType.BINARY or forecast.question.type == QuestionType.MULTIPLE_CHOICE for forecast in binary_and_multiple_choice_tournament.forecasts)
     assert all(question.type == QuestionType.BINARY or question.type == QuestionType.MULTIPLE_CHOICE for question in binary_and_multiple_choice_tournament.questions)
     assert len(binary_and_multiple_choice_tournament.forecasts) < len(tournament.forecasts)

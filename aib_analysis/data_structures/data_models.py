@@ -429,7 +429,7 @@ class LeaderboardEntry(BaseModel):
 
     @property
     def question_count(self) -> int:
-        return len(set([score.forecast.question.question_id for score in self.scores]))
+        return len(set[int]([score.forecast.question.question_id for score in self.scores]))
 
     def top_n_scores(self, n: int) -> list[Score]:
         return sorted(self.scores, key=lambda x: x.score, reverse=True)[:n]
@@ -441,9 +441,9 @@ class LeaderboardEntry(BaseModel):
         return random.sample(self.scores, n)
 
     def get_confidence_interval(
-        self, confidence_level: float = 0.95
+        self, confidence_level: float = 0.95, num_bootstraps: int | None = None
     ) -> ConfidenceInterval:
         score_observations = [score.score for score in self.scores]
         return ConfidenceIntervalCalculator.confidence_interval_from_observations(
-            score_observations, confidence_level
+            score_observations, confidence_level, num_bootstraps
         )

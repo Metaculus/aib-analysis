@@ -1,8 +1,13 @@
-from aib_analysis.math.stats import ConfidenceIntervalCalculator, MeanHypothesisCalculator, ObservationStats
+from aib_analysis.math.stats import (
+    ConfidenceIntervalCalculator,
+    MeanHypothesisCalculator,
+    ObservationStats,
+)
 
 import pytest
 
 # NOTE: tests were copied from forecasting-tools stats testing
+
 
 class TestConfidenceInterval:
 
@@ -78,7 +83,7 @@ class TestConfidenceInterval:
         )
 
         assert confidence_interval.mean == pytest.approx(-0.08513, 0.1)
-        assert confidence_interval.margin_of_error == pytest.approx(0.3818, 0.1)
+        assert confidence_interval.t_based_confidence_interval.margin_of_error == pytest.approx(0.3818, 0.1)
         assert confidence_interval.lower_bound == pytest.approx(-0.4669, 0.1)
         assert confidence_interval.upper_bound == pytest.approx(0.2967, 0.1)
 
@@ -169,7 +174,7 @@ class TestConfidenceInterval:
         )
 
         assert confidence_interval.mean == pytest.approx(8.2267, 0.1)
-        assert confidence_interval.margin_of_error == pytest.approx(0.924, 0.1)
+        assert confidence_interval.t_based_confidence_interval.margin_of_error == pytest.approx(0.924, 0.1)
         assert confidence_interval.lower_bound == pytest.approx(7.3, 0.1)
         assert confidence_interval.upper_bound == pytest.approx(9.15, 0.1)
 
@@ -205,8 +210,8 @@ class TestConfidenceInterval:
         )
 
         assert confidence_interval.mean == pytest.approx(127.45, 0.1)
-        assert confidence_interval.standard_deviation == pytest.approx(25.965, 0.1)
-        assert confidence_interval.margin_of_error == pytest.approx(10.038, 0.1)
+        assert confidence_interval.t_based_confidence_interval.standard_deviation == pytest.approx(25.965, 0.1)
+        assert confidence_interval.t_based_confidence_interval.margin_of_error == pytest.approx(10.038, 0.1)
         assert confidence_interval.lower_bound == pytest.approx(117.412, 0.1)
         assert confidence_interval.upper_bound == pytest.approx(137.488, 0.1)
 
@@ -244,7 +249,6 @@ class TestMeanStatCalculator:
         assert hypothesis_test.p_value == pytest.approx(0.0396, 0.01)
         assert hypothesis_test.hypothesis_rejected == False
 
-
     def test_mean_is_equal_to_hypothesis_mean(self) -> None:
         # https://ecampusontario.pressbooks.pub/introstats/chapter/8-7-hypothesis-tests-for-a-population-mean-with-unknown-population-standard-deviation/
         hypothesis_mean = 3.78
@@ -260,7 +264,10 @@ class TestMeanStatCalculator:
         )
 
         hypothesis_test = MeanHypothesisCalculator._test_if_mean_is_equal_to_than_hypothesis_mean_w_observation_stats(
-            observation_stats, hypothesis_mean, confidence
+            observation_stats,
+            hypothesis_mean,
+            shapiro_test_passes=None,
+            confidence=confidence,
         )
 
         assert hypothesis_test.p_value == pytest.approx(0.0244, 0.01)
