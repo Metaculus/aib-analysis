@@ -1,10 +1,12 @@
+from typing import Literal
+
 import numpy as np
 import scipy.stats as stats
 from pydantic import BaseModel
 from scipy.stats import shapiro, t
 
 
-class ConfidenceInterval(BaseModel):
+class TBasedConfidenceInterval(BaseModel):
     mean: float
     margin_of_error: float
     standard_deviation: float
@@ -18,17 +20,62 @@ class ConfidenceInterval(BaseModel):
         return self.mean + self.margin_of_error
 
 
+class BootstrapConfidenceInterval(BaseModel):
+    mean: float
+    lower_bound: float
+    upper_bound: float
+
+
+class ConfidenceInterval(BaseModel):
+    t_based_confidence_interval: TBasedConfidenceInterval
+    bootstrap_confidence_interval: BootstrapConfidenceInterval | None
+    default_confidence_interval: Literal["t_based", "bootstrap"] = "t_based"
+
+    @property
+    def lower_bound(self) -> float:
+        return self._get_correct_interval().lower_bound
+
+    @property
+    def upper_bound(self) -> float:
+        return self._get_correct_interval().upper_bound
+
+    @property
+    def mean(self) -> float:
+        return self._get_correct_interval().mean
+
+    def _get_correct_interval(
+        self,
+    ) -> TBasedConfidenceInterval | BootstrapConfidenceInterval:
+        if (
+            self.default_confidence_interval == "t_based"
+        ):
+            return self.t_based_confidence_interval
+        elif (
+            self.default_confidence_interval == "bootstrap"
+            and self.bootstrap_confidence_interval is not None
+        ):
+            return self.bootstrap_confidence_interval
+        else:
+            raise ValueError(
+                f"Invalid default confidence interval: {self.default_confidence_interval}"
+            )
+
+
 class ConfidenceIntervalCalculator:
+    DEFAULT_NUM_BOOTSTRAPS = 9999
 
     @classmethod
     def confidence_interval_from_observations(
-        cls, observations: list[float], confidence: float = 0.9
+        cls,
+        observations: list[float],
+        confidence: float = 0.9,
+        num_bootstraps: int | None = None,
     ) -> ConfidenceInterval:
         """
         This solves the following stats problem:
         'estimating population mean with unknown population standard deviation'
 
-        Requirements
+        Requirements for T-based confidence interval:
         - Simple random sample
         - Either the sample is from a normally distributed population or n >30
         - Observations are independent
@@ -48,8 +95,21 @@ class ConfidenceIntervalCalculator:
         sample_mean = np.mean(observations)
         sample_std = np.std(observations, ddof=1)
 
-        return cls.confidence_interval_from_mean_and_std(
+        t_based_confidence_interval = cls.confidence_interval_from_mean_and_std(
             float(sample_mean), float(sample_std), sample_size, confidence
+        )
+        if num_bootstraps is not None:
+            bootstrap_confidence_interval = (
+                cls.bootstrap_confidence_interval_from_observations(
+                    observations, confidence, num_bootstraps
+                )
+            )
+        else:
+            bootstrap_confidence_interval = None
+
+        return ConfidenceInterval(
+            t_based_confidence_interval=t_based_confidence_interval,
+            bootstrap_confidence_interval=bootstrap_confidence_interval,
         )
 
     @classmethod
@@ -59,16 +119,58 @@ class ConfidenceIntervalCalculator:
         sample_std: float,
         sample_size: int,
         confidence: float,
-    ) -> ConfidenceInterval:
+    ) -> TBasedConfidenceInterval:
         standard_error = sample_std / np.sqrt(sample_size)
         alpha = 1 - confidence
         critical_value = t.ppf(1 - alpha / 2, sample_size - 1)
         margin_of_error = critical_value * standard_error
 
-        return ConfidenceInterval(
+        return TBasedConfidenceInterval(
             mean=float(sample_mean),
             margin_of_error=margin_of_error,
             standard_deviation=float(sample_std),
+        )
+
+    @classmethod
+    def bootstrap_confidence_interval_from_observations(
+        cls,
+        observations: list[float],
+        confidence: float,
+        num_bootstraps: int = DEFAULT_NUM_BOOTSTRAPS,
+    ) -> BootstrapConfidenceInterval:
+        statistics: list[float] = []
+        for _ in range(num_bootstraps):
+            percentage_to_sample = 1.0
+            sample = np.random.choice(
+                observations,
+                size=int(len(observations) * percentage_to_sample),
+                replace=True,
+            )
+            statistic = np.mean(sample)
+            statistics.append(float(statistic))
+
+        alpha = 1 - confidence
+
+        ordered = sorted(statistics)
+        lower = np.percentile(ordered, (alpha / 2) * 100)
+        upper = np.percentile(ordered, (1 - alpha / 2) * 100)
+        mean = np.mean(observations)
+
+        # Visualize the distribution of the bootstrap statistics if needed
+        # import matplotlib.pyplot as plt
+        # import streamlit as st
+
+        # fig, ax = plt.subplots()
+        # ax.hist(statistics, bins=30)
+        # ax.set_xlabel('Bootstrap Statistics')
+        # ax.set_ylabel('Frequency')
+        # ax.set_title('Distribution of Bootstrap Statistics')
+        # st.pyplot(fig)
+
+        return BootstrapConfidenceInterval(
+            mean=float(mean),
+            lower_bound=float(lower),
+            upper_bound=float(upper),
         )
 
 
@@ -76,6 +178,8 @@ class HypothesisTest(BaseModel):
     p_value: float
     hypothesis_rejected: bool
     written_conclusion: str | None = None
+    shapiro_test_passes: bool | None
+    interval_type: Literal["t_based", "bootstrap"]
 
 
 class ObservationStats(BaseModel):
@@ -109,9 +213,13 @@ class MeanHypothesisCalculator:
         assert 0 < confidence < 1, "Confidence must be between 0 and 1"
         test_normality_assumption(len(observations), observations)
         observation_stats = cls._get_observation_stats(observations)
-        return cls._test_if_mean_is_greater_w_observation_stats(
-            observation_stats, hypothesis_mean, confidence
+        result = cls._test_if_mean_is_greater_w_observation_stats(
+            observation_stats,
+            hypothesis_mean,
+            shapiro_test_passes=shapiro_test_passes(observations),
+            confidence=confidence,
         )
+        return result
 
     @classmethod
     def test_if_mean_is_equal_to_than_hypothesis_mean(
@@ -132,9 +240,13 @@ class MeanHypothesisCalculator:
         assert 0 < confidence < 1, "Confidence must be between 0 and 1"
         test_normality_assumption(len(observations), observations)
         observation_stats = cls._get_observation_stats(observations)
-        return cls._test_if_mean_is_equal_to_than_hypothesis_mean_w_observation_stats(
-            observation_stats, hypothesis_mean, confidence
+        result = cls._test_if_mean_is_equal_to_than_hypothesis_mean_w_observation_stats(
+            observation_stats,
+            hypothesis_mean,
+            shapiro_test_passes=shapiro_test_passes(observations),
+            confidence=confidence,
         )
+        return result
 
     @classmethod
     def _get_observation_stats(cls, observations: list[float]) -> ObservationStats:
@@ -153,6 +265,7 @@ class MeanHypothesisCalculator:
         cls,
         observation_stats: ObservationStats,
         hypothesis_mean: float,
+        shapiro_test_passes: bool | None,
         confidence: float = 0.95,
     ) -> HypothesisTest:
         test_normality_assumption(observation_stats.count)
@@ -169,13 +282,17 @@ class MeanHypothesisCalculator:
 
         hypothesis_rejected = p_value < alpha
         if hypothesis_rejected:
-            written_conclusion = f"We reject the null hypothesis (the population mean is less than or equal to {hypothesis_mean}) with {confidence*100:.2f}% confidence since at the {alpha*100:.2f}% level of significance, the sample data do, in fact, give enough evidence to conclude that the population mean is greater than {hypothesis_mean}. If the null hypothesis is true, then there is a {p_value*100:.2f}% probability that the sample (observed) mean would be observed at {average} or more. Since the mean value observed in the sample was {average} we can reject the null hypothesis. This also means there is sufficient evidence to support the alternative hypothesis that the population mean is greater than {hypothesis_mean}. The sample consisted of {count} observations."
+            written_conclusion = f"We reject the null hypothesis (the population mean is less than or equal to {hypothesis_mean}) with {confidence*100:.2f}% confidence since at the {alpha*100:.2f}% level of significance, the sample data do, in fact, give enough evidence to conclude that the population mean is greater than {hypothesis_mean}. Since the mean value observed in the sample was {average} we can reject the null hypothesis. This also means there is sufficient evidence to support the alternative hypothesis that the population mean is greater than {hypothesis_mean}. The sample consisted of {count} observations."
+            # TODO: Add the correct version of this sentence back:  If the null hypothesis is true, then there is a {p_value*100:.2f}% probability that the sample (observed) mean would be observed at {average} or more
         else:
-            written_conclusion = f"We fail to reject the null hypothesis (the population mean is less than or equal to {hypothesis_mean}) since at the {alpha*100:.2f}% level of significance, the sample data do not give enough evidence to conclude that the population mean is greater than {hypothesis_mean}. If the null hypothesis is true, then there is a {p_value*100:.2f}% probability that the sample (observed) mean would be observed at {average} or more. Thus there is not enough evidence to suggest that the population mean is greater than {hypothesis_mean}. The sample consisted of {count} observations."
+            written_conclusion = f"We fail to reject the null hypothesis (the population mean is less than or equal to {hypothesis_mean}) since at the {alpha*100:.2f}% level of significance, the sample data do not give enough evidence to conclude that the population mean is greater than {hypothesis_mean}.  Thus there is not enough evidence to suggest that the population mean is greater than {hypothesis_mean}. The sample consisted of {count} observations."
+            # TODO: Add the correct version of this sentence back: If the null hypothesis is true, then there is a {p_value*100:.2f}% probability that the sample (observed) mean would be observed at {average} or more.
         return HypothesisTest(
             p_value=p_value,
             hypothesis_rejected=hypothesis_rejected,
             written_conclusion=written_conclusion,
+            shapiro_test_passes=shapiro_test_passes,
+            interval_type="t_based",
         )
 
     @classmethod
@@ -183,6 +300,7 @@ class MeanHypothesisCalculator:
         cls,
         observation_stats: ObservationStats,
         hypothesis_mean: float,
+        shapiro_test_passes: bool | None,
         confidence: float = 0.95,
     ) -> HypothesisTest:
         test_normality_assumption(observation_stats.count)
@@ -205,7 +323,14 @@ class MeanHypothesisCalculator:
             p_value=p_value,
             hypothesis_rejected=hypothesis_rejected,
             written_conclusion=written_conclusion,
+            shapiro_test_passes=shapiro_test_passes,
+            interval_type="t_based",
         )
+
+
+def shapiro_test_passes(observations: list[float]) -> bool:
+    _, normality_pvalue = shapiro(observations)
+    return normality_pvalue > 0.05
 
 
 def test_normality_assumption(
@@ -214,10 +339,8 @@ def test_normality_assumption(
     if sample_size < 2:
         raise ValueError("Not enough data for T-based confidence interval")
 
-    if sample_size < 30 and observations:
-        _, normality_pvalue = shapiro(observations)
-        if normality_pvalue < 0.05:
+    if observations and sample_size < 30:
+        if not shapiro_test_passes(observations):
             raise ValueError(
                 "Data fails normality assumption for T-based confidence interval"
             )
-

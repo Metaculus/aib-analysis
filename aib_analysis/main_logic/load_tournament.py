@@ -5,6 +5,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import pendulum
+
 from aib_analysis.data_structures.data_models import (
     Forecast,
     ForecastType,
@@ -30,6 +31,11 @@ def load_tournament(
     user_cache: dict[str, User] = {}
 
     dataframe = pd.read_csv(forecast_file_path, low_memory=False)
+    question_to_remove = [
+        "Will the same presidential candidate win Michigan and Wisconsin in the 2024 election?"
+    ] # This question in Q4 has no scores in the Metaculus database due to mis-configuration (and we don't want to update a finalized tourn).
+    dataframe = dataframe[~dataframe["question_title"].isin(question_to_remove)]
+    assert isinstance(dataframe, pd.DataFrame)
 
     logger.info(f"Loaded {len(dataframe)} forecast rows")
     log_every_n = 5000
