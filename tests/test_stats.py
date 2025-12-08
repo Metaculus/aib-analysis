@@ -83,7 +83,7 @@ class TestConfidenceInterval:
         )
 
         assert confidence_interval.mean == pytest.approx(-0.08513, 0.1)
-        assert confidence_interval.margin_of_error == pytest.approx(0.3818, 0.1)
+        assert confidence_interval.t_based_confidence_interval.margin_of_error == pytest.approx(0.3818, 0.1)
         assert confidence_interval.lower_bound == pytest.approx(-0.4669, 0.1)
         assert confidence_interval.upper_bound == pytest.approx(0.2967, 0.1)
 
@@ -174,7 +174,7 @@ class TestConfidenceInterval:
         )
 
         assert confidence_interval.mean == pytest.approx(8.2267, 0.1)
-        assert confidence_interval.margin_of_error == pytest.approx(0.924, 0.1)
+        assert confidence_interval.t_based_confidence_interval.margin_of_error == pytest.approx(0.924, 0.1)
         assert confidence_interval.lower_bound == pytest.approx(7.3, 0.1)
         assert confidence_interval.upper_bound == pytest.approx(9.15, 0.1)
 
@@ -210,8 +210,8 @@ class TestConfidenceInterval:
         )
 
         assert confidence_interval.mean == pytest.approx(127.45, 0.1)
-        assert confidence_interval.standard_deviation == pytest.approx(25.965, 0.1)
-        assert confidence_interval.margin_of_error == pytest.approx(10.038, 0.1)
+        assert confidence_interval.t_based_confidence_interval.standard_deviation == pytest.approx(25.965, 0.1)
+        assert confidence_interval.t_based_confidence_interval.margin_of_error == pytest.approx(10.038, 0.1)
         assert confidence_interval.lower_bound == pytest.approx(117.412, 0.1)
         assert confidence_interval.upper_bound == pytest.approx(137.488, 0.1)
 
