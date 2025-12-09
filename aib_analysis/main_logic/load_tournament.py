@@ -103,13 +103,15 @@ def _parse_forecast_row(
     if question_id in question_cache:
         question = question_cache[question_id]
     else:
+        cp_reveal_exists = pd.notnull(row.get("cp_reveal_time"))
+        assert isinstance(cp_reveal_exists, bool)
         question = Question(
             question_text=row["question_title"],
             resolution=resolution,
             weight=float(row["question_weight"]),
             spot_scoring_time=(
                 pd.to_datetime(row["cp_reveal_time"])
-                if pd.notnull(row.get("cp_reveal_time"))
+                if cp_reveal_exists
                 else pd.to_datetime(row["scheduled_close_time"])
             ),
             question_id=question_id,
@@ -138,11 +140,17 @@ def _parse_forecast_row(
     try:
         end_time = pendulum.parse(row["forecast_endtime"])
         assert isinstance(end_time, datetime)
-    except Exception as e:
+    except Exception:
         end_time = None
 
     prediction_time = pendulum.parse(row["forecast_timestamp"])
     assert isinstance(prediction_time, datetime)
+
+    forecasters_at_time = row.get("forecasters_at_time")
+    if forecasters_at_time is not None:
+        forecasters_at_time = int(forecasters_at_time)
+    else:
+        forecasters_at_time = None
 
     forecast = Forecast(
         question=question,
@@ -150,6 +158,7 @@ def _parse_forecast_row(
         prediction=prediction,
         prediction_time=prediction_time,
         end_time=end_time,
+        forecasters_at_time=forecasters_at_time,
     )
     return forecast, question, user
 

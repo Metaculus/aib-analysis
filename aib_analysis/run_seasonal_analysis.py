@@ -14,7 +14,6 @@ from aib_analysis.main_logic.load_tournament import load_tournament
 from aib_analysis.main_logic.process_tournament import (
     combine_tournaments,
     create_team_tournament,
-    create_weighted_q3_spot_forecast_tourn,
     get_best_forecasters_from_tournament,
     save_tournament,
     smart_remove_questions_from_tournament,
@@ -25,27 +24,58 @@ logger = logging.getLogger(__name__)
 
 
 def main(
-    pro_path: str,
+    cp_path: str,
     bot_path: str,
-    quarterly_cup_path: str | None,
     output_folder: str,
 ):
     initialize_logging()
+    cp_size = 15
 
     local_counter: int = 0
+
     def next_count() -> int:
         nonlocal local_counter
         local_counter += 1
         return local_counter
-    
-    is_q3 = "q3" in output_folder.lower()
-    is_q4 = "q4" in output_folder.lower()
 
-    # ----------------------- Pros and Bot Tournaments -----------------------
-    pro_tournament = grab_tournament_data(pro_path, UserType.PRO, "Pro Tournament")
+    # ----------------------- CPs and Bot Tournaments -----------------------
+    full_cp_tournament = grab_tournament_data(cp_path, UserType.CP, "CP Tournament")
     save_tournament(
-        pro_tournament,
-        "pro_tournament.json",
+        full_cp_tournament,
+        "cp_tournament.json",
+        folder=output_folder,
+        counter_override=next_count(),
+    )
+
+    # Goal: >15 CP vs Bot team
+    # Bot team chosen by: random selection of questions in tournament. Pick top 10 bots. choose 33% of total questions.
+    # Comparison set chosen from left over, filtered for > 15 forecasters
+    # Other alternative:
+    # - Stratify by all possible counfounders. Question theme, question type, question easiness, CP size, etc.
+    # Use fixed seed for reproducibility.
+
+    quality_cp_forecasts = [
+        forecast
+        for forecast in full_cp_tournament.forecasts
+        if forecast.forecasters_at_time is not None
+        and forecast.forecasters_at_time >= cp_size
+    ]
+    quality_cp_tournament = SimulatedTournament(
+        name="Comparison CP Tournament",
+        forecasts=quality_cp_forecasts,
+    )
+    save_tournament(
+        quality_cp_tournament,
+        "quality_cp_tournament.json",
+        folder=output_folder,
+        divide_into_types=True,
+        counter_override=next_count(),
+    )
+
+    comparison_cp_tournament = quality_cp_tournament
+    save_tournament(
+        comparison_cp_tournament,
+        "comparison_cp_tournament.json",
         folder=output_folder,
         counter_override=next_count(),
     )
@@ -53,13 +83,10 @@ def main(
     bot_tournament_full = grab_tournament_data(
         bot_path, UserType.BOT, "Bot Tournament Full"
     )
-    if is_q3:
-        bot_tournament = create_weighted_q3_spot_forecast_tourn(bot_tournament_full)
-    else:
-        bot_tournament = SimulatedTournament(
-            name="Bot Tournament (Only spot forecasts)",
-            forecasts=bot_tournament_full.spot_forecasts,
-        )
+    bot_tournament = SimulatedTournament(
+        name="Bot Tournament (Only spot forecasts)",
+        forecasts=bot_tournament_full.spot_forecasts,
+    )
     save_tournament(
         bot_tournament,
         "bot_tournament.json",
@@ -72,12 +99,13 @@ def main(
         bot_tournament
     )  # Do this early so we can error out if we don't have right comparison bot users
 
-    bot_tournament_wo_pro_questions = smart_remove_questions_from_tournament(
-        tournament=bot_tournament, questions_to_exclude=pro_tournament.questions
+    bot_team_qualification_tournament = smart_remove_questions_from_tournament(
+        tournament=bot_tournament,
+        questions_to_exclude=comparison_cp_tournament.questions,
     )
     save_tournament(
-        bot_tournament_wo_pro_questions,
-        "bot_tournament_without_pro_questions.json",
+        bot_team_qualification_tournament,
+        "bot_team_qualification_tournament.json",
         divide_into_types=True,
         folder=output_folder,
         counter_override=next_count(),
@@ -123,15 +151,18 @@ def main(
         counter_override=next_count(),
     )
 
-    # ------------------------- Combine Pro and Bot Tournaments -------------------------
+    # ------------------------- Combine CP and Bot Tournaments -------------------------
 
-    use_pro_weights = False if is_q3 or is_q4 else True
-    pro_with_bot_tourn = combine_tournaments(
-        pro_tournament, bot_tournament, use_tourn_1_weights=use_pro_weights
+    use_bot_tourn_weights = True
+    use_weights_from_linked_cp_questions = not use_bot_tourn_weights
+    cp_with_bot_tourn = combine_tournaments(
+        comparison_cp_tournament,
+        bot_tournament,
+        use_tourn_1_weights=use_weights_from_linked_cp_questions,
     )
     save_tournament(
-        pro_with_bot_tourn,
-        "pro_with_bot_tourn__no_teams.json",
+        cp_with_bot_tourn,
+        "cp_with_bot_tourn__no_teams.json",
         divide_into_types=True,
         folder=output_folder,
         counter_override=next_count(),
@@ -142,47 +173,47 @@ def main(
     for bot_team_size in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 30, 50, 100]:
         if bot_team_size > len(bot_tournament.users):
             continue
-        pro_team = pro_tournament.users
-        bot_team_for_pro_comparison = get_best_forecasters_from_tournament(
-            bot_tournament_wo_pro_questions, bot_team_size
+        cp_team = comparison_cp_tournament.users
+        bot_team_for_cp_comparison = get_best_forecasters_from_tournament(
+            bot_team_qualification_tournament, bot_team_size
         )
-        pro_v_bot_tournament__teams = create_team_tournament(
-            tournament_1=pro_tournament,
+        cp_v_bot_tournament__teams = create_team_tournament(
+            tournament_1=comparison_cp_tournament,
             tournament_2=bot_tournament,
-            team_1=pro_team,
-            team_2=bot_team_for_pro_comparison,
-            aggregate_name_1="Pro Team",
+            team_1=cp_team,
+            team_2=bot_team_for_cp_comparison,
+            aggregate_name_1="CP Team",
             aggregate_name_2="Bot Team",
-            use_tourn_1_weights=use_pro_weights,
+            use_tourn_1_weights=use_weights_from_linked_cp_questions,
         )
         save_tournament(
-            pro_v_bot_tournament__teams,
-            f"pro_vs_bot_tournament__teams_size_{bot_team_size}.json",
+            cp_v_bot_tournament__teams,
+            f"cp_vs_bot_tournament__teams_size_{bot_team_size}.json",
             divide_into_types=False,
             folder=output_folder,
             counter_override=team_comparison_counter,
         )
         if bot_team_size == 10:
             save_tournament(
-                pro_v_bot_tournament__teams,
-                "pro_vs_bot_tournament__teams_size_10.json",
+                cp_v_bot_tournament__teams,
+                "cp_vs_bot_tournament__teams_size_10.json",
                 divide_into_types=True,
                 folder=output_folder,
                 counter_override=next_count(),
             )
-            size_10_bot_team = bot_team_for_pro_comparison
+            size_10_bot_team = bot_team_for_cp_comparison
 
     # ------------------- Control/comparison Bots -------------------
     assert size_10_bot_team is not None, "Size 10 bot team is not None"
     number_to_use = 99
     comparison_vs_bot__teams = create_team_tournament(
-        tournament_1=pro_with_bot_tourn,
-        tournament_2=pro_with_bot_tourn,
+        tournament_1=cp_with_bot_tourn,
+        tournament_2=cp_with_bot_tourn,
         team_1=comparison_bot_users,
         team_2=size_10_bot_team,
         aggregate_name_1="Comparison Team",
         aggregate_name_2="Bot Team",
-        use_tourn_1_weights=use_pro_weights,
+        use_tourn_1_weights=use_weights_from_linked_cp_questions,
     )
     save_tournament(
         comparison_vs_bot__teams,
@@ -191,64 +222,21 @@ def main(
         divide_into_types=True,
         counter_override=number_to_use,
     )
-    comparison_vs_pros__teams = create_team_tournament(
-        tournament_1=pro_with_bot_tourn,
-        tournament_2=pro_with_bot_tourn,
+    comparison_vs_cps__teams = create_team_tournament(
+        tournament_1=cp_with_bot_tourn,
+        tournament_2=cp_with_bot_tourn,
         team_1=comparison_bot_users,
-        team_2=pro_team,
+        team_2=cp_team,
         aggregate_name_1="Comparison Team",
-        aggregate_name_2="Pro Team",
-        use_tourn_1_weights=use_pro_weights,
+        aggregate_name_2="CP Team",
+        use_tourn_1_weights=use_weights_from_linked_cp_questions,
     )
     save_tournament(
-        comparison_vs_pros__teams,
-        "comparison_vs_pro__teams.json",
+        comparison_vs_cps__teams,
+        "comparison_vs_cp__teams.json",
         folder=output_folder,
         divide_into_types=True,
         counter_override=number_to_use,
-    )
-
-    # ------------------- Quarterly Cup -------------------
-    if quarterly_cup_path is None:
-        return
-
-    cup_tournament = grab_tournament_data(
-        quarterly_cup_path, UserType.BOT, "Quarterly Cup"
-    )
-    save_tournament(
-        cup_tournament,
-        "spot_scores_for_quarterly_cup.json",
-        folder=output_folder,
-        counter_override=next_count(),
-    )
-
-    bot_tournament_wo_cup_questions = smart_remove_questions_from_tournament(
-        bot_tournament, cup_tournament.questions
-    )
-    save_tournament(
-        bot_tournament_wo_cup_questions,
-        "bot_tournament_wo_cup_questions.json",
-        folder=output_folder,
-        counter_override=next_count(),
-    )
-
-    bot_team_for_cup_comparison = get_best_forecasters_from_tournament(
-        bot_tournament_wo_cup_questions, bot_team_size
-    )
-    cup_vs_bot_teams = create_team_tournament(
-        tournament_1=cup_tournament,
-        tournament_2=bot_tournament,
-        team_1="all",
-        team_2=bot_team_for_cup_comparison,
-        aggregate_name_1="Cup Team (All forecasters)",
-        aggregate_name_2="Bot Team",
-        use_tourn_1_weights=use_pro_weights,
-    )
-    save_tournament(
-        cup_vs_bot_teams,
-        "cup_vs_bot_teams.json",
-        folder=output_folder,
-        counter_override=next_count(),
     )
 
 
@@ -265,9 +253,6 @@ def get_comparison_bot_users(bot_tournament: SimulatedTournament) -> list[User]:
     comparison_bot_users = [
         user for user in bot_tournament.users if user.name in comparison_bot_names
     ]
-    # assert (
-    #     len(comparison_bot_users) == 2
-    # ), f"Expected 2 control bot users, got {len(comparison_bot_users)}"
     return comparison_bot_users
 
 
@@ -280,8 +265,7 @@ def grab_tournament_data(
 if __name__ == "__main__":
 
     main(
-        pro_path="local/private_input_data/cp_forecasts_fall.csv",
+        cp_path="local/private_input_data/cp_forecasts_fall.csv",
         bot_path="local/private_input_data/bot_forecasts_fall.csv",
-        quarterly_cup_path=None,
         output_folder="local/fall_2025_simulations_teams_comparison/",
     )

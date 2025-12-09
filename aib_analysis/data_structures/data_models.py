@@ -33,6 +33,7 @@ class Forecast(BaseModel):
     prediction: ForecastType
     prediction_time: datetime # Same as forecast start time
     end_time: datetime | None = None
+    forecasters_at_time: int | None = None
     _id: str | None = None
     model_config = ConfigDict(frozen=True)
 
@@ -145,6 +146,14 @@ class Forecast(BaseModel):
                 raise ValueError(
                     f"Prediction must be between 0 and 1, got {p}. Full prediction: {self.prediction}"
                 )
+        return self
+
+    @model_validator(mode="after")
+    def check_forecasters_at_time_is_set(self) -> Self:
+        if self.forecasters_at_time is not None and self.forecasters_at_time <= 0:
+            raise ValueError(f"Forecasters at time must be greater than 0, got {self.forecasters_at_time}")
+        if self.user.type == UserType.CP and self.forecasters_at_time is None:
+            raise ValueError("Community prediction forecasts must have a forecasters_at_time set")
         return self
 
     def __hash__(self) -> int:
