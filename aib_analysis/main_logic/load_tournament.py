@@ -176,6 +176,12 @@ def _parse_forecast(forecast_row: dict) -> ForecastType:
         continuous_cdf = row["continuous_cdf"]
         if pd.notnull(continuous_cdf):
             prediction = eval(continuous_cdf)
+            for i, p in enumerate(prediction):
+                prediction[i] = float(p)
+                if abs(p - 1) < 1e-6:
+                    prediction[i] = 1
+                elif abs(p) < 1e-6:
+                    prediction[i] = 0
         else:
             prediction = None
     else:
@@ -189,7 +195,9 @@ def _parse_forecast(forecast_row: dict) -> ForecastType:
 def _parse_resolution(forecast_row: dict) -> ResolutionType:
     q_type = forecast_row["type"]
     raw_resolution = forecast_row["resolution"]
-    if pd.isnull(raw_resolution) or str(raw_resolution).lower() in [
+    if pd.isnull(raw_resolution):
+        raise ValueError(f"Some questions are not resolved. Resolution: {raw_resolution}. Row: {forecast_row}")
+    if str(raw_resolution).lower() in [
         "annulled",
         "ambiguous",
     ]:
