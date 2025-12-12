@@ -515,9 +515,11 @@ def save_tournament(
 def _save_specific_tournament_to_file(
     tournament_to_save: SimulatedTournament, save_path: str
 ):
-    modified_tournament = copy.deepcopy(tournament_to_save)
-    modified_tournament.forecasts = []
-    SimulatedTournament.model_validate(modified_tournament)
+    # modified_tournament = copy.deepcopy(tournament_to_save)
+    # modified_tournament.forecasts = []
+    # SimulatedTournament.model_validate(modified_tournament)
+    # NOTE: Uncomment (and probably debug) this code to prevent unecessary duplication between forecasts and scores in saved json.
+    modified_tournament = tournament_to_save
 
     try:
         with open(save_path, "w") as f:

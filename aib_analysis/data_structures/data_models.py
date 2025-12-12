@@ -33,6 +33,7 @@ class Forecast(BaseModel):
     prediction: ForecastType
     prediction_time: datetime # Same as forecast start time
     end_time: datetime | None = None
+    forecasters_at_time: int | None = None
     _id: str | None = None
     model_config = ConfigDict(frozen=True)
 
@@ -103,45 +104,56 @@ class Forecast(BaseModel):
 
     @model_validator(mode="after")
     def check_prediction_type_matches(self) -> Self:
-        if self.prediction is not None:
-            q_type = self.question.type
-            if q_type == QuestionType.BINARY:
-                if not (
-                    isinstance(self.prediction, list)
-                    and len(self.prediction) in (1, 2)
-                    and all(0 <= p <= 1 for p in self.prediction)
-                ):
-                    raise ValueError(
-                        "Prediction must be a list of 1 or 2 floats for binary questions."
-                    )
-            elif q_type == QuestionType.MULTIPLE_CHOICE:
-                if not (
-                    isinstance(self.prediction, list)
-                    and len(self.prediction) >= 2
-                    and all(isinstance(p, float) for p in self.prediction)
-                ):
-                    raise ValueError(
-                        "Prediction must be a list of floats (length >= 2) for multiple choice questions."
-                    )
-                if abs(sum(self.prediction) - 1) > 1e-6:
-                    raise ValueError(
-                        "Prediction must sum to 1 for multiple choice questions."
-                    )
-            elif q_type == QuestionType.NUMERIC:
-                if not (
-                    isinstance(self.prediction, list)
-                    and len(self.prediction) == 201
-                    and all(isinstance(p, float) for p in self.prediction)
-                ):
-                    raise ValueError(
-                        "Prediction must be a list of 201 floats for numeric questions."
-                    )
-        if self.prediction is not None:
-            for p in self.prediction:
-                if not (0 <= p <= 1):
-                    raise ValueError(
-                        f"Prediction must be between 0 and 1, got {p}. Full prediction: {self.prediction}"
-                    )
+        if self.prediction is None:
+            return self
+
+        q_type = self.question.type
+        if q_type == QuestionType.BINARY:
+            if not (
+                isinstance(self.prediction, list)
+                and len(self.prediction) in (1, 2)
+                and all(0 <= p <= 1 for p in self.prediction)
+            ):
+                raise ValueError(
+                    "Prediction must be a list of 1 or 2 floats for binary questions."
+                )
+        elif q_type == QuestionType.MULTIPLE_CHOICE:
+            if not (
+                isinstance(self.prediction, list)
+                and len(self.prediction) >= 2
+                and all(isinstance(p, float) for p in self.prediction)
+            ):
+                raise ValueError(
+                    "Prediction must be a list of floats (length >= 2) for multiple choice questions."
+                )
+            if abs(sum(self.prediction) - 1) > 1e-6:
+                raise ValueError(
+                    "Prediction must sum to 1 for multiple choice questions."
+                )
+        elif q_type == QuestionType.NUMERIC:
+            is_list = isinstance(self.prediction, list)
+            has_201_points = len(self.prediction) == 201
+            non_float_items = [p for p in self.prediction if not isinstance(p, float)]
+            all_floats = len(non_float_items) == 0
+            if not (is_list and has_201_points and all_floats):
+                raise ValueError(
+                    "Prediction must be a list of 201 floats for numeric questions."
+                )
+
+        # verify predictions are between 0 and 1
+        for p in self.prediction:
+            if not (0 <= p <= 1):
+                raise ValueError(
+                    f"Prediction must be between 0 and 1, got {p}. Full prediction: {self.prediction}"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def check_forecasters_at_time_is_set(self) -> Self:
+        if self.forecasters_at_time is not None and self.forecasters_at_time <= 0:
+            raise ValueError(f"Forecasters at time must be greater than 0, got {self.forecasters_at_time}")
+        if self.user.type == UserType.CP and self.forecasters_at_time is None:
+            raise ValueError("Community prediction forecasts must have a forecasters_at_time set")
         return self
 
     def __hash__(self) -> int:
