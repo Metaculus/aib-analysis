@@ -21,6 +21,9 @@ def calculate_peer_score(
     question_weight: float = 1.0,
     q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
 ) -> float:
+    if len(forecast_for_other_users) == 0:
+        return 0.0
+
     question_type = _determine_question_type(q_type, resolution)
     resolution = _normalize_resolution(question_type, resolution, range_min, range_max)
     forecast_for_resolution = _determine_probability_for_resolution(

@@ -691,5 +691,3 @@ def display_aggregate_comparison(team_comparison_tourns: list[SimulatedTournamen
 
         for entry in entries_to_graph:
             st.write(f"- Bot Team Size: {len(entry.user.aggregated_users)} | Score: {entry.average_score:.3f}")
-
-        
