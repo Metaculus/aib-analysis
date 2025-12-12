@@ -32,7 +32,12 @@ def main(tournaments_folder: str | None = None):
         st.write("No tournaments folder selected")
         folder_options = [f"local/{folder}" for folder in os.listdir("local/")]
         if os.path.exists("local/minibench/"):
-            folder_options.extend([f"local/minibench/{folder}" for folder in os.listdir("local/minibench/")])
+            folder_options.extend(
+                [
+                    f"local/minibench/{folder}"
+                    for folder in os.listdir("local/minibench/")
+                ]
+            )
         folder_options.sort()
         st.write("- " + "\n- ".join(folder_options))
         return
@@ -51,10 +56,17 @@ def main(tournaments_folder: str | None = None):
             for file in files_grouped_by_first_number[first_number]:
                 st.write(f"- {file}")
 
-    hypothesis_test_tourns_files = [file for file in all_files_in_folder if "pro_vs_bot_tournament__teams" in file]
+    hypothesis_test_tourns_files = [
+        file
+        for file in all_files_in_folder
+        if "pro_vs_bot_tournament__teams" in file
+        or "cp_vs_bot_tournament__teams" in file
+    ]
 
     # Create selectbox for group selection
-    group_options = [f"Group {first_number}" for first_number in files_grouped_by_first_number.keys()]
+    group_options = [
+        f"Group {first_number}" for first_number in files_grouped_by_first_number.keys()
+    ]
     selected_group = st.selectbox("Select a group to display:", group_options)
 
     # Extract the group number from the selected option
@@ -67,14 +79,24 @@ def main(tournaments_folder: str | None = None):
         logger.info(f"Displaying tournament {file}")
         if file.endswith(".json"):
             tournament = grab_tournament_data(tournaments_folder, file)
-            tournament_name = file[2:].replace(".json", "").replace("__", " | ").replace("_", " ").title()
+            tournament_name = (
+                file[2:]
+                .replace(".json", "")
+                .replace("__", " | ")
+                .replace("_", " ")
+                .title()
+            )
             if file in hypothesis_test_tourns_files:
-                display_bot_v_pro_hypothesis_test(tournament, f"Hypothesis test for {tournament_name}")
+                display_bot_v_pro_hypothesis_test(
+                    tournament, f"Hypothesis test for {tournament_name}"
+                )
                 team_comparison_tourns.append(tournament)
             display_individual_tournament(tournament, tournament_name)
 
             if file == "7_pro_vs_bot_tournament__teams.json":
-                comparison_tournament = grab_tournament_data(tournaments_folder, "1_pro_tournament.json")
+                comparison_tournament = grab_tournament_data(
+                    tournaments_folder, "1_pro_tournament.json"
+                )
                 display_unique_questions(comparison_tournament, tournament)
 
     if len(team_comparison_tourns) > 0:
@@ -83,14 +105,17 @@ def main(tournaments_folder: str | None = None):
     st.write("---")
     st.info("Contact ben [at] metaculus [.com] with any questions about this data")
 
+
 def grab_tournament_data(
-    folder: str, file: str,
+    folder: str,
+    file: str,
 ) -> SimulatedTournament:
     with open(os.path.join(folder, file)) as f:
         logger.info(f"Loading tournament {file}")
         tournament = SimulatedTournament.model_validate_json(f.read())
         logger.info(f"Finished loading tournament {file}")
     return tournament
+
 
 if __name__ == "__main__":
     main(None)
