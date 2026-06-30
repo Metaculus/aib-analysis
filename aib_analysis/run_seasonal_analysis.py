@@ -44,11 +44,11 @@ def main(
     main_team_size = 10
     random.seed(random_seed)
 
-    # ----------------------- Base CP and Bot Tournament -----------------------
-    cp_tournament = grab_tournament_data(cp_path, UserType.CP, "CP Tournament")
+    # ----------------------- Base Pro and Bot Tournament -----------------------
+    pro_tournament = grab_tournament_data(cp_path, UserType.PRO, "Pro Tournament")
     save_tournament(
-        cp_tournament,
-        "cp_tournament.json",
+        pro_tournament,
+        "pro_tournament.json",
         folder=output_folder,
         counter_override=next_count(),
     )
@@ -70,13 +70,13 @@ def main(
 
     # ----------------------- Train Test Split -----------------------
     test_set_fraction = 0.67  # Give extra room so that the cp forecaster filter works
-    test_set_size = int(len(cp_tournament.questions) * test_set_fraction)
+    test_set_size = int(len(pro_tournament.questions) * test_set_fraction)
     test_set_save_number = next_count()
 
-    full_cp_test_set_questions = random.sample(cp_tournament.questions, test_set_size)
+    full_cp_test_set_questions = random.sample(pro_tournament.questions, test_set_size)
     full_cp_test_set_forecasts = [
         forecast
-        for forecast in cp_tournament.forecasts
+        for forecast in pro_tournament.forecasts
         if forecast.question in full_cp_test_set_questions
     ]
     full_cp_test_set_tournament = SimulatedTournament(
@@ -122,7 +122,7 @@ def main(
     team_comparison_counter = next_count()
     use_bot_tourn_weights = True
     for bot_team_size in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 30, 50, 100]:
-        if bot_team_size > len(bot_tournament.users):
+        if bot_team_size > len(bot_tournament_full.users):
             continue
         cp_team = quality_cp_test_set_tournament.users
         bot_team_for_cp_comparison = get_best_forecasters_from_tournament(
@@ -156,7 +156,7 @@ def main(
     # ------------------------- Other Tournaments -------------------------
     process_metac_bot_tournament(bot_tournament, output_folder)
     process_bot_maker_only_tournament(bot_tournament, output_folder)
-    process_cp_with_bot_tournament(cp_tournament, bot_tournament, output_folder, main_cp_size)
+    process_cp_with_bot_tournament(pro_tournament, bot_tournament, output_folder, main_cp_size)
 
 
 def process_metac_bot_tournament(
@@ -249,7 +249,7 @@ def grab_tournament_data(
 if __name__ == "__main__":
 
     main(
-        cp_path="local/private_input_data/cp_forecasts_fall.csv",
-        bot_path="local/private_input_data/bot_forecasts_fall.csv",
-        output_folder="local/fall_2025_simulations_teams_comparison/",
+        cp_path="local/private_input_data/pro_forecasts_2026_spring.csv",
+        bot_path="local/private_input_data/bot_forecasts_2026_spring.csv",
+        output_folder="local/spring_2026_simulations_teams_comparison/",
     )

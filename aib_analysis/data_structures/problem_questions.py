@@ -20,6 +20,7 @@ class Tournament(Enum):
     Q1_2025_VS_CUP = "q1_2025_vs_cup"
     Q2_2025 = "q2_2025"
     Fall_2025 = "fall_2025"
+    Spring_2026 = "spring_2026"
 
 
 class ProblemQuestion(BaseModel):
@@ -96,6 +97,15 @@ force_match_questions: list[ProblemQuestion] = [
         notes="Different open bounds (False vs True for upper bound). Created 2 days apart.",
         proposed_action="",
         tournament=Tournament.Q1_2025_VS_CUP,
+    ),
+    # Spring 2026
+    ProblemQuestion(
+        question_text="How many commercial aircraft deliveries will Airbus report for March 2026 ?",
+        question_1_url="https://www.metaculus.com/questions/42109/",
+        question_2_url="https://www.metaculus.com/questions/42272/",
+        notes="Duplicate questions in the same tournament. One is discrete, one is numeric. Both resolved to 60.",
+        proposed_action="Remove from comparison",
+        tournament=Tournament.Spring_2026,
     ),
 ]
 

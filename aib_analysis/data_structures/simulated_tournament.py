@@ -113,7 +113,7 @@ class SimulatedTournament(BaseModel):
                 self._question_to_spot_forecasts_cache[question_id_to_cache].append(
                     forecast
                 )
-        spot_forecasts = self._question_to_spot_forecasts_cache[question_id]
+        spot_forecasts = self._question_to_spot_forecasts_cache.get(question_id, [])
         return (
             spot_forecasts.copy()
         )  # Shallow copy (so you don't modify order of original list)

@@ -32,7 +32,8 @@ def load_tournament(
 
     dataframe = pd.read_csv(forecast_file_path, low_memory=False)
     question_to_remove = [
-        "Will the same presidential candidate win Michigan and Wisconsin in the 2024 election?"
+        "Will the same presidential candidate win Michigan and Wisconsin in the 2024 election?",
+        "How many commercial aircraft deliveries will Airbus report for March 2026 ?"
     ] # This question in Q4 has no scores in the Metaculus database due to mis-configuration (and we don't want to update a finalized tourn).
     dataframe = dataframe[~dataframe["question_title"].isin(question_to_remove)]
     assert isinstance(dataframe, pd.DataFrame)
@@ -123,6 +124,7 @@ def _parse_forecast_row(
             open_upper_bound=_parse_open_upper_bound(row),
             open_lower_bound=_parse_open_lower_bound(row),
             zero_point=_parse_zero_point(row),
+            inbound_outcome_count=_parse_inbound_outcome_count(row),
             created_at=pd.to_datetime(row["created_at"]),
             project=row["project_title"],
         )
@@ -193,6 +195,18 @@ def _parse_forecast(forecast_row: dict) -> ForecastType:
                     prediction[i] = 0
         else:
             prediction = None
+    elif question_type == "discrete":
+        continuous_cdf = row["continuous_cdf"]
+        if pd.notnull(continuous_cdf):
+            prediction = eval(continuous_cdf)
+            for i, p in enumerate(prediction):
+                prediction[i] = float(p)
+                if abs(p - 1) < 1e-6:
+                    prediction[i] = 1
+                elif abs(p) < 1e-6:
+                    prediction[i] = 0
+        else:
+            prediction = None
     else:
         prediction = None
 
@@ -205,7 +219,8 @@ def _parse_resolution(forecast_row: dict) -> ResolutionType:
     q_type = forecast_row["type"]
     raw_resolution = forecast_row["resolution"]
     if pd.isnull(raw_resolution):
-        raise ValueError(f"Some questions are not resolved. Resolution: {raw_resolution}. Row: {forecast_row}")
+        logger.debug(f"Question is not resolved. Resolution is NaN. Treating as unresolved (None). Row: {forecast_row.get('question_title')}")
+        return None
     if str(raw_resolution).lower() in [
         "annulled",
         "ambiguous",
@@ -219,7 +234,7 @@ def _parse_resolution(forecast_row: dict) -> ResolutionType:
         raise ValueError(f"Invalid resolution: {raw_resolution}")
     elif q_type == "multiple_choice":
         return str(raw_resolution)
-    elif q_type == "numeric":
+    elif q_type == "numeric" or q_type == "discrete":
         if raw_resolution == "above_upper_bound":
             return 1000000000000000000000000000000000.0  # Make it super obvious this is a fake number that is above upper bount
         if raw_resolution == "below_lower_bound":
@@ -243,7 +258,7 @@ def _parse_options(forecast_row: dict) -> tuple[str, ...] | None:
 
 
 def _parse_upper_bound(forecast_row: dict) -> float | None:
-    if forecast_row["type"] == "numeric":
+    if forecast_row["type"] == "numeric" or forecast_row["type"] == "discrete":
         upper = forecast_row.get("range_max")
         if upper is not None and pd.notnull(upper) and upper != "":
             return float(upper)
@@ -252,7 +267,7 @@ def _parse_upper_bound(forecast_row: dict) -> float | None:
 
 
 def _parse_lower_bound(forecast_row: dict) -> float | None:
-    if forecast_row["type"] == "numeric":
+    if forecast_row["type"] == "numeric" or forecast_row["type"] == "discrete":
         lower = forecast_row.get("range_min")
         if lower is not None and pd.notnull(lower) and lower != "":
             return float(lower)
@@ -261,18 +276,28 @@ def _parse_lower_bound(forecast_row: dict) -> float | None:
 
 
 def _parse_zero_point(forecast_row: dict) -> float | None:
-    if forecast_row["type"] == "numeric":
+    if forecast_row["type"] == "numeric" or forecast_row["type"] == "discrete":
         zero_point = forecast_row.get("zero_point")
         if pd.isna(zero_point):
             return None
         elif zero_point is not None and pd.notnull(zero_point) and zero_point != "":
             return float(zero_point)
-        raise ValueError(f"Invalid zero point: {zero_point}")
+        # raise ValueError(f"Invalid zero point: {zero_point}")
+    return None
+
+def _parse_inbound_outcome_count(forecast_row: dict) -> int | None:
+    if forecast_row["type"] == "discrete":
+        inbound_outcome_count = forecast_row.get("inbound_outcome_count")
+        if pd.isna(inbound_outcome_count):
+            return None
+        elif inbound_outcome_count is not None and pd.notnull(inbound_outcome_count) and inbound_outcome_count != "":
+            return int(inbound_outcome_count)
+        raise ValueError(f"Invalid inbound_outcome_count: {inbound_outcome_count}")
     return None
 
 
 def _parse_open_upper_bound(forecast_row: dict) -> bool | None:
-    if forecast_row["type"] == "numeric":
+    if forecast_row["type"] == "numeric" or forecast_row["type"] == "discrete":
         open_upper = forecast_row.get("open_upper_bound")
         if open_upper is not None and pd.notnull(open_upper) and open_upper != "":
             return _parse_truth_value(open_upper)
@@ -281,7 +306,7 @@ def _parse_open_upper_bound(forecast_row: dict) -> bool | None:
 
 
 def _parse_open_lower_bound(forecast_row: dict) -> bool | None:
-    if forecast_row["type"] == "numeric":
+    if forecast_row["type"] == "numeric" or forecast_row["type"] == "discrete":
         open_lower = forecast_row.get("open_lower_bound")
         if open_lower is not None and pd.notnull(open_lower) and open_lower != "":
             return _parse_truth_value(open_lower)
