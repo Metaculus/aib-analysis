@@ -134,7 +134,7 @@ def _determine_baseline(
             baseline_prob = 0.05
         else:
             open_bound_count = bool(open_upper_bound) + bool(open_lower_bound)
-            pmf_inner_bins = len(forecast) - 1 # len(forecast) is len(cdf)
+            pmf_inner_bins = len(forecast) - 1 # len(forecast) is len(cdf). For numeric PMF has 202 bins, 2 of which represent the bounds. CDF is 201. So 201 -1 = 200 is the internal bins
             baseline_prob = (
                 1 - 0.05 * open_bound_count
             ) / pmf_inner_bins
