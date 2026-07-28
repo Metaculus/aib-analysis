@@ -8,6 +8,7 @@ import streamlit as st
 from aib_analysis.data_structures.custom_types import QuestionType
 from aib_analysis.data_structures.data_models import (
     Leaderboard,
+    LeaderboardEntry,
     Question,
     Score,
     ScoreType,
@@ -20,9 +21,6 @@ from aib_analysis.main_logic.process_tournament import (
     constrain_question_types,
     find_question_titles_unique_to_first_tournament,
     get_leaderboard,
-)
-from aib_analysis.data_structures.data_models import (
-    LeaderboardEntry,
 )
 from aib_analysis.math.stats import (
     MeanHypothesisCalculator,
@@ -329,7 +327,7 @@ def display_scores(scores: list[Score]):
     st.dataframe(df, use_container_width=True)
 
 
-def display_leaderboard(leaderboard: Leaderboard):
+def display_leaderboard(leaderboard: Leaderboard) -> None:
     confidence_level = 0.95
     _display_average_scores_plot(leaderboard, confidence_level)
     _display_leaderboard_table(leaderboard, confidence_level)
