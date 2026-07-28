@@ -32,8 +32,7 @@ def load_tournament(
 
     dataframe = pd.read_csv(forecast_file_path, low_memory=False)
     question_to_remove = [
-        "Will the same presidential candidate win Michigan and Wisconsin in the 2024 election?",
-        "How many commercial aircraft deliveries will Airbus report for March 2026 ?"
+        "Will the same presidential candidate win Michigan and Wisconsin in the 2024 election?"
     ] # This question in Q4 has no scores in the Metaculus database due to mis-configuration (and we don't want to update a finalized tourn).
     dataframe = dataframe[~dataframe["question_title"].isin(question_to_remove)]
     assert isinstance(dataframe, pd.DataFrame)
@@ -104,17 +103,11 @@ def _parse_forecast_row(
     if question_id in question_cache:
         question = question_cache[question_id]
     else:
-        cp_reveal_exists = pd.notnull(row.get("cp_reveal_time"))
-        assert isinstance(cp_reveal_exists, bool)
         question = Question(
             question_text=row["question_title"],
             resolution=resolution,
             weight=float(row["question_weight"]),
-            spot_scoring_time=(
-                pd.to_datetime(row["cp_reveal_time"])
-                if cp_reveal_exists
-                else pd.to_datetime(row["scheduled_close_time"])
-            ),
+            spot_scoring_time=_resolve_spot_scoring_time(row),
             question_id=question_id,
             post_id=int(row["post_id"]),
             type=QuestionType(row["type"]),
@@ -132,10 +125,20 @@ def _parse_forecast_row(
     if username in user_cache:
         user = user_cache[username]
     else:
+        is_bot = _parse_optional_bool(row, "is_bot")
+        if is_bot is None:
+            actual_user_type = user_type
+        else:
+            actual_user_type = UserType.BOT if is_bot else UserType.PRO
+
         user = User(
             name=username,
-            type=user_type,
+            type=actual_user_type,
             aggregated_users=[],
+            is_primary_bot=_parse_optional_bool(row, "is_primary_bot"),
+            exclude_from_aggregations=_parse_optional_bool(
+                row, "exclude_from_aggregations"
+            ),
         )
         user_cache[username] = user
 
@@ -183,19 +186,7 @@ def _parse_forecast(forecast_row: dict) -> ForecastType:
             prediction = eval(probability_yes_per_category)
         else:
             prediction = None
-    elif question_type == "numeric":
-        continuous_cdf = row["continuous_cdf"]
-        if pd.notnull(continuous_cdf):
-            prediction = eval(continuous_cdf)
-            for i, p in enumerate(prediction):
-                prediction[i] = float(p)
-                if abs(p - 1) < 1e-6:
-                    prediction[i] = 1
-                elif abs(p) < 1e-6:
-                    prediction[i] = 0
-        else:
-            prediction = None
-    elif question_type == "discrete":
+    elif question_type == "numeric" or question_type == "discrete":
         continuous_cdf = row["continuous_cdf"]
         if pd.notnull(continuous_cdf):
             prediction = eval(continuous_cdf)
@@ -219,7 +210,6 @@ def _parse_resolution(forecast_row: dict) -> ResolutionType:
     q_type = forecast_row["type"]
     raw_resolution = forecast_row["resolution"]
     if pd.isnull(raw_resolution):
-        logger.debug(f"Question is not resolved. Resolution is NaN. Treating as unresolved (None). Row: {forecast_row.get('question_title')}")
         return None
     if str(raw_resolution).lower() in [
         "annulled",
@@ -275,6 +265,58 @@ def _parse_lower_bound(forecast_row: dict) -> float | None:
     return None
 
 
+def _parse_optional_datetime(row: dict, field_name: str) -> pd.Timestamp | None:
+    value = row.get(field_name)
+    if value is None or pd.isnull(value):
+        return None
+    return pd.to_datetime(value)
+
+
+def _parse_optional_bool(row: dict, field_name: str) -> bool | None:
+    if field_name not in row:
+        return None
+    value = row[field_name]
+    if value is None or (isinstance(value, float) and pd.isnull(value)):
+        return None
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    if isinstance(value, str):
+        if value == "True":
+            return True
+        if value == "False":
+            return False
+        return None
+    return bool(value)
+
+
+def _resolve_spot_scoring_time(row: dict) -> pd.Timestamp:
+    """Match Metaculus Question.get_spot_scoring_time()."""
+    spot_scoring_time = _parse_optional_datetime(row, "spot_scoring_time")
+    if spot_scoring_time is not None:
+        return spot_scoring_time
+
+    cp_reveal_time = _parse_optional_datetime(row, "cp_reveal_time")
+    open_time = _parse_optional_datetime(row, "open_time")
+    if (
+        cp_reveal_time is not None
+        and open_time is not None
+        and cp_reveal_time > open_time
+    ):
+        return cp_reveal_time
+
+    actual_close_time = _parse_optional_datetime(row, "actual_close_time")
+    if actual_close_time is not None:
+        return actual_close_time
+
+    scheduled_close_time = _parse_optional_datetime(row, "scheduled_close_time")
+    if scheduled_close_time is not None:
+        return scheduled_close_time
+
+    raise ValueError(
+        f"Could not resolve spot_scoring_time for question_id={row.get('question_id')}"
+    )
+
+
 def _parse_zero_point(forecast_row: dict) -> float | None:
     if forecast_row["type"] == "numeric" or forecast_row["type"] == "discrete":
         zero_point = forecast_row.get("zero_point")
@@ -282,7 +324,7 @@ def _parse_zero_point(forecast_row: dict) -> float | None:
             return None
         elif zero_point is not None and pd.notnull(zero_point) and zero_point != "":
             return float(zero_point)
-        # raise ValueError(f"Invalid zero point: {zero_point}")
+        raise ValueError(f"Invalid zero point: {zero_point}")
     return None
 
 def _parse_inbound_outcome_count(forecast_row: dict) -> int | None:

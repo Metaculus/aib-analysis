@@ -19,7 +19,8 @@ def calculate_peer_score(
     range_min: float | None = None,
     range_max: float | None = None,
     question_weight: float = 1.0,
-    q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
+    q_type: Literal["binary", "multiple_choice", "numeric", "discrete"] | None = None,
+    zero_point: float | None = None,
 ) -> float:
     if len(forecast_for_other_users) == 0:
         return 0.0
@@ -27,19 +28,25 @@ def calculate_peer_score(
     question_type = _determine_question_type(q_type, resolution)
     resolution = _normalize_resolution(question_type, resolution, range_min, range_max)
     forecast_for_resolution = _determine_probability_for_resolution(
-        question_type, forecast, resolution, options, range_min, range_max
+        question_type, forecast, resolution, options, range_min, range_max, zero_point
     )
     other_user_forecasts = [
         _determine_probability_for_resolution(
-            question_type, forecast, resolution, options, range_min, range_max
+            question_type, f, resolution, options, range_min, range_max, zero_point
         )
-        for forecast in forecast_for_other_users
+        for f in forecast_for_other_users
     ]
 
     geometric_mean = gmean(other_user_forecasts)
     peer_score = np.log(forecast_for_resolution / geometric_mean)
+    
+    n_forecasters = len(other_user_forecasts)
+    if n_forecasters > 1:
+        peer_score *= (n_forecasters / (n_forecasters - 1))
+        
     if question_type == QuestionType.NUMERIC or question_type == QuestionType.DISCRETE:
         peer_score /= 2
+        
     return peer_score * question_weight * 100
 
 
@@ -52,7 +59,8 @@ def calculate_baseline_score(
     question_weight: float = 1.0,
     open_upper_bound: bool | None = False,
     open_lower_bound: bool | None = False,
-    q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
+    q_type: Literal["binary", "multiple_choice", "numeric", "discrete"] | None = None,
+    zero_point: float | None = None,
 ) -> float:
     """
     Question type can be infered from resolution type
@@ -61,7 +69,7 @@ def calculate_baseline_score(
     question_type = _determine_question_type(q_type, resolution)
     resolution = _normalize_resolution(question_type, resolution, range_min, range_max)
     prob_for_resolution = _determine_probability_for_resolution(
-        question_type, forecast, resolution, options, range_min, range_max
+        question_type, forecast, resolution, options, range_min, range_max, zero_point
     )
     baseline_prob = _determine_baseline(
         question_type,
@@ -145,6 +153,7 @@ def _determine_probability_for_resolution(
     options: list[str] | None = None,
     range_min: float | None = None,
     range_max: float | None = None,
+    zero_point: float | None = None,
 ) -> float:
     """
     Returns a 0 to 1 probability for the resolution
@@ -192,7 +201,7 @@ def _determine_probability_for_resolution(
             resolution, float
         ), f"Resolution is {resolution} which is not a float"
         prob_for_resolution = _numeric_resolution_prob(
-            forecast, resolution, range_min, range_max
+            forecast, resolution, range_min, range_max, zero_point
         )
     else:
         raise ValueError(f"Unknown question type: {q_type}")
@@ -234,7 +243,7 @@ def _multiple_choice_resolution_prob(
 
 
 def _numeric_resolution_prob(
-    forecast: list[float], resolution: float, range_min: float, range_max: float
+    forecast: list[float], resolution: float, range_min: float, range_max: float, zero_point: float | None = None
 ) -> float:
     previous_prob = 0
     for current_prob in forecast:
@@ -246,7 +255,7 @@ def _numeric_resolution_prob(
     pmf = cdf_to_pmf(cdf)
 
     resolution_bin_idx = _resolution_value_to_pmf_index(
-        pmf, resolution, range_min, range_max
+        pmf, resolution, range_min, range_max, zero_point
     )
 
     prob_for_resolution = pmf[resolution_bin_idx]
@@ -274,7 +283,7 @@ def _determine_divisor_for_baseline_score(
 
 
 def _resolution_value_to_pmf_index(
-    pmf: list[float], resolution: float, range_min: float, range_max: float
+    pmf: list[float], resolution: float, range_min: float, range_max: float, zero_point: float | None = None
 ) -> int:
     """
     PMF explanation:
@@ -285,7 +294,7 @@ def _resolution_value_to_pmf_index(
     """
     outcome_count = len(pmf) - 2
     position_in_range = _resolution_value_to_position_in_numeric_range(
-        resolution, range_min, range_max
+        resolution, range_min, range_max, zero_point
     )
     resolution_bin_idx = _position_in_range_to_bucket_index(position_in_range, outcome_count)
     if resolution_bin_idx >= len(pmf) or resolution_bin_idx < 0:

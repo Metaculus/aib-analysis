@@ -252,14 +252,14 @@ def main(
 
 
 def get_comparison_bot_users(bot_tournament: SimulatedTournament) -> list[User]:
-    # Metaculus control/template pair for this season (one GPT-family + one Claude-family).
-    # Used as an aggregated "Comparison Team" vs top bot team and vs pros — not a
-    # cross-season continuity sample. Past seasons used different account names for the
-    # same role (e.g. metac-gpt-4o / metac-claude-3-5-... in Q1–Q2, mf-bot-1 / mf-bot-3
-    # in Q3–Q4).
     comparison_bot_names = [
-        "metac-gpt-5-1-high+asknews",
-        "metac-claude-4-5-sonnet-high-32k+asknews",
+        "metac-gpt-4o+asknews",  # Q2 version of gpt-4o
+        "metac-claude-3-5-sonnet-20240620+asknews",  # Q2 version of claude 3.5 sonnet
+        "metac-gpt-4o",  # Q1 version of gpt-4o
+        "metac-claude-3-5-sonnet-20240620",  # Q1 version of claude 3.5 sonnet
+        "mf-bot-1",  # Q3/4 version of gpt-4o
+        "mf-bot-3",  # Q3/4 version of claude 3.5 sonnet
+        # "metac-claude-3-5-sonnet-latest+asknews", # Wasn't around in Q3
     ]
     comparison_bot_users = [
         user for user in bot_tournament.users if user.name in comparison_bot_names
@@ -278,8 +278,29 @@ def grab_tournament_data(
 
 if __name__ == "__main__":
     main(
-        pro_path="local/private_input_data/pro_forecasts_2026_spring.csv",
-        bot_path="local/private_input_data/bot_forecasts_2026_spring.csv",
+        pro_path="local/private_input_data/pro_forecasts_q3.csv",
+        bot_path="local/private_input_data/bot_forecasts_q3.csv",
         quarterly_cup_path=None,
-        output_folder="local/spring_2026_simulations_teams_comparison/",
+        output_folder="local/q3_2024_simulations_teams_comparison/",
+    )
+
+    main(
+        pro_path="local/private_input_data/pro_forecasts_q4.csv",
+        bot_path="local/private_input_data/bot_forecasts_q4.csv",
+        quarterly_cup_path=None,
+        output_folder="local/q4_2024_simulations_teams_comparison/",
+    )
+
+    main(
+        pro_path="input_data/pro_forecasts_q1.csv",
+        bot_path="input_data/bot_forecasts_q1.csv",
+        quarterly_cup_path=None,  # "local/quarterly_cup_forecats_before_cp_reveal_time_q1.csv",
+        output_folder="local/q1_2025_simulations_teams_comparison/",
+    )
+
+    main(
+        pro_path="input_data/pro_forecasts_q2.csv",
+        bot_path="input_data/bot_forecasts_q2.csv",
+        quarterly_cup_path=None,
+        output_folder="local/q2_2025_simulations_teams_comparison/",
     )
