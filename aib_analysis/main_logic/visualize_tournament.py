@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from aib_analysis.data_structures.custom_types import QuestionType
+from aib_analysis.data_structures.custom_types import QuestionType, UserType
 from aib_analysis.data_structures.data_models import (
     Leaderboard,
     LeaderboardEntry,
@@ -62,13 +62,15 @@ def display_tournament_and_variations(
 def display_individual_tournament(tournament: SimulatedTournament, name: str):
     st.subheader(f"{name}")
 
+    hidden_user_types = infer_leaderboard_display_exclusions(name)
+
     # Display tournament statistics
     with st.expander(f"{name} Spot Peer Leaderboard"):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
-        display_leaderboard(leaderboard)
+        display_leaderboard(leaderboard, hidden_user_types=hidden_user_types)
     with st.expander(f"{name} Spot Baseline Leaderboard"):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_BASELINE)
-        display_leaderboard(leaderboard)
+        display_leaderboard(leaderboard, hidden_user_types=hidden_user_types)
     with st.expander(f"{name} Stats"):
         display_tournament_stats(tournament)
     with st.expander(f"{name} Forecasts"):
@@ -327,13 +329,76 @@ def display_scores(scores: list[Score]):
     st.dataframe(df, use_container_width=True)
 
 
-def display_leaderboard(leaderboard: Leaderboard) -> None:
+def infer_leaderboard_display_exclusions(tournament_name: str) -> set[UserType]:
+    """Users kept in scoring/peer pools but hidden from LB charts/tables.
+
+    Bot tournaments may include humans so peer GMs match Metaculus; pro tournaments
+    may include coherence/key-factor bots. Mixed comparison views show everyone.
+    """
+    normalized = (
+        tournament_name.lower().replace("|", " ").replace("_", " ").replace("-", " ")
+    )
+    if " vs " in f" {normalized} " or "with bot" in normalized:
+        return set()
+    if "pro" in normalized and "bot" not in normalized:
+        return {UserType.BOT}
+    if "bot" in normalized:
+        return {UserType.PRO}
+    return set()
+
+
+def filter_leaderboard_for_display(
+    leaderboard: Leaderboard, hidden_user_types: set[UserType]
+) -> tuple[Leaderboard, list[LeaderboardEntry]]:
+    if not hidden_user_types:
+        return leaderboard, []
+    visible_entries = [
+        entry
+        for entry in leaderboard.entries
+        if entry.user.type not in hidden_user_types
+    ]
+    hidden_entries = [
+        entry
+        for entry in leaderboard.entries
+        if entry.user.type in hidden_user_types
+    ]
+    return (
+        Leaderboard(entries=visible_entries, type=leaderboard.type),
+        hidden_entries,
+    )
+
+
+def _note_hidden_leaderboard_users(hidden_entries: list[LeaderboardEntry]) -> None:
+    if not hidden_entries:
+        return
+    by_type: dict[str, list[str]] = {}
+    for entry in hidden_entries:
+        by_type.setdefault(entry.user.type.value, []).append(entry.user.name)
+    parts = []
+    for user_type, names in sorted(by_type.items()):
+        sample = ", ".join(sorted(names)[:8])
+        extra = f" (+{len(names) - 8} more)" if len(names) > 8 else ""
+        parts.append(f"{len(names)} {user_type} ({sample}{extra})")
+    st.info(
+        "Excluded from this leaderboard chart/table (still included in scoring / peer "
+        f"baselines where applicable): {'; '.join(parts)}."
+    )
+
+
+def display_leaderboard(
+    leaderboard: Leaderboard,
+    hidden_user_types: set[UserType] | None = None,
+) -> None:
     confidence_level = 0.95
-    _display_average_scores_plot(leaderboard, confidence_level)
-    _display_leaderboard_table(leaderboard, confidence_level)
+    display_board, hidden_entries = filter_leaderboard_for_display(
+        leaderboard, hidden_user_types or set()
+    )
+    _note_hidden_leaderboard_users(hidden_entries)
+    _display_average_scores_plot(display_board, confidence_level)
+    _display_leaderboard_table(display_board, confidence_level)
     _display_score_histogram_by_user(
-        leaderboard.all_scores,
-        title="All Users Scores Histogram (overlay, not stacked)",
+        display_board.all_scores,
+        title="Displayed Users Scores Histogram (overlay, not stacked)",
     )
 
 

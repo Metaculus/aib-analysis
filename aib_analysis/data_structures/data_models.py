@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import random
 from datetime import datetime, timedelta, timezone
-
+from typing import Literal
 from pydantic import BaseModel, ConfigDict, model_validator
 from typing_extensions import Self
 
@@ -220,6 +220,7 @@ class Question(BaseModel, frozen=True):
     spot_scoring_time: datetime
     project: str | None = None
     notes: str | None = None
+    unscored_resolution_reason: Literal["annulled", "ambiguous", "blank"] | None = None     # When resolution is None: "annulled" / "ambiguous" from CSV, or "blank" for null resolution (often deleted posts). None if unknown (e.g. older JSON).
     model_config = ConfigDict(frozen=True)
 
     @property

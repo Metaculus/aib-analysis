@@ -97,6 +97,7 @@ def _parse_forecast_row(
 ) -> tuple[Forecast, Question, User]:
     prediction = _parse_forecast(row)
     resolution = _parse_resolution(row)
+    unscored_resolution_reason = _parse_unscored_resolution_reason(row)
     question_id = int(row["question_id"])
     username = row["forecaster"]
 
@@ -120,6 +121,7 @@ def _parse_forecast_row(
             inbound_outcome_count=_parse_inbound_outcome_count(row),
             created_at=pd.to_datetime(row["created_at"]),
             project=row["project_title"],
+            unscored_resolution_reason=unscored_resolution_reason,
         )
         question_cache[question_id] = question
     if username in user_cache:
@@ -232,6 +234,19 @@ def _parse_resolution(forecast_row: dict) -> ResolutionType:
         return float(raw_resolution)
 
     return raw_resolution
+
+
+def _parse_unscored_resolution_reason(forecast_row: dict) -> str | None:
+    """Why resolution is non-scoring: annulled/ambiguous from CSV, or blank (often deleted)."""
+    raw_resolution = forecast_row["resolution"]
+    if pd.isnull(raw_resolution):
+        return "blank"
+    lower_resolution = str(raw_resolution).lower()
+    if lower_resolution == "annulled":
+        return "annulled"
+    if lower_resolution == "ambiguous":
+        return "ambiguous"
+    return None
 
 
 def _parse_options(forecast_row: dict) -> tuple[str, ...] | None:

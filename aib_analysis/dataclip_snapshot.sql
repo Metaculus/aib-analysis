@@ -60,6 +60,8 @@ AND p.default_project_id = 32930 -- Pro Forecasters - AI Forecasting Benchmark 2
 -- AND p.default_project_id = 32830 -- MiniBench Sept 15
 --AND p.default_project_id = 32630 -- Q1 Quarterly Cup
 -- AND p.default_project_id = 32726 -- Summer Metaculus Cup
-AND u.is_bot = false -- pro/human exports; use u.is_bot = true for bot tournaments
+-- Do not filter on u.is_bot: include stray humans on bot projects (peer GM parity) and
+-- coherence bots on pro projects. Streamlit hides the out-of-scope users from
+-- leaderboard charts/tables while keeping them in scoring.
 -- AND f.start_time < q.cp_reveal_time -- If for quarterly cup
 ORDER BY f.start_time DESC;
