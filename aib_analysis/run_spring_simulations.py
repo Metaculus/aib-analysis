@@ -72,7 +72,7 @@ def main(
     skip_comparison_team_outputs = False
     if len(comparison_bot_users) < 2:
         logger.warning(
-            "Skipping comparison-team outputs: expected 2 cross-tournament control "
+            "Skipping comparison-team outputs: expected 2 or greater cross-tournament control "
             f"bots, found {len(comparison_bot_users)}: "
             f"{[user.name for user in comparison_bot_users]}"
         )
@@ -238,8 +238,9 @@ def main(
         counter_override=next_count(),
     )
 
+    cup_team_size = 10
     bot_team_for_cup_comparison = get_best_forecasters_from_tournament(
-        bot_tournament_wo_cup_questions, bot_team_size
+        bot_tournament_wo_cup_questions, cup_team_size
     )
     cup_vs_bot_teams = create_team_tournament(
         tournament_1=cup_tournament,
