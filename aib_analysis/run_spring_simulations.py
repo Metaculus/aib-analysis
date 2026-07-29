@@ -68,9 +68,15 @@ def main(
         counter_override=next_count(),
     )
 
-    comparison_bot_users = get_comparison_bot_users(
-        bot_tournament
-    )  # Do this early so we can error out if we don't have right comparison bot users
+    comparison_bot_users = get_comparison_bot_users(bot_tournament)
+    skip_comparison_team_outputs = False
+    if len(comparison_bot_users) < 2:
+        logger.warning(
+            "Skipping comparison-team outputs: expected 2 cross-tournament control "
+            f"bots, found {len(comparison_bot_users)}: "
+            f"{[user.name for user in comparison_bot_users]}"
+        )
+        skip_comparison_team_outputs = True
 
     bot_tournament_wo_pro_questions = smart_remove_questions_from_tournament(
         tournament=bot_tournament, questions_to_exclude=pro_tournament.questions
@@ -173,39 +179,40 @@ def main(
             size_10_bot_team = bot_team_for_pro_comparison
 
     # ------------------- Control/comparison Bots -------------------
-    number_to_use = 99
-    comparison_vs_bot__teams = create_team_tournament(
-        tournament_1=pro_with_bot_tourn,
-        tournament_2=pro_with_bot_tourn,
-        team_1=comparison_bot_users,
-        team_2=size_10_bot_team,
-        aggregate_name_1="Comparison Team",
-        aggregate_name_2="Bot Team",
-        use_tourn_1_weights=use_pro_weights,
-    )
-    save_tournament(
-        comparison_vs_bot__teams,
-        "comparison_vs_bot__teams.json",
-        folder=output_folder,
-        divide_into_types=True,
-        counter_override=number_to_use,
-    )
-    comparison_vs_pros__teams = create_team_tournament(
-        tournament_1=pro_with_bot_tourn,
-        tournament_2=pro_with_bot_tourn,
-        team_1=comparison_bot_users,
-        team_2=pro_team,
-        aggregate_name_1="Comparison Team",
-        aggregate_name_2="Pro Team",
-        use_tourn_1_weights=use_pro_weights,
-    )
-    save_tournament(
-        comparison_vs_pros__teams,
-        "comparison_vs_pro__teams.json",
-        folder=output_folder,
-        divide_into_types=True,
-        counter_override=number_to_use,
-    )
+    if not skip_comparison_team_outputs and size_10_bot_team is not None:
+        number_to_use = 99
+        comparison_vs_bot__teams = create_team_tournament(
+            tournament_1=pro_with_bot_tourn,
+            tournament_2=pro_with_bot_tourn,
+            team_1=comparison_bot_users,
+            team_2=size_10_bot_team,
+            aggregate_name_1="Comparison Team",
+            aggregate_name_2="Bot Team",
+            use_tourn_1_weights=use_pro_weights,
+        )
+        save_tournament(
+            comparison_vs_bot__teams,
+            "comparison_vs_bot__teams.json",
+            folder=output_folder,
+            divide_into_types=True,
+            counter_override=number_to_use,
+        )
+        comparison_vs_pros__teams = create_team_tournament(
+            tournament_1=pro_with_bot_tourn,
+            tournament_2=pro_with_bot_tourn,
+            team_1=comparison_bot_users,
+            team_2=pro_team,
+            aggregate_name_1="Comparison Team",
+            aggregate_name_2="Pro Team",
+            use_tourn_1_weights=use_pro_weights,
+        )
+        save_tournament(
+            comparison_vs_pros__teams,
+            "comparison_vs_pro__teams.json",
+            folder=output_folder,
+            divide_into_types=True,
+            counter_override=number_to_use,
+        )
 
     # ------------------- Quarterly Cup -------------------
     if quarterly_cup_path is None:
@@ -252,6 +259,8 @@ def main(
 
 
 def get_comparison_bot_users(bot_tournament: SimulatedTournament) -> list[User]:
+    # Cross-tournament control pair: same GPT + Claude Metaculus template lineage
+    # across seasons (account names change; exactly two should match a given CSV).
     comparison_bot_names = [
         "metac-gpt-4o+asknews",  # Q2 version of gpt-4o
         "metac-claude-3-5-sonnet-20240620+asknews",  # Q2 version of claude 3.5 sonnet
@@ -264,9 +273,6 @@ def get_comparison_bot_users(bot_tournament: SimulatedTournament) -> list[User]:
     comparison_bot_users = [
         user for user in bot_tournament.users if user.name in comparison_bot_names
     ]
-    assert (
-        len(comparison_bot_users) == 2
-    ), f"Expected 2 control bot users, got {len(comparison_bot_users)}"
     return comparison_bot_users
 
 
@@ -278,29 +284,8 @@ def grab_tournament_data(
 
 if __name__ == "__main__":
     main(
-        pro_path="local/private_input_data/pro_forecasts_q3.csv",
-        bot_path="local/private_input_data/bot_forecasts_q3.csv",
+        pro_path="local/private_input_data/pro_forecasts_2026_spring.csv",
+        bot_path="local/private_input_data/bot_forecasts_2026_spring.csv",
         quarterly_cup_path=None,
-        output_folder="local/q3_2024_simulations_teams_comparison/",
-    )
-
-    main(
-        pro_path="local/private_input_data/pro_forecasts_q4.csv",
-        bot_path="local/private_input_data/bot_forecasts_q4.csv",
-        quarterly_cup_path=None,
-        output_folder="local/q4_2024_simulations_teams_comparison/",
-    )
-
-    main(
-        pro_path="input_data/pro_forecasts_q1.csv",
-        bot_path="input_data/bot_forecasts_q1.csv",
-        quarterly_cup_path=None,  # "local/quarterly_cup_forecats_before_cp_reveal_time_q1.csv",
-        output_folder="local/q1_2025_simulations_teams_comparison/",
-    )
-
-    main(
-        pro_path="input_data/pro_forecasts_q2.csv",
-        bot_path="input_data/bot_forecasts_q2.csv",
-        quarterly_cup_path=None,
-        output_folder="local/q2_2025_simulations_teams_comparison/",
+        output_folder="local/spring_2026_simulations_teams_comparison/",
     )
