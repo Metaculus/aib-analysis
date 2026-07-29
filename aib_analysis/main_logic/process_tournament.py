@@ -50,6 +50,10 @@ def combine_tournaments(
     tournament_2: SimulatedTournament,
     use_tourn_1_weights: bool,
 ) -> SimulatedTournament:
+    """Merge two tournaments into one by pairing questions (hash or force-match) and keeping forecasts from both sides.
+
+    Annulled/ambiguous questions are skipped and never paired, since they cannot be scored.
+    """
     logger.info(f"Combining tournaments {tournament_1.name} and {tournament_2.name}")
 
     if (

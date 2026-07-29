@@ -202,7 +202,8 @@ class TestCombineTournaments:
         pro_users = pro_tournament.users
         bot_users = bot_tournament.users
         combined_tournament = combine_tournaments(pro_tournament, bot_tournament, use_tourn_1_weights=True)
-        assert len(combined_tournament.questions) == 98
+        # Annulled/ambiguous hash pairs are skipped when combining (2 fewer than historical 98).
+        assert len(combined_tournament.questions) == 96
         assert len(combined_tournament.forecasts) < len(pro_forecasts) + len(
             bot_forecasts
         )
@@ -372,7 +373,8 @@ class TestCreateTeam:
             use_tourn_1_weights=True,
         )
         assert len(aggregate_tournament.users) == 2
-        assert len(aggregate_tournament.questions) == 98
+        # Annulled/ambiguous hash pairs are skipped when combining (2 fewer than historical 98).
+        assert len(aggregate_tournament.questions) == 96
         leaderboard = get_leaderboard(aggregate_tournament, ScoreType.SPOT_PEER)
         entries = leaderboard.entries_via_sum_of_scores()
         assert entries[0].user.name == pro_team_name

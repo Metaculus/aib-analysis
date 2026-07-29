@@ -711,46 +711,76 @@ def display_aggregate_comparison(team_comparison_tourns: list[SimulatedTournamen
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
         bot_entry = [entry for entry in leaderboard.entries if entry.user == bot_team_user][0]
         entries_to_graph.append(bot_entry)
-    
+
     st.subheader("Aggregate comparison")
     with st.expander("Aggregate comparison"):
-        entries_to_graph = sorted(entries_to_graph, key=lambda x: len(x.user.aggregated_users))
-        
-        scores = [entry.average_score for entry in entries_to_graph]
-        confidence_intervals = [entry.get_confidence_interval(confidence_level=0.95) for entry in entries_to_graph]
-        lower_bounds = [ci.lower_bound for ci in confidence_intervals]
-        upper_bounds = [ci.upper_bound for ci in confidence_intervals]
-        
-        error_y_minus = [score - lower for score, lower in zip(scores, lower_bounds)]
-        error_y_plus = [upper - score for score, upper in zip(scores, upper_bounds)]
-        
-        team_sizes = [len(entry.user.aggregated_users) for entry in entries_to_graph]
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=team_sizes,
-            y=scores,
-            mode='markers+lines',
-            name='Bot Team Score',
-            marker={'size': 10},
-            error_y={
-                'type': 'data',
-                'symmetric': False,
-                'array': error_y_plus,
-                'arrayminus': error_y_minus,
-                'visible': True
-            }
-        ))
-        
-        fig.update_layout(
-            title='Bot Team Performance vs Team Size',
-            xaxis_title='Team Size',
-            yaxis_title='Average Score',
-            hovermode='closest',
-            showlegend=True
+        entries_to_graph = sorted(
+            entries_to_graph, key=lambda entry: len(entry.user.aggregated_users)
         )
-        
+
+        scores: list[float] = []
+        team_sizes: list[int] = []
+        error_y_minus: list[float | None] = []
+        error_y_plus: list[float | None] = []
+        confidence_interval_warnings: list[str] = []
+
+        for entry in entries_to_graph:
+            team_size = len(entry.user.aggregated_users)
+            score = entry.average_score
+            team_sizes.append(team_size)
+            scores.append(score)
+            try:
+                confidence_interval = entry.get_confidence_interval(
+                    confidence_level=0.95
+                )
+                error_y_minus.append(score - confidence_interval.lower_bound)
+                error_y_plus.append(confidence_interval.upper_bound - score)
+            except ValueError as error:
+                error_y_minus.append(None)
+                error_y_plus.append(None)
+                confidence_interval_warnings.append(
+                    f"team size {team_size} ({entry.question_count} scores): {error}"
+                )
+
+        if confidence_interval_warnings:
+            st.warning(
+                "T-based confidence intervals omitted for some points "
+                "(normality assumption failed with n < 30):\n\n"
+                + "\n".join(
+                    f"- {warning}" for warning in confidence_interval_warnings
+                )
+            )
+
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatter(
+                x=team_sizes,
+                y=scores,
+                mode="markers+lines",
+                name="Bot Team Score",
+                marker={"size": 10},
+                error_y={
+                    "type": "data",
+                    "symmetric": False,
+                    "array": error_y_plus,
+                    "arrayminus": error_y_minus,
+                    "visible": True,
+                },
+            )
+        )
+
+        fig.update_layout(
+            title="Bot Team Performance vs Team Size",
+            xaxis_title="Team Size",
+            yaxis_title="Average Score",
+            hovermode="closest",
+            showlegend=True,
+        )
+
         st.plotly_chart(fig, use_container_width=True)
 
         for entry in entries_to_graph:
-            st.write(f"- Bot Team Size: {len(entry.user.aggregated_users)} | Score: {entry.average_score:.3f}")
+            st.write(
+                f"- Bot Team Size: {len(entry.user.aggregated_users)} | "
+                f"Score: {entry.average_score:.3f}"
+            )
