@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import random
 from datetime import datetime, timedelta, timezone
-
+from typing import Literal
 from pydantic import BaseModel, ConfigDict, model_validator
 from typing_extensions import Self
 
@@ -51,7 +51,6 @@ class Forecast(BaseModel):
         return self._id
 
     def get_spot_baseline_score(self, resolution: ResolutionType) -> Score:
-        self._error_if_need_zero_point()
         q = self.question
         score_value = calculate_baseline_score(
             forecast=self.prediction,
@@ -63,6 +62,7 @@ class Forecast(BaseModel):
             range_max=q.range_max,
             open_upper_bound=q.open_upper_bound,
             open_lower_bound=q.open_lower_bound,
+            zero_point=q.zero_point,
         )
 
         return Score(
@@ -74,13 +74,9 @@ class Forecast(BaseModel):
     def get_spot_peer_score(
         self, resolution: ResolutionType, other_users_forecasts: list[Forecast]
     ) -> Score:
-        self._error_if_need_zero_point()
+        # Metaculus includes the scored forecaster in the geometric mean baseline and
+        # applies N/(N-1) as a leave-one-out approximation, so self may appear here.
         other_preds = [f.prediction for f in other_users_forecasts]
-        users_used_in_scoring = [f.user for f in other_users_forecasts]
-        if self.user in users_used_in_scoring:
-            raise ValueError(
-                "Forecast Author cannot be in other users forecasts list for peer score"
-            )
         q = self.question
         score_value = calculate_peer_score(
             forecast=self.prediction,
@@ -91,16 +87,13 @@ class Forecast(BaseModel):
             options=list(q.options) if q.options is not None else None,
             range_min=q.range_min,
             range_max=q.range_max,
+            zero_point=q.zero_point,
         )
         return Score(
             score=score_value,
             type=ScoreType.SPOT_PEER,
             forecast=self,
         )
-
-    def _error_if_need_zero_point(self) -> None:
-        if self.question.is_log_scale:
-            raise NotImplementedError(f"Numeric question {self.question.question_id} has a zero point. Log Scall is currently not supported")
 
     @model_validator(mode="after")
     def check_prediction_type_matches(self) -> Self:
@@ -126,9 +119,9 @@ class Forecast(BaseModel):
                 raise ValueError(
                     "Prediction must be a list of floats (length >= 2) for multiple choice questions."
                 )
-            if abs(sum(self.prediction) - 1) > 1e-6:
+            if abs(sum(self.prediction) - 1) > 1e-5:
                 raise ValueError(
-                    "Prediction must sum to 1 for multiple choice questions."
+                    f"Prediction must sum to 1 for multiple choice questions, got {sum(self.prediction)} for {self.prediction}"
                 )
         elif q_type == QuestionType.NUMERIC:
             is_list = isinstance(self.prediction, list)
@@ -138,6 +131,19 @@ class Forecast(BaseModel):
             if not (is_list and has_201_points and all_floats):
                 raise ValueError(
                     "Prediction must be a list of 201 floats for numeric questions."
+                )
+        elif q_type == QuestionType.DISCRETE:
+            if self.question.inbound_outcome_count is None:
+                raise ValueError("inbound_outcome_count must be set for discrete questions.")
+            
+            is_list = isinstance(self.prediction, list)
+            expected_points = self.question.inbound_outcome_count + 1
+            has_expected_points = len(self.prediction) == expected_points
+            non_float_items = [p for p in self.prediction if not isinstance(p, float)]
+            all_floats = len(non_float_items) == 0
+            if not (is_list and has_expected_points and all_floats):
+                raise ValueError(
+                    f"Prediction must be a list of {expected_points} floats for discrete questions, got {len(self.prediction) if is_list else 'non-list'}."
                 )
 
         # verify predictions are between 0 and 1
@@ -207,12 +213,14 @@ class Question(BaseModel, frozen=True):
     open_upper_bound: bool | None
     open_lower_bound: bool | None
     zero_point: float | None = None
+    inbound_outcome_count: int | None = None
     weight: float
     post_id: int
     created_at: datetime
     spot_scoring_time: datetime
     project: str | None = None
     notes: str | None = None
+    unscored_resolution_reason: Literal["annulled", "ambiguous", "blank"] | None = None     # When resolution is None: "annulled" / "ambiguous" from CSV, or "blank" for null resolution (often deleted posts). None if unknown (e.g. older JSON).
     model_config = ConfigDict(frozen=True)
 
     @property
@@ -236,6 +244,10 @@ class Question(BaseModel, frozen=True):
                 self.resolution, float
             ):
                 raise ValueError("Resolution must be a float for numeric questions.")
+            if self.type == QuestionType.DISCRETE and not isinstance(
+                self.resolution, float
+            ):
+                raise ValueError("Resolution must be a float for discrete questions.")
         return self
 
     @model_validator(mode="after")
@@ -266,6 +278,17 @@ class Question(BaseModel, frozen=True):
             ):
                 raise ValueError(
                     "Numeric questions must have all bound information (upper_bound, lower_bound, open_upper_bound, open_lower_bound)."
+                )
+        if self.type == QuestionType.DISCRETE:
+            if (
+                self.range_max is None
+                or self.range_min is None
+                or self.open_upper_bound is None
+                or self.open_lower_bound is None
+                or self.inbound_outcome_count is None
+            ):
+                raise ValueError(
+                    "Discrete questions must have all bound information (upper_bound, lower_bound, open_upper_bound, open_lower_bound) and inbound_outcome_count."
                 )
         if self.type == QuestionType.MULTIPLE_CHOICE:
             if not self.options or len(self.options) < 2:
@@ -339,6 +362,7 @@ class Question(BaseModel, frozen=True):
             self.open_upper_bound,
             self.open_lower_bound,
             self.zero_point,
+            self.inbound_outcome_count,
             spot_scoring_window,
         )
         return str(hash(hash_fields))
@@ -348,11 +372,22 @@ class User(BaseModel):
     name: str
     type: UserType
     aggregated_users: list[User]
+    is_primary_bot: bool | None = None
+    exclude_from_aggregations: bool | None = None
     model_config = ConfigDict(frozen=True)
 
     @property
     def is_metac_bot(self) -> bool:
         return "metac-" in self.name.lower() or "mf-bot-" in self.name.lower()
+
+    @property
+    def contributes_to_peer_baseline(self) -> bool:
+        """Match Metaculus exclude_non_primary_bots + blacklist filtering."""
+        if self.exclude_from_aggregations is True:
+            return False # None for exclude_from_aggregations is interpreted as a default of False
+        if self.type == UserType.BOT and self.is_primary_bot is False:
+            return False # None for is_primary_bot is interpreted as a default of True
+        return True
 
 
 class Leaderboard(BaseModel):

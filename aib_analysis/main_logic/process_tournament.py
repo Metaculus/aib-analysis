@@ -1,7 +1,7 @@
 import copy
 import logging
-import os
 from datetime import timedelta, timezone
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
@@ -50,6 +50,10 @@ def combine_tournaments(
     tournament_2: SimulatedTournament,
     use_tourn_1_weights: bool,
 ) -> SimulatedTournament:
+    """Merge two tournaments into one by pairing questions (hash or force-match) and keeping forecasts from both sides.
+
+    Annulled/ambiguous questions are skipped and never paired, since they cannot be scored.
+    """
     logger.info(f"Combining tournaments {tournament_1.name} and {tournament_2.name}")
 
     if (
@@ -65,7 +69,11 @@ def combine_tournaments(
 
     matching_questions: dict[str, list[Question]] = {}
     for question_1 in tournament_1.questions:
+        if question_1.is_annulled_or_ambiguous:
+            continue
         for question_2 in tournament_2.questions:
+            if question_2.is_annulled_or_ambiguous:
+                continue
             hash_1 = question_1.get_hash_for_tournament_matching()
             hash_2 = question_2.get_hash_for_tournament_matching()
             dictionary_key = f"{hash_1}_{hash_2}"
@@ -233,14 +241,27 @@ def smart_remove_questions_from_tournament(
     questions_to_exclude: list[Question],
     use_tournament_matching_hash: bool = True,
 ) -> SimulatedTournament:
+    """Drop questions from `tournament` that match any in `questions_to_exclude` (by matching hash or force-match).
+
+    Typical use: build a bot-only qualification set by removing questions that also appear on the pro tournament.
+    """
     if not use_tournament_matching_hash:
         raise NotImplementedError("Not implemented")
+
+    # Annulled/ambiguous questions are not scored and should not drive removals
+    active_questions_to_exclude = [
+        question
+        for question in questions_to_exclude
+        if not question.is_annulled_or_ambiguous
+    ]
+    if len(active_questions_to_exclude) > 0:
+        logger.warning(f"Not removing {len(questions_to_exclude) - len(active_questions_to_exclude)} annulled/ambiguous questions from tournament {tournament.name} even though its in the exclude list")
 
     final_questions_to_include = []
     all_matches_in_current_tournament: list[list[Question]] = []
     for current_question in tournament.questions:
         matches_with_current_question: list[Question] = []
-        for question_to_exclude in questions_to_exclude:
+        for question_to_exclude in active_questions_to_exclude:
             exclude_hash = question_to_exclude.get_hash_for_tournament_matching()
             current_hash = current_question.get_hash_for_tournament_matching()
             if current_hash == exclude_hash:
@@ -261,9 +282,16 @@ def smart_remove_questions_from_tournament(
 
     initial_questions_count = len(tournament.questions)
     num_questions_removed = initial_questions_count - len(final_questions_to_include)
-    if num_questions_removed != len(questions_to_exclude):
+    if num_questions_removed != len(active_questions_to_exclude):
+        skipped_annulled = len(questions_to_exclude) - len(active_questions_to_exclude)
+        annulled_note = (
+            f" (skipped {skipped_annulled} annulled/ambiguous from exclude list)"
+            if skipped_annulled
+            else ""
+        )
         logger.warning(
-            f"{len(questions_to_exclude)} questions were supposed to be removed from tournament. Instead, {num_questions_removed} removals were made."
+            f"{len(active_questions_to_exclude)} questions were supposed to be removed from tournament. "
+            f"Instead, {num_questions_removed} removals were made.{annulled_note}"
         )
 
     for matches_with_current_question in all_matches_in_current_tournament:
@@ -279,12 +307,12 @@ def smart_remove_questions_from_tournament(
     ]
     if len(filtered_forecasts) == 0:
         raise ValueError(
-            f"No forecasts left after removing {len(questions_to_exclude)} questions from {tournament.name}"
+            f"No forecasts left after removing {len(active_questions_to_exclude)} questions from {tournament.name}"
         )
 
     return SimulatedTournament(
         forecasts=filtered_forecasts,
-        name=f"{tournament.name} ({len(questions_to_exclude)} Questions removed)",
+        name=f"{tournament.name} ({len(active_questions_to_exclude)} Questions removed)",
     )
 
 
@@ -477,11 +505,12 @@ def save_tournament(
     else:
         count_to_use = counter_override
     non_json_name = file_name.replace(".json", "")
-    save_path = f"{folder}{count_to_use}_{non_json_name}"
+    folder_path = Path(folder)
+    save_stem = folder_path / f"{count_to_use}_{non_json_name}"
     logger.info(f"Saving tournament {count_to_use} of {non_json_name}")
-    os.makedirs(folder, exist_ok=True)
+    folder_path.mkdir(parents=True, exist_ok=True)
 
-    _save_specific_tournament_to_file(tournament_to_save, f"{save_path}.json")
+    _save_specific_tournament_to_file(tournament_to_save, f"{save_stem}.json")
 
     if divide_into_types:
         binary_combined_tournament = constrain_question_types(
@@ -490,7 +519,7 @@ def save_tournament(
 
         if binary_combined_tournament is not None:
             _save_specific_tournament_to_file(
-                binary_combined_tournament, f"{save_path}__binary.json"
+                binary_combined_tournament, f"{save_stem}__binary.json"
             )
 
         multiple_choice_combined_tournament = constrain_question_types(
@@ -500,7 +529,7 @@ def save_tournament(
         if multiple_choice_combined_tournament is not None:
             _save_specific_tournament_to_file(
                 multiple_choice_combined_tournament,
-                f"{save_path}__multiple_choice.json",
+                f"{save_stem}__multiple_choice.json",
             )
 
         numeric_combined_tournament = constrain_question_types(
@@ -508,7 +537,7 @@ def save_tournament(
         )
         if numeric_combined_tournament is not None:
             _save_specific_tournament_to_file(
-                numeric_combined_tournament, f"{save_path}__numeric.json"
+                numeric_combined_tournament, f"{save_stem}__numeric.json"
             )
 
 

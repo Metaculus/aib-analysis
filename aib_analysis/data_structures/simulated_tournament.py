@@ -47,7 +47,6 @@ class SimulatedTournament(BaseModel):
             unique_forecasts = list(set(tuple(forecasts)))
             self.forecasts = unique_forecasts
 
-        self._remove_log_scale_questions()
         self._initialize_spot_forecast_cache()
         self._initialize_user_and_question_caches()
         if len(self.scores_cache) == 0:
@@ -113,7 +112,7 @@ class SimulatedTournament(BaseModel):
                 self._question_to_spot_forecasts_cache[question_id_to_cache].append(
                     forecast
                 )
-        spot_forecasts = self._question_to_spot_forecasts_cache[question_id]
+        spot_forecasts = self._question_to_spot_forecasts_cache.get(question_id, [])
         return (
             spot_forecasts.copy()
         )  # Shallow copy (so you don't modify order of original list)
@@ -168,30 +167,15 @@ class SimulatedTournament(BaseModel):
         assert len(scores) == 1, "Expected exactly for question for user if spot score"
         return scores[0]
 
-    def _remove_log_scale_questions(self) -> None:
-        non_log_scale_forecasts = [
-            forecast
-            for forecast in self.forecasts
-            if not forecast.question.is_log_scale
-        ]
-        if not (len(non_log_scale_forecasts) == len(self.forecasts)):
-            non_log_scaled_questions = [
-                question for question in self.questions if question.is_log_scale
-            ]
-            logger.warning(
-                f"Removed {len(self.forecasts) - len(non_log_scale_forecasts)} log scale forecasts and {len(self.questions) - len(non_log_scaled_questions)} log scale questions"
-            )
-        self.forecasts = non_log_scale_forecasts
-
     def _initialize_spot_forecast_cache(self) -> None:
         spot_forecasts: dict[tuple[str, int], Forecast] = {}
         for forecast in self.forecasts:
             question = forecast.question
             user_name = forecast.user.name
             spot_time = question.spot_scoring_time
-            if forecast.prediction_time >= spot_time:
+            if forecast.prediction_time > spot_time:
                 continue
-            if forecast.end_time and forecast.end_time < spot_time:
+            if forecast.end_time and forecast.end_time <= spot_time:
                 continue
             key = (user_name, question.question_id)
             current = spot_forecasts.get(key)
@@ -237,13 +221,19 @@ class SimulatedTournament(BaseModel):
         if isinstance(resolution, AnnulledAmbiguousResolutionType):
             return []
 
-        spot_forecasts_from_others: list[Forecast] = self.question_to_spot_forecasts(
+        spot_forecasts: list[Forecast] = self.question_to_spot_forecasts(
             forecast_to_score.question.question_id
         )
-        spot_forecasts_from_others.remove(forecast_to_score)
+        # Metaculus includes the scored forecaster in the geometric mean, then applies
+        # N/(N-1). It also excludes non-primary bots and blacklisted users.
+        peer_baseline_forecasts = [
+            forecast
+            for forecast in spot_forecasts
+            if forecast.user.contributes_to_peer_baseline
+        ]
 
         spot_peer_score = forecast_to_score.get_spot_peer_score(
-            resolution, spot_forecasts_from_others
+            resolution, peer_baseline_forecasts
         )
         spot_baseline_score = forecast_to_score.get_spot_baseline_score(resolution)
         scores = [spot_peer_score, spot_baseline_score]

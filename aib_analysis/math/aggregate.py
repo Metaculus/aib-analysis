@@ -8,6 +8,7 @@ from typing_extensions import Self
 
 from aib_analysis.data_structures.custom_types import (
     BinaryForecastType,
+    DiscreteForecastType,
     MCForecastType,
     NumericForecastType,
     QuestionType,
@@ -139,9 +140,11 @@ def aggregate_forecasts(
         mc_predictions = [forecast.prediction for forecast in forecasts]
         mc_predictions = typeguard.check_type(mc_predictions, list[MCForecastType])
         aggregated_forecast = _aggregate_mc_forecasts(mc_predictions)
-    elif question_type == QuestionType.NUMERIC:
+    elif question_type == QuestionType.NUMERIC or question_type == QuestionType.DISCRETE:
         numeric_predictions = [forecast.prediction for forecast in forecasts]
-        numeric_predictions = typeguard.check_type(numeric_predictions, list[NumericForecastType])
+        numeric_predictions = typeguard.check_type(
+            numeric_predictions, list[NumericForecastType | DiscreteForecastType]
+        )
         aggregated_forecast = _aggregate_numeric_forecasts(numeric_predictions)
     else:
         raise ValueError(f"Unknown question type: {question_type}")

@@ -20,6 +20,7 @@ class Tournament(Enum):
     Q1_2025_VS_CUP = "q1_2025_vs_cup"
     Q2_2025 = "q2_2025"
     Fall_2025 = "fall_2025"
+    Spring_2026 = "spring_2026"
 
 
 class ProblemQuestion(BaseModel):
@@ -97,6 +98,35 @@ force_match_questions: list[ProblemQuestion] = [
         proposed_action="",
         tournament=Tournament.Q1_2025_VS_CUP,
     ),
+    # Spring 2026
+    ProblemQuestion(
+        question_text="How many commercial aircraft deliveries will Airbus report for March 2026 ?",
+        question_1_url="https://www.metaculus.com/questions/42109/",
+        question_2_url="https://www.metaculus.com/questions/42272/",
+        notes="Duplicate questions in the same tournament. One is discrete, one is numeric. Both resolved to 60.",
+        proposed_action="Remove from comparison",
+        tournament=Tournament.Spring_2026,
+    ),
+    ProblemQuestion(
+        question_text="What will be the legal status of an EU PPWR delegated act on recyclability performance classes ... May 1, 2026?",
+        question_1_url="https://www.metaculus.com/questions/42519/",
+        question_2_url="https://www.metaculus.com/questions/42329/",
+        notes="Title mismatch only: pro 'on May 1' vs bot 'before May 1'. Same options and resolution ('No publication').",
+        proposed_action="Force match",
+        tournament=Tournament.Spring_2026,
+    ),
+    ProblemQuestion(
+        question_text="How many new civil antitrust merger challenges will the DOJ file against 'Big Tech' firms before May 1, 2026?",
+        question_1_url="https://www.metaculus.com/questions/42094/",
+        question_2_url="https://www.metaculus.com/questions/42050/",
+        notes=(
+            "Already hash-matches; force-match documents the intended pair. "
+            "Do not pair with annulled pro duplicate https://www.metaculus.com/questions/42063/ "
+            "(different inbound_outcome_count / spot window / annulled resolution)."
+        ),
+        proposed_action="Force match (exclude annulled 42063)",
+        tournament=Tournament.Spring_2026,
+    ),
 ]
 
 class ProblemManager:
@@ -131,6 +161,39 @@ class ProblemManager:
         return False
 
 
+def _all_unscored_title_match_message(title_matched_questions: list[Question]) -> str:
+    urls = [question.url for question in title_matched_questions]
+    reasons = {
+        question.unscored_resolution_reason for question in title_matched_questions
+    }
+    if None in reasons:
+        return (
+            "Matching question titles found, but all resolutions are blank "
+            f"(annulled or deleted): {urls}"
+        )
+    if reasons == {"annulled"}:
+        return f"Matching question titles found, but all are annulled: {urls}"
+    if reasons == {"ambiguous"}:
+        return f"Matching question titles found, but all are ambiguous: {urls}"
+    if reasons == {"blank"}:
+        return (
+            "Matching question titles found, but all have blank resolutions "
+            f"(deleted or unresolved): {urls}"
+        )
+    reason_counts = []
+    for reason in sorted(reasons):
+        count = sum(
+            1
+            for question in title_matched_questions
+            if question.unscored_resolution_reason == reason
+        )
+        reason_counts.append(f"{count} {reason}")
+    return (
+        "Matching question titles found, but all resolutions are blank "
+        f"(annulled or deleted): {urls} ({', '.join(reason_counts)})"
+    )
+
+
 def title_matched_questions_are_problematic(
     title_matched_questions: list[Question], log_results: bool
 ) -> bool:
@@ -148,7 +211,7 @@ def title_matched_questions_are_problematic(
 
     log_comparison_table = False
     if len(non_annulled_questions) == 0:
-        info_message = f"Matching question titles found, but all are annulled: {[q.url for q in title_matched_questions]}"
+        info_message = _all_unscored_title_match_message(title_matched_questions)
     elif len(non_annulled_questions) == 1:
         unique_projects = list(set([q.project for q in title_matched_questions]))
         if len(unique_projects) > 1:

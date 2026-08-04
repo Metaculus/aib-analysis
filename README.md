@@ -1,11 +1,8 @@
-The main entry point to the project is `aib_analysis/main.py`
-
 ## Installing Dependencies
-To set up the project please run:
-Installing dependencies
-Make sure you have python and poetry installed (poetry is a python package manager).
 
-If you don't have poetry installed run the below:
+Make sure you have Python and Poetry installed (Poetry is a Python package manager).
+
+If you don't have Poetry installed:
 ```
 sudo apt update -y
 sudo apt install -y pipx
@@ -15,42 +12,47 @@ pipx install poetry
 poetry config virtualenvs.in-project true
 ```
 
-Inside the terminal, go to the directory you cloned the repository into and run the following command:
-
+From the repo root:
 ```
 poetry install
 ```
 
 to install all required dependencies.
 
-You may also need to follow instructions [here](https://git-lfs.com/) for setting up git management for large files.
+## Input data
 
-## Running the Analysis
+Forecast CSVs live under `local/private_input_data/` (gitignored). For Spring 2026 the simulation script expects:
 
-To generate the analysis data run `aib_analysis/run_q1_q1_simulations.py`.
+- `local/private_input_data/pro_forecasts_2026_spring.csv`
+- `local/private_input_data/bot_forecasts_2026_spring.csv`
 
-Check the logs for warnings to see edge cases that have come up.
+You can:
 
-To display the analysis please execute:
+- If you have access, download prior analysis outputs (and sometimes inputs) from [this Google Drive folder](https://drive.google.com/drive/folders/1m7e8AQd4M-Y4oPuj--dDAEYwxO-J2kth?usp=drive_link), or
+- Request access to analysis data from the instructions shared [here](https://www.metaculus.com/notebooks/38928/ai-benchmark-resources/#what-data-do-i-have-access-to-via-api-how-can-i-get-access-to-more) which will show you how to use the [Metaculus Data Needs Form](https://docs.google.com/forms/d/e/1FAIpQLSeJhtZzHl5qMvBjbXbatyaqoS4IU7RE0GGw_vlhs6I9syqn1g/viewform?usp=pp_url&entry.192763438=https://www.metaculus.com/api/)
+
+## Running the analysis
+
+For the current (Spring 2026) tournament:
+
+```
+poetry run python aib_analysis/run_spring_simulations.py
+```
+
+That writes JSON artifacts to `local/spring_2026_simulations_teams_comparison/`.
+
+Check `logs/latest_info.log` for warnings (annulled questions, weight mismatches, unmatched questions, missing control bots, etc.).
+
+For older seasons (Q1–Q4), use `aib_analysis/run_q1_q2_simulations.py` and edit the `__main__` paths/folders as needed.
+
+## Viewing results
+
 ```
 poetry run streamlit run aib_analysis/front_end.py
 ```
 
-This will bring up the visuals for the analysis. Make sure you have chosen the right input data in this script. Front end uses caching, so restart streamlit if you update the underlying data.
-
-
-Make sure to restart the site or click "clear cache" in the triple dot menu on the site if you change the underlying data or simulated_tournament loading/intialization code.
-
-
-You can see/download/use previous analysis results here https://drive.google.com/drive/folders/1m7e8AQd4M-Y4oPuj--dDAEYwxO-J2kth?usp=drive_link
+In the UI, set the tournaments folder to the simulation output path (e.g. `local/spring_2026_simulations_teams_comparison`). Restart Streamlit or use **Clear cache** in the ⋮ menu after changing underlying JSON or loading/scoring code.
 
 ## Structure
-The project is focused around the SimulatedTournament object. This is initialized with a number of Forecast objects (see `data_models.py`) and used to create other parts of a tournament (Users, Scores, etc). Every data analysis item we care about is just a tournament of some sort. Often this is a filter, aggregation, intersection, etc of forecasts from another tournament, but even a comparison of 2 people is a tournament.
 
-Refactor advantages
-- Pydantic model validation (type safety, and consistency checks at initialization time)
-- Easier to unit test
-- More reusable (e.g. We can use this structure for regular peer score comparisons in the future)
-- Git diffs are easier to read
-- We can eventually publish our results as an interactive app if we want to (and if not, we can more easily check and interact with the data ourselves)
-
+The project is built around `SimulatedTournament` (see `data_models.py` / `simulated_tournament.py`). It is initialized from `Forecast` objects and derives users, scores, etc. Most analyses are filtered, aggregated, or combined tournaments built from those forecasts.

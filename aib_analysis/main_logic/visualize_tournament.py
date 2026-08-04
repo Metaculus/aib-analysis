@@ -5,9 +5,10 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from aib_analysis.data_structures.custom_types import QuestionType
+from aib_analysis.data_structures.custom_types import QuestionType, UserType
 from aib_analysis.data_structures.data_models import (
     Leaderboard,
+    LeaderboardEntry,
     Question,
     Score,
     ScoreType,
@@ -20,9 +21,6 @@ from aib_analysis.main_logic.process_tournament import (
     constrain_question_types,
     find_question_titles_unique_to_first_tournament,
     get_leaderboard,
-)
-from aib_analysis.data_structures.data_models import (
-    LeaderboardEntry,
 )
 from aib_analysis.math.stats import (
     MeanHypothesisCalculator,
@@ -64,13 +62,15 @@ def display_tournament_and_variations(
 def display_individual_tournament(tournament: SimulatedTournament, name: str):
     st.subheader(f"{name}")
 
+    hidden_user_types = infer_leaderboard_display_exclusions(name)
+
     # Display tournament statistics
     with st.expander(f"{name} Spot Peer Leaderboard"):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
-        display_leaderboard(leaderboard)
+        display_leaderboard(leaderboard, hidden_user_types=hidden_user_types)
     with st.expander(f"{name} Spot Baseline Leaderboard"):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_BASELINE)
-        display_leaderboard(leaderboard)
+        display_leaderboard(leaderboard, hidden_user_types=hidden_user_types)
     with st.expander(f"{name} Stats"):
         display_tournament_stats(tournament)
     with st.expander(f"{name} Forecasts"):
@@ -329,13 +329,76 @@ def display_scores(scores: list[Score]):
     st.dataframe(df, use_container_width=True)
 
 
-def display_leaderboard(leaderboard: Leaderboard):
+def infer_leaderboard_display_exclusions(tournament_name: str) -> set[UserType]:
+    """Users kept in scoring/peer pools but hidden from LB charts/tables.
+
+    Bot tournaments may include humans so peer GMs match Metaculus; pro tournaments
+    may include coherence/key-factor bots. Mixed comparison views show everyone.
+    """
+    normalized = (
+        tournament_name.lower().replace("|", " ").replace("_", " ").replace("-", " ")
+    )
+    if " vs " in f" {normalized} " or "with bot" in normalized:
+        return set()
+    if "pro" in normalized and "bot" not in normalized:
+        return {UserType.BOT}
+    if "bot" in normalized:
+        return {UserType.PRO}
+    return set()
+
+
+def filter_leaderboard_for_display(
+    leaderboard: Leaderboard, hidden_user_types: set[UserType]
+) -> tuple[Leaderboard, list[LeaderboardEntry]]:
+    if not hidden_user_types:
+        return leaderboard, []
+    visible_entries = [
+        entry
+        for entry in leaderboard.entries
+        if entry.user.type not in hidden_user_types
+    ]
+    hidden_entries = [
+        entry
+        for entry in leaderboard.entries
+        if entry.user.type in hidden_user_types
+    ]
+    return (
+        Leaderboard(entries=visible_entries, type=leaderboard.type),
+        hidden_entries,
+    )
+
+
+def _note_hidden_leaderboard_users(hidden_entries: list[LeaderboardEntry]) -> None:
+    if not hidden_entries:
+        return
+    by_type: dict[str, list[str]] = {}
+    for entry in hidden_entries:
+        by_type.setdefault(entry.user.type.value, []).append(entry.user.name)
+    parts = []
+    for user_type, names in sorted(by_type.items()):
+        sample = ", ".join(sorted(names)[:8])
+        extra = f" (+{len(names) - 8} more)" if len(names) > 8 else ""
+        parts.append(f"{len(names)} {user_type} ({sample}{extra})")
+    st.info(
+        "Excluded from this leaderboard chart/table (still included in scoring / peer "
+        f"baselines where applicable): {'; '.join(parts)}."
+    )
+
+
+def display_leaderboard(
+    leaderboard: Leaderboard,
+    hidden_user_types: set[UserType] | None = None,
+) -> None:
     confidence_level = 0.95
-    _display_average_scores_plot(leaderboard, confidence_level)
-    _display_leaderboard_table(leaderboard, confidence_level)
+    display_board, hidden_entries = filter_leaderboard_for_display(
+        leaderboard, hidden_user_types or set()
+    )
+    _note_hidden_leaderboard_users(hidden_entries)
+    _display_average_scores_plot(display_board, confidence_level)
+    _display_leaderboard_table(display_board, confidence_level)
     _display_score_histogram_by_user(
-        leaderboard.all_scores,
-        title="All Users Scores Histogram (overlay, not stacked)",
+        display_board.all_scores,
+        title="Displayed Users Scores Histogram (overlay, not stacked)",
     )
 
 
@@ -648,46 +711,76 @@ def display_aggregate_comparison(team_comparison_tourns: list[SimulatedTournamen
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_PEER)
         bot_entry = [entry for entry in leaderboard.entries if entry.user == bot_team_user][0]
         entries_to_graph.append(bot_entry)
-    
+
     st.subheader("Aggregate comparison")
     with st.expander("Aggregate comparison"):
-        entries_to_graph = sorted(entries_to_graph, key=lambda x: len(x.user.aggregated_users))
-        
-        scores = [entry.average_score for entry in entries_to_graph]
-        confidence_intervals = [entry.get_confidence_interval(confidence_level=0.95) for entry in entries_to_graph]
-        lower_bounds = [ci.lower_bound for ci in confidence_intervals]
-        upper_bounds = [ci.upper_bound for ci in confidence_intervals]
-        
-        error_y_minus = [score - lower for score, lower in zip(scores, lower_bounds)]
-        error_y_plus = [upper - score for score, upper in zip(scores, upper_bounds)]
-        
-        team_sizes = [len(entry.user.aggregated_users) for entry in entries_to_graph]
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=team_sizes,
-            y=scores,
-            mode='markers+lines',
-            name='Bot Team Score',
-            marker={'size': 10},
-            error_y={
-                'type': 'data',
-                'symmetric': False,
-                'array': error_y_plus,
-                'arrayminus': error_y_minus,
-                'visible': True
-            }
-        ))
-        
-        fig.update_layout(
-            title='Bot Team Performance vs Team Size',
-            xaxis_title='Team Size',
-            yaxis_title='Average Score',
-            hovermode='closest',
-            showlegend=True
+        entries_to_graph = sorted(
+            entries_to_graph, key=lambda entry: len(entry.user.aggregated_users)
         )
-        
+
+        scores: list[float] = []
+        team_sizes: list[int] = []
+        error_y_minus: list[float | None] = []
+        error_y_plus: list[float | None] = []
+        confidence_interval_warnings: list[str] = []
+
+        for entry in entries_to_graph:
+            team_size = len(entry.user.aggregated_users)
+            score = entry.average_score
+            team_sizes.append(team_size)
+            scores.append(score)
+            try:
+                confidence_interval = entry.get_confidence_interval(
+                    confidence_level=0.95
+                )
+                error_y_minus.append(score - confidence_interval.lower_bound)
+                error_y_plus.append(confidence_interval.upper_bound - score)
+            except ValueError as error:
+                error_y_minus.append(None)
+                error_y_plus.append(None)
+                confidence_interval_warnings.append(
+                    f"team size {team_size} ({entry.question_count} scores): {error}"
+                )
+
+        if confidence_interval_warnings:
+            st.warning(
+                "T-based confidence intervals omitted for some points "
+                "(normality assumption failed with n < 30):\n\n"
+                + "\n".join(
+                    f"- {warning}" for warning in confidence_interval_warnings
+                )
+            )
+
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatter(
+                x=team_sizes,
+                y=scores,
+                mode="markers+lines",
+                name="Bot Team Score",
+                marker={"size": 10},
+                error_y={
+                    "type": "data",
+                    "symmetric": False,
+                    "array": error_y_plus,
+                    "arrayminus": error_y_minus,
+                    "visible": True,
+                },
+            )
+        )
+
+        fig.update_layout(
+            title="Bot Team Performance vs Team Size",
+            xaxis_title="Team Size",
+            yaxis_title="Average Score",
+            hovermode="closest",
+            showlegend=True,
+        )
+
         st.plotly_chart(fig, use_container_width=True)
 
         for entry in entries_to_graph:
-            st.write(f"- Bot Team Size: {len(entry.user.aggregated_users)} | Score: {entry.average_score:.3f}")
+            st.write(
+                f"- Bot Team Size: {len(entry.user.aggregated_users)} | "
+                f"Score: {entry.average_score:.3f}"
+            )

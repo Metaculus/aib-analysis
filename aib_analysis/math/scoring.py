@@ -19,7 +19,8 @@ def calculate_peer_score(
     range_min: float | None = None,
     range_max: float | None = None,
     question_weight: float = 1.0,
-    q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
+    q_type: Literal["binary", "multiple_choice", "numeric", "discrete"] | None = None,
+    zero_point: float | None = None,
 ) -> float:
     if len(forecast_for_other_users) == 0:
         return 0.0
@@ -27,19 +28,25 @@ def calculate_peer_score(
     question_type = _determine_question_type(q_type, resolution)
     resolution = _normalize_resolution(question_type, resolution, range_min, range_max)
     forecast_for_resolution = _determine_probability_for_resolution(
-        question_type, forecast, resolution, options, range_min, range_max
+        question_type, forecast, resolution, options, range_min, range_max, zero_point
     )
     other_user_forecasts = [
         _determine_probability_for_resolution(
-            question_type, forecast, resolution, options, range_min, range_max
+            question_type, f, resolution, options, range_min, range_max, zero_point
         )
-        for forecast in forecast_for_other_users
+        for f in forecast_for_other_users
     ]
 
     geometric_mean = gmean(other_user_forecasts)
     peer_score = np.log(forecast_for_resolution / geometric_mean)
-    if question_type == QuestionType.NUMERIC:
+    
+    n_forecasters = len(other_user_forecasts)
+    if n_forecasters > 1:
+        peer_score *= (n_forecasters / (n_forecasters - 1))
+        
+    if question_type == QuestionType.NUMERIC or question_type == QuestionType.DISCRETE:
         peer_score /= 2
+        
     return peer_score * question_weight * 100
 
 
@@ -52,7 +59,8 @@ def calculate_baseline_score(
     question_weight: float = 1.0,
     open_upper_bound: bool | None = False,
     open_lower_bound: bool | None = False,
-    q_type: Literal["binary", "multiple_choice", "numeric"] | None = None,
+    q_type: Literal["binary", "multiple_choice", "numeric", "discrete"] | None = None,
+    zero_point: float | None = None,
 ) -> float:
     """
     Question type can be infered from resolution type
@@ -61,11 +69,12 @@ def calculate_baseline_score(
     question_type = _determine_question_type(q_type, resolution)
     resolution = _normalize_resolution(question_type, resolution, range_min, range_max)
     prob_for_resolution = _determine_probability_for_resolution(
-        question_type, forecast, resolution, options, range_min, range_max
+        question_type, forecast, resolution, options, range_min, range_max, zero_point
     )
     baseline_prob = _determine_baseline(
         question_type,
         resolution,
+        forecast,
         options,
         range_min,
         range_max,
@@ -88,6 +97,7 @@ def calculate_baseline_score(
 def _determine_baseline(
     question_type: QuestionType,
     resolution: ResolutionType,
+    forecast: ForecastType,
     options: list[str] | None = None,
     range_min: float | None = None,
     range_max: float | None = None,
@@ -101,17 +111,17 @@ def _determine_baseline(
         if options is None:
             raise ValueError("Options are required for multiple choice questions")
         baseline_prob = 1 / len(options)
-    elif question_type == QuestionType.NUMERIC:
+    elif question_type == QuestionType.NUMERIC or question_type == QuestionType.DISCRETE:
         if open_upper_bound is None or open_lower_bound is None:
             raise ValueError(
-                "Open upper bound and lower bound are required for numeric questions"
+                f"Open upper bound and lower bound are required for {question_type.value} questions"
             )
         if range_min is None or range_max is None:
             raise ValueError(
-                "Range min and range max are required for numeric questions"
+                f"Range min and range max are required for {question_type.value} questions"
             )
         if not isinstance(resolution, float):
-            raise ValueError("Resolution must be a float for numeric questions")
+            raise ValueError(f"Resolution must be a float for {question_type.value} questions")
 
 
         resolved_outside_bounds = False
@@ -124,9 +134,10 @@ def _determine_baseline(
             baseline_prob = 0.05
         else:
             open_bound_count = bool(open_upper_bound) + bool(open_lower_bound)
+            pmf_inner_bins = len(forecast) - 1 # len(forecast) is len(cdf). For numeric PMF has 202 bins, 2 of which represent the bounds. CDF is 201. So 201 -1 = 200 is the internal bins
             baseline_prob = (
                 1 - 0.05 * open_bound_count
-            ) / 200  # PMF has 202 bins, 2 of which represent the bounds. So 200 is the internal bins
+            ) / pmf_inner_bins
     else:
         raise ValueError("Unknown question type")
     assert (
@@ -142,6 +153,7 @@ def _determine_probability_for_resolution(
     options: list[str] | None = None,
     range_min: float | None = None,
     range_max: float | None = None,
+    zero_point: float | None = None,
 ) -> float:
     """
     Returns a 0 to 1 probability for the resolution
@@ -167,7 +179,7 @@ def _determine_probability_for_resolution(
             f"Error encountered for question of type {q_type} with resolution {resolution} and forecast {forecast}: {e}"
         )
 
-    if not q_type == QuestionType.NUMERIC and any(p <= 0 or p >= 1 for p in forecast):
+    if not (q_type == QuestionType.NUMERIC or q_type == QuestionType.DISCRETE) and any(p < 0 or p > 1 for p in forecast):
         raise ValueError("Forecast contains probabilities outside of 0 to 1 range")
 
     if q_type == QuestionType.BINARY:
@@ -180,16 +192,16 @@ def _determine_probability_for_resolution(
         prob_for_resolution = _multiple_choice_resolution_prob(
             forecast, resolution, options
         )
-    elif q_type == QuestionType.NUMERIC:
+    elif q_type == QuestionType.NUMERIC or q_type == QuestionType.DISCRETE:
         if range_min is None or range_max is None:
             raise ValueError(
-                "Range min and range max are required for numeric questions"
+                f"Range min and range max are required for {q_type.value} questions"
             )
         assert isinstance(
             resolution, float
         ), f"Resolution is {resolution} which is not a float"
         prob_for_resolution = _numeric_resolution_prob(
-            forecast, resolution, range_min, range_max
+            forecast, resolution, range_min, range_max, zero_point
         )
     else:
         raise ValueError(f"Unknown question type: {q_type}")
@@ -231,11 +243,8 @@ def _multiple_choice_resolution_prob(
 
 
 def _numeric_resolution_prob(
-    forecast: list[float], resolution: float, range_min: float, range_max: float
+    forecast: list[float], resolution: float, range_min: float, range_max: float, zero_point: float | None = None
 ) -> float:
-    if len(forecast) != 201:
-        raise ValueError("CDF should have 201 bins")
-
     previous_prob = 0
     for current_prob in forecast:
         if current_prob < previous_prob:
@@ -246,7 +255,7 @@ def _numeric_resolution_prob(
     pmf = cdf_to_pmf(cdf)
 
     resolution_bin_idx = _resolution_value_to_pmf_index(
-        pmf, resolution, range_min, range_max
+        pmf, resolution, range_min, range_max, zero_point
     )
 
     prob_for_resolution = pmf[resolution_bin_idx]
@@ -267,28 +276,27 @@ def _determine_divisor_for_baseline_score(
         if options is None:
             raise ValueError("Options are required for multiple choice questions")
         return np.log(len(options))
-    elif question_type == QuestionType.NUMERIC:
+    elif question_type == QuestionType.NUMERIC or question_type == QuestionType.DISCRETE:
         return 2
     else:
         raise ValueError("Unknown question type")
 
 
 def _resolution_value_to_pmf_index(
-    pmf: list[float], resolution: float, range_min: float, range_max: float
+    pmf: list[float], resolution: float, range_min: float, range_max: float, zero_point: float | None = None
 ) -> int:
     """
     PMF explanation:
-    - 200 bins for the internal range
+    - `outcome_count` bins for the internal range
     - 1 bin for the 'above upper bound'
     - 1 bin for the 'below lower bound'
-    - 202 total bins
+    - `outcome_count + 2` total bins
     """
-    if len(pmf) != 202:
-        raise ValueError(f"PMF should have 202 bins, but has {len(pmf)}")
+    outcome_count = len(pmf) - 2
     position_in_range = _resolution_value_to_position_in_numeric_range(
-        resolution, range_min, range_max
+        resolution, range_min, range_max, zero_point
     )
-    resolution_bin_idx = _position_in_range_to_bucket_index(position_in_range)
+    resolution_bin_idx = _position_in_range_to_bucket_index(position_in_range, outcome_count)
     if resolution_bin_idx >= len(pmf) or resolution_bin_idx < 0:
         raise ValueError(
             f"Invalid resolution bin index: {resolution_bin_idx}. Resolution: {resolution}, Range min: {range_min}, Range max: {range_max}"
@@ -299,9 +307,8 @@ def _resolution_value_to_pmf_index(
     return resolution_bin_idx
 
 def _position_in_range_to_bucket_index(
-    position_in_range: float
+    position_in_range: float, outcome_count: int
 ) -> int:
-    outcome_count = 200
     if position_in_range < 0:
         return 0
     if position_in_range > 1:
@@ -441,7 +448,6 @@ def _determine_question_type(
 
 
 def cdf_to_pmf(cdf: list[float]) -> list[float]:
-    assert len(cdf) == 201, f"There should be 201 bins, but there are {len(cdf)}"
     lower_bound_prob = cdf[0]
     upper_bound_prob = 1 - cdf[-1]
     pmf = (
@@ -449,17 +455,16 @@ def cdf_to_pmf(cdf: list[float]) -> list[float]:
         + [cdf[i] - cdf[i - 1] for i in range(1, len(cdf))]
         + [upper_bound_prob]
     )
-    assert len(pmf) == 202, f"There should be 202 bins, but there are {len(pmf)}"
+    assert len(pmf) == len(cdf) + 1, f"There should be {len(cdf) + 1} bins, but there are {len(pmf)}"
     return pmf
 
 
 def pmf_to_cdf(pmf: list[float]) -> list[float]:
-    assert len(pmf) == 202, f"There should be 202 bins, but there are {len(pmf)}"
     cdf = []
     total = 0.0
     for p in pmf:
         total += p
         cdf.append(total)
-    assert len(cdf) == 201, f"There should be 201 bins, but there are {len(cdf)}"
+    assert len(cdf) == len(pmf) - 1, f"There should be {len(pmf) - 1} bins, but there are {len(cdf)}"
     return cdf
 
