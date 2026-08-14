@@ -47,6 +47,8 @@ def main(tournaments_folder: str | None = None):
     files_grouped_by_first_number = {}
     for file in all_files_in_folder:
         first_number = file.split("_")[0]
+        if not first_number.isdigit():
+            continue
         first_number = int(first_number)
         files_grouped_by_first_number.setdefault(first_number, []).append(file)
 
