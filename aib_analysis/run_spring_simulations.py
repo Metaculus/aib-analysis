@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 def set_all_question_weights_to_one(
     tournament: SimulatedTournament,
 ) -> SimulatedTournament:
-    """Rescore a tournament with every question weight forced to 1.0."""
+    """Rescore a tournament with every question_fweight forced to 1.0."""
     new_forecasts: list[Forecast] = [
         forecast.model_copy(
             update={
@@ -41,43 +41,12 @@ def set_all_question_weights_to_one(
     return SimulatedTournament(name=tournament.name, forecasts=new_forecasts)
 
 
-def remove_users_from_tournament(
-    tournament: SimulatedTournament,
-    usernames: set[str],
-) -> SimulatedTournament:
-    """Drop all forecasts from the given users, then rescore."""
-    if not usernames:
-        return tournament
-    present = {user.name for user in tournament.users} & usernames
-    missing = usernames - {user.name for user in tournament.users}
-    if missing:
-        logger.warning(
-            f"Users to exclude not found in {tournament.name}: {sorted(missing)}"
-        )
-    if not present:
-        return tournament
-    filtered_forecasts = [
-        forecast
-        for forecast in tournament.forecasts
-        if forecast.user.name not in present
-    ]
-    logger.info(
-        f"Excluding {len(present)} user(s) from scoring in {tournament.name}: "
-        f"{sorted(present)}"
-    )
-    return SimulatedTournament(
-        name=f"{tournament.name} (excluded {', '.join(sorted(present))})",
-        forecasts=filtered_forecasts,
-    )
-
-
 def main(
     pro_path: str,
     bot_path: str,
     quarterly_cup_path: str | None,
     output_folder: str,
     force_unit_weights: bool = False,
-    usernames_to_exclude_from_scoring: list[str] | None = None,
 ):
     initialize_logging()
 
@@ -89,24 +58,15 @@ def main(
     
     is_q3 = "q3" in output_folder.lower()
     is_q4 = "q4" in output_folder.lower()
-    excluded_usernames = set(usernames_to_exclude_from_scoring or [])
     if force_unit_weights:
         logger.info(
             "force_unit_weights=True: all question weights will be set to 1.0 before scoring"
-        )
-    if excluded_usernames:
-        logger.info(
-            f"Excluding from scoring: {sorted(excluded_usernames)}"
         )
 
     # ----------------------- Pros and Bot Tournaments -----------------------
     pro_tournament = grab_tournament_data(pro_path, UserType.PRO, "Pro Tournament")
     if force_unit_weights:
         pro_tournament = set_all_question_weights_to_one(pro_tournament)
-    if excluded_usernames:
-        pro_tournament = remove_users_from_tournament(
-            pro_tournament, excluded_usernames
-        )
     save_tournament(
         pro_tournament,
         "pro_tournament.json",
@@ -126,10 +86,6 @@ def main(
         )
     if force_unit_weights:
         bot_tournament = set_all_question_weights_to_one(bot_tournament)
-    if excluded_usernames:
-        bot_tournament = remove_users_from_tournament(
-            bot_tournament, excluded_usernames
-        )
     save_tournament(
         bot_tournament,
         "bot_tournament.json",
@@ -251,7 +207,7 @@ def main(
             )
             size_10_bot_team = bot_team_for_pro_comparison
 
-    # ------------------- Pros + bots + team aggregates (group 9) -------------------
+    # ------------------- Pros + bots + team aggregates -------------------
     if size_10_bot_team is not None:
         pro_team_names = {user.name for user in pro_tournament.users}
         bot_team_names = {user.name for user in size_10_bot_team}
@@ -260,6 +216,11 @@ def main(
         ]
         bot_team_in_combined = [
             user for user in pro_with_bot_tourn.users if user.name in bot_team_names
+        ]
+        fall_2025_bots_in_combined = [
+            user
+            for user in pro_with_bot_tourn.users
+            if user.name in FALL_2025_TOP_BOT_NAMES
         ]
         non_commercial_bots_in_combined = [
             user
@@ -276,6 +237,19 @@ def main(
                 f"Expected {len(bot_team_names)} bot-team members in combined tournament, "
                 f"found {len(bot_team_in_combined)}"
             )
+        missing_fall_2025_bots = FALL_2025_TOP_BOT_NAMES - {
+            user.name for user in fall_2025_bots_in_combined
+        }
+        if missing_fall_2025_bots:
+            raise ValueError(
+                f"Fall 2025 top bots missing from combined tournament: "
+                f"{sorted(missing_fall_2025_bots)}"
+            )
+        if len(fall_2025_bots_in_combined) != len(FALL_2025_TOP_BOT_NAMES):
+            raise ValueError(
+                f"Expected {len(FALL_2025_TOP_BOT_NAMES)} Fall 2025 top bots, "
+                f"found {len(fall_2025_bots_in_combined)}"
+            )
         missing_commercial_bots = COMMERCIAL_BOT_NAMES - {
             user.name for user in pro_with_bot_tourn.users if user.type == UserType.BOT
         }
@@ -288,6 +262,10 @@ def main(
             raise ValueError("No non-commercial bots found for aggregate")
 
         logger.info(
+            f"Fall 2025 Bot Team: aggregating {len(fall_2025_bots_in_combined)} bots "
+            f"({sorted(FALL_2025_TOP_BOT_NAMES)})"
+        )
+        logger.info(
             f"Non-Commercial Bot Team: aggregating "
             f"{len(non_commercial_bots_in_combined)} bots "
             f"(excluded commercial bots: {sorted(COMMERCIAL_BOT_NAMES)})"
@@ -299,6 +277,7 @@ def main(
         for team_users, team_name in [
             (pro_team_in_combined, "Pro Team"),
             (bot_team_in_combined, "Bot Team"),
+            (fall_2025_bots_in_combined, "Fall 2025 Top Bots"),
             (non_commercial_bots_in_combined, "Non-Commercial Bot Team"),
         ]:
             team_aggregate = create_aggregated_user_at_spot_time(
@@ -315,7 +294,7 @@ def main(
             )
 
         pro_bots_with_teams = SimulatedTournament(
-            name="Pro + Bot with Pro / Bot / Non-Commercial Bot Teams",
+            name="Pro + Bots + team aggregates",
             forecasts=(
                 list(pro_with_bot_tourn.forecasts)
                 + [forecast for batch in team_forecast_batches for forecast in batch]
@@ -323,7 +302,7 @@ def main(
         )
         save_tournament(
             pro_bots_with_teams,
-            "pro_with_bot_tourn__with_teams.json",
+            "individual_pros_vs_bots_vs_various_teams.json",
             divide_into_types=True,
             folder=output_folder,
             counter_override=next_count(),
@@ -445,13 +424,26 @@ COMMERCIAL_BOT_NAMES: set[str] = {
     "Upskillbot",
 }
 
+# Top 10 bots from Fall 2025 AIB leaderboard (used as a fixed team in Spring comparisons).
+FALL_2025_TOP_BOT_NAMES: set[str] = {
+    "Preseen-Atlas",
+    "manticAI",
+    "GreeneiBot2",
+    "mmBot",
+    "CumulativeBot",
+    "Panshul42",
+    "AUTOMATIC",
+    "laertes",
+    "nostreambot",
+    "metac-asknews-deepnews[research-only]",
+}
+
 
 if __name__ == "__main__":
     main(
         pro_path="local/private_input_data/pro_forecasts_2026_spring.csv",
         bot_path="local/private_input_data/bot_forecasts_2026_spring.csv",
         quarterly_cup_path=None,
-        output_folder="local/spring_2026_simulations_teams_comparison_no_preseen_chestnut/",
+        output_folder="local/spring_2026_simulations_teams_comparison/",
         force_unit_weights=False,
-        usernames_to_exclude_from_scoring=["Preseen-Chestnut"],
     )
