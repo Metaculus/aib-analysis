@@ -444,6 +444,6 @@ if __name__ == "__main__":
         pro_path="local/private_input_data/pro_forecasts_2026_spring.csv",
         bot_path="local/private_input_data/bot_forecasts_2026_spring.csv",
         quarterly_cup_path=None,
-        output_folder="local/spring_2026_simulations_teams_comparison/",
+        output_folder="local/spring_2026_simulations/",
         force_unit_weights=False,
     )
