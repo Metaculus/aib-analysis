@@ -1,6 +1,6 @@
 """Run the bot-maker survey analysis for one season.
 
-    poetry run python aib_analysis/run_survey_analysis.py --season spring-2026
+    poetry run python aib_analysis/survey_analysis_v1/run_survey_analysis.py --season spring-2026
 
 Outputs into the season's `output_dir`:
     survey_report.html          reviewable report with every chart and table
@@ -20,14 +20,15 @@ import os
 import sys
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
+top_level_dir = os.path.abspath(os.path.join(current_dir, "../../"))
 sys.path.append(top_level_dir)
 
-from aib_analysis.survey_analysis.analysis import derive_features, run_analysis
-from aib_analysis.survey_analysis.loading import load_dataset
-from aib_analysis.survey_analysis.plots import build_all_charts
-from aib_analysis.survey_analysis.report import write_reports
-from aib_analysis.survey_analysis.seasons import SEASONS
+from aib_analysis.survey_analysis_v1.analysis import derive_features, run_analysis
+from aib_analysis.survey_analysis_v1.loading import load_dataset
+from aib_analysis.survey_analysis_v1.seasons import SEASONS
+from aib_analysis.survey_analysis_v1.utils.plots import build_all_charts
+from aib_analysis.survey_analysis_v1.utils.report import write_reports
+from aib_analysis.survey_analysis_v1.utils.review_report import build_review_report
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +66,15 @@ def main(season_key: str) -> None:
 
     charts = build_all_charts(results)
     report_path = write_reports(results, charts)
+    review_path = build_review_report(results)
+    review_html = review_path.with_suffix(".html")
 
-    print(f"\nReport:  {report_path}")
-    print(f"Charts:  {config.charts_dir} ({len(charts)} figures)")
-    print(f"Data:    {config.data_dir}")
+    print(f"\nSummary report:  {report_path}")
+    print(f"Review report:   {review_path} (Markdown, opens in VS Code)")
+    if review_html.exists():
+        print(f"                 {review_html} (self-contained, opens in any browser)")
+    print(f"Charts:          {config.charts_dir} ({len(charts)} summary figures)")
+    print(f"Data:            {config.data_dir}")
 
 
 if __name__ == "__main__":

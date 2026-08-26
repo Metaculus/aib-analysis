@@ -18,13 +18,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from aib_analysis.survey_analysis.analysis import (
+from aib_analysis.survey_analysis_v1.analysis import (
     AnalysisResults,
     category_counts,
     split_top_bottom,
 )
-from aib_analysis.survey_analysis.loading import Respondent
-from aib_analysis.survey_analysis.statistics import TestFamily, pearson_ci
+from aib_analysis.survey_analysis_v1.loading import Respondent
+from aib_analysis.survey_analysis_v1.statistics import TestFamily, pearson_ci
 
 logger = logging.getLogger(__name__)
 

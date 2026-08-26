@@ -3,9 +3,9 @@
 The survey analysis needs a flat bot_name -> total_score table. This produces
 it from the tournament JSON written by the simulation scripts.
 
-    poetry run python aib_analysis/build_leaderboard_csv.py \
+    poetry run python aib_analysis/survey_analysis_v1/build_leaderboard_csv.py \
         local/spring_2026_simulations/2_bot_tournament.json \
-        temp/spring_survey_analysis/data/spring_2026_leaderboard.csv
+        local/spring_survey_analysis/data/spring_2026_leaderboard.csv
 
 Loading the JSON takes a few minutes; the files run to hundreds of MB.
 """
@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
+top_level_dir = os.path.abspath(os.path.join(current_dir, "../../"))
 sys.path.append(top_level_dir)
 
 from aib_analysis.data_structures.custom_types import ScoreType

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from aib_analysis.survey_analysis.config import (
+from aib_analysis.survey_analysis_v1.config import (
     BinaryFeature,
     CategoricalFeature,
     CountFeature,
@@ -110,8 +110,8 @@ SPRING_2026 = SeasonConfig(
     / "local/private_input_data/fall_and_spring_survey_data"
     / "Spring 2026 FutureEval Prize and participation stats.csv",
     leaderboard_csv=REPO_ROOT
-    / "temp/spring_survey_analysis/data/spring_2026_leaderboard.csv",
-    output_dir=REPO_ROOT / "temp/spring_survey_analysis",
+    / "local/spring_survey_analysis/data/spring_2026_leaderboard.csv",
+    output_dir=REPO_ROOT / "local/spring_survey_analysis",
     # 'MWG Bot' in the survey is registered as bot 'MWG' under owner MWGHuman.
     name_aliases={"mwgbot": "mwg"},
     # Preseen-Chestnut placed 5th on the raw leaderboard but was disqualified
@@ -410,6 +410,13 @@ SPRING_2026 = SeasonConfig(
             "Competed in the previous season",
             "experience",
             negate=True,
+        ),
+        BinaryFeature(
+            "final_gpt_5_4",
+            "final_model",
+            ("gpt-5.4", "gpt 5.4"),
+            "GPT-5.4 for final prediction",
+            "model",
         ),
     ),
     ordinal_features=(

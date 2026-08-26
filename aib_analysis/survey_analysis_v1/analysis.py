@@ -7,9 +7,9 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from aib_analysis.survey_analysis.config import SeasonConfig
-from aib_analysis.survey_analysis.loading import Dataset, Respondent
-from aib_analysis.survey_analysis.statistics import (
+from aib_analysis.survey_analysis_v1.config import SeasonConfig
+from aib_analysis.survey_analysis_v1.loading import Dataset, Respondent
+from aib_analysis.survey_analysis_v1.statistics import (
     TestFamily,
     TestResult,
     fisher_binary,

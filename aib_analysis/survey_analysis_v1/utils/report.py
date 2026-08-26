@@ -8,15 +8,15 @@ import logging
 from datetime import date
 from pathlib import Path
 
-from aib_analysis.survey_analysis.analysis import (
+from aib_analysis.survey_analysis_v1.analysis import (
     AnalysisResults,
     category_counts,
     median_of,
     rate,
     split_top_bottom,
 )
-from aib_analysis.survey_analysis.plots import Chart
-from aib_analysis.survey_analysis.statistics import TestFamily
+from aib_analysis.survey_analysis_v1.utils.plots import Chart
+from aib_analysis.survey_analysis_v1.statistics import TestFamily
 
 logger = logging.getLogger(__name__)
 

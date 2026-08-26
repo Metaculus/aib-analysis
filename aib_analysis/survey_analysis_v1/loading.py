@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from aib_analysis.survey_analysis.config import SURVEY_COLUMNS, SeasonConfig
+from aib_analysis.survey_analysis_v1.config import SURVEY_COLUMNS, SeasonConfig
 
 logger = logging.getLogger(__name__)
 

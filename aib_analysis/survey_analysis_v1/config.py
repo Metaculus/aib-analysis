@@ -251,3 +251,11 @@ class SeasonConfig:
     @property
     def data_dir(self) -> Path:
         return self.output_dir / "data"
+
+    @property
+    def review_charts_dir(self) -> Path:
+        return self.output_dir / "review_charts"
+
+    @property
+    def review_report_path(self) -> Path:
+        return self.output_dir / "review_report.md"
