@@ -1,10 +1,9 @@
-"""Correlation and group-comparison helpers, scaled to a general audience.
+"""Correlation helpers, scaled to a general audience.
 
 Tests used:
 - binary feature vs peer score : point-biserial correlation (Pearson on 0/1)
 - ordinal / count vs peer score : Spearman rank correlation
 - continuous vs peer score      : Pearson correlation
-- winner vs non-winner on a binary feature : Fisher exact test + rate gap
 
 Every result carries the coefficient, p-value, sample size, and a plain-language
 direction so the report can describe it without jargon.

@@ -8,6 +8,11 @@ the wrong bot. Runs without env vars or local data.
 
 from __future__ import annotations
 
+import csv
+
+import pytest
+
+from aib_analysis.survey_analysis_v2 import config
 from aib_analysis.survey_analysis_v2.leaderboard import LeaderboardRow
 from aib_analysis.survey_analysis_v2.loading import (
     PrizeOwner,
@@ -15,11 +20,14 @@ from aib_analysis.survey_analysis_v2.loading import (
     _alnum_key,
     _match_leaderboard,
     _match_prize,
+    _resolve_winner,
     _split_bot_list,
     _to_float,
     _to_int,
+    load_survey,
     normalize_name,
 )
+from aib_analysis.survey_analysis_v2.manual_adjustments import WinnerOverride
 
 
 # --------------------------------------------------------------------------- #
@@ -154,3 +162,68 @@ def test_groups_include_top10_only_when_flagged():
     assert winner_top10.groups == ["winner", "top_10"]
     plain = Respondent("b", {}, is_winner=False, is_top_10=False)
     assert plain.groups == ["non_winner"]
+
+
+# --------------------------------------------------------------------------- #
+# Bot-level winner resolution (the prize sheet is owner-level)
+# --------------------------------------------------------------------------- #
+def test_single_bot_owner_status_transfers_to_bot():
+    won = _owner(["solo-bot"], winner_count=1, aib_prize=50.0)
+    assert _resolve_winner("solo-bot", won, None) == (True, "owner_single_bot")
+    lost = _owner(["solo-bot"], winner_count=0, aib_prize=0.0)
+    assert _resolve_winner("solo-bot", lost, None) == (False, "owner_single_bot")
+
+
+def test_multi_bot_owner_with_no_wins_means_no_winner():
+    owner = _owner(["bot-1", "bot-2"], winner_count=0, aib_prize=0.0)
+    assert _resolve_winner("bot-1", owner, None) == (False, "owner_multi_bot_no_wins")
+
+
+def test_multi_bot_owner_with_wins_requires_override():
+    owner = _owner(["bot-1", "bot-2"], winner_count=1, aib_prize=100.0)
+    with pytest.raises(ValueError, match="owner-level"):
+        _resolve_winner("bot-1", owner, None)
+
+
+def test_override_resolves_ambiguous_multi_bot_owner():
+    owner = _owner(["bot-1", "bot-2"], winner_count=1, aib_prize=100.0)
+    override = WinnerOverride(bot_name="bot-1", is_winner=True, reason="best ranked")
+    assert _resolve_winner("bot-1", owner, override) == (True, "manual_override")
+    loser_override = WinnerOverride(bot_name="bot-2", is_winner=False, reason="worse ranked")
+    assert _resolve_winner("bot-2", owner, loser_override) == (False, "manual_override")
+
+
+def test_override_applies_even_without_prize_match():
+    override = WinnerOverride(bot_name="bot-x", is_winner=True, reason="known winner")
+    assert _resolve_winner("bot-x", None, override) == (True, "manual_override")
+
+
+def test_no_prize_match_defaults_to_non_winner():
+    assert _resolve_winner("bot-x", None, None) == (False, "no_prize_match")
+
+
+# --------------------------------------------------------------------------- #
+# Survey loading: blank bot names must never be dropped silently
+# --------------------------------------------------------------------------- #
+def _write_survey_csv(path, rows: list[list[str]]) -> None:
+    header = [config.COLUMNS["timestamp"], config.COLUMNS["bot_name"]]
+    with open(path, "w", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(header)
+        writer.writerows(rows)
+
+
+def test_load_survey_skips_fully_empty_rows(tmp_path, monkeypatch):
+    path = tmp_path / "survey.csv"
+    _write_survey_csv(path, [["1/1/26", "bot-a"], ["", ""], ["1/2/26", "bot-b"]])
+    monkeypatch.setattr(config, "SURVEY_CSV", str(path))
+    records = load_survey()
+    assert [record["bot_name"] for record in records] == ["bot-a", "bot-b"]
+
+
+def test_load_survey_raises_on_answers_without_bot_name(tmp_path, monkeypatch):
+    path = tmp_path / "survey.csv"
+    _write_survey_csv(path, [["1/1/26", "bot-a"], ["1/2/26", ""]])
+    monkeypatch.setattr(config, "SURVEY_CSV", str(path))
+    with pytest.raises(ValueError, match="no bot name"):
+        load_survey()

@@ -58,36 +58,17 @@ def test_midpoint_keys_match_vocab_exactly(slug, midpoint_map):
 @pytest.mark.parametrize(
     "slug, midpoint_map",
     [
+        ("hours", config.HOURS_MIDPOINT),
         ("llm_calls", config.LLM_CALLS_MIDPOINT),
         ("cost_per_q", config.COST_MIDPOINT),
         ("iterations", config.ITERATIONS_MIDPOINT),
     ],
 )
 def test_midpoints_are_non_decreasing_along_ordinal_order(slug, midpoint_map):
-    # For these buckets, ordinal position and numeric magnitude agree, so the
-    # midpoint proxy is monotone. (hours is the deliberate exception below.)
+    # The ordinal order and the midpoint magnitudes must agree, otherwise the
+    # chart axis and the Spearman input rank respondents differently.
     ordered = [midpoint_map[opt] for opt in config.ORDINAL_ORDER[slug]]
     assert ordered == sorted(ordered), f"{slug} midpoints not monotone: {ordered}"
-
-
-def test_hours_ordinal_and_midpoint_disagree_is_known_and_contained():
-    # KNOWN ANOMALY: the hours ordinal mixes two unit systems whose ranges
-    # overlap ("2 full time weeks - 1 full time month" ~= 120h is listed AFTER
-    # "161-320hrs" = 240h). This is intentionally tolerated because:
-    #   (1) correlations use hours_mid (the midpoint value), NOT the ordinal
-    #       index, so Spearman ranks respondents by real hours regardless of
-    #       list order; and
-    #   (2) the two buckets that make it non-monotone are the ones out of order.
-    # This test pins the anomaly so any future reordering is a deliberate change,
-    # and asserts the midpoints themselves still sort into a sane hours sequence.
-    ordered = [config.HOURS_MIDPOINT[opt] for opt in config.ORDINAL_ORDER["hours"]]
-    assert ordered != sorted(ordered), "hours became monotone; update this note"
-    offenders = [
-        (config.ORDINAL_ORDER["hours"][i - 1], config.ORDINAL_ORDER["hours"][i])
-        for i in range(1, len(ordered))
-        if ordered[i] < ordered[i - 1]
-    ]
-    assert offenders == [("161-320hrs", "2 full time weeks - 1 full time month")]
 
 
 # --------------------------------------------------------------------------- #

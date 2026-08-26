@@ -3,6 +3,10 @@
 Produces two views of the same data:
 - per-cell parse results (raw -> matched -> leftover) for the review doc
 - per-respondent numeric/boolean variables for correlation and charts
+
+Human-reviewed manual adjustments (manual_adjustments.py) are applied after
+parsing and before any derived value is computed, so booleans, midpoints, and
+counts all reflect the adjusted answers.
 """
 
 from __future__ import annotations
@@ -10,11 +14,16 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from aib_analysis.survey_analysis_v2 import config, parsing
+from aib_analysis.survey_analysis_v2 import config, manual_adjustments, parsing
 from aib_analysis.survey_analysis_v2.config import ModelInfo
-from aib_analysis.survey_analysis_v2.loading import Respondent
+from aib_analysis.survey_analysis_v2.loading import Respondent, normalize_name
+from aib_analysis.survey_analysis_v2.manual_adjustments import AnswerAdjustment
 
 logger = logging.getLogger(__name__)
+
+_MODEL_BY_DISPLAY: dict[str, ModelInfo] = {
+    model.display: model for model in config.MODEL_REGISTRY
+}
 
 
 @dataclass
@@ -38,6 +47,7 @@ class RespondentFeatures:
     support_ignored: list[str]
     support_unmatched: list[str]
     frontier: bool
+    adjustments_applied: list[AnswerAdjustment] = field(default_factory=list)
 
     @property
     def bot_name(self) -> str:
@@ -63,8 +73,8 @@ NUMERIC_VARIABLE_SPECS: list[VariableSpec] = [
     VariableSpec("frontier", "Frontier final model", "binary"),
     VariableSpec("n_research_sources", "Number of research sources", "count"),
     VariableSpec("team_size", "Team size", "ordinal"),
-    VariableSpec("iterations_mid", "Iterations forecast live (midpoint)", "ordinal"),
-    VariableSpec("hours_mid", "Total active hours (midpoint)", "ordinal"),
+    VariableSpec("iterations_mid", "Iterations that went live (midpoint)", "ordinal"),
+    VariableSpec("hours_mid", "Total development hours (midpoint)", "ordinal"),
     VariableSpec("llm_calls_mid", "LLM calls per question (midpoint)", "ordinal"),
     VariableSpec("cost_mid", "Cost per question (midpoint)", "ordinal"),
     VariableSpec("research_vs_reasoning_ord", "Research vs reasoning (0=research..4=reasoning)", "ordinal"),
@@ -91,7 +101,79 @@ def _ordinal_index(value: str | None, order: list[str]) -> float | None:
         return None
 
 
+def _find_other_index(others: list[str], write_in: str) -> int | None:
+    target = write_in.strip().lower()
+    for index, token in enumerate(others):
+        if token.strip().lower() == target:
+            return index
+    return None
+
+
+def _remove_token(tokens: list[str], removed: str) -> None:
+    for index, token in enumerate(tokens):
+        if token.strip().lower() == removed.strip().lower():
+            tokens.pop(index)
+            return
+
+
+def _apply_answer_adjustment(
+    cell: ParsedCell,
+    adjustment: AnswerAdjustment,
+    models: list[ModelInfo] | None = None,
+    ignored: list[str] | None = None,
+    unmatched: list[str] | None = None,
+) -> bool:
+    """Apply one reviewed adjustment to a parsed cell.
+
+    Returns False when the write-in is no longer present (a stale row), so the
+    caller can flag it. `models`/`ignored`/`unmatched` are only passed for the
+    model columns, where a mapped write-in also joins the classified model list.
+    """
+    index = _find_other_index(cell.other, adjustment.write_in)
+    if index is None:
+        return False
+    if adjustment.action == "leave":
+        return True
+    removed = cell.other.pop(index)
+    if models is not None:
+        _remove_token(ignored or [], removed)
+        _remove_token(unmatched or [], removed)
+    if adjustment.action == "ignore":
+        return True
+    if models is not None:
+        model = _MODEL_BY_DISPLAY[adjustment.canonical_option]
+        if model.display not in cell.matched:
+            models.append(model)
+            cell.matched.append(model.display)
+        return True
+    slug = adjustment.column_slug
+    if slug in config.MULTISELECT_VOCAB:
+        vocab = config.MULTISELECT_VOCAB[slug]
+        if adjustment.canonical_option not in cell.matched:
+            cell.matched.append(adjustment.canonical_option)
+            cell.matched.sort(key=vocab.index)
+    else:
+        cell.matched = [adjustment.canonical_option]
+    return True
+
+
+def _adjustment_key(adjustment: AnswerAdjustment) -> tuple[str, str, str]:
+    return (
+        normalize_name(adjustment.bot_name),
+        adjustment.column_slug,
+        adjustment.write_in.strip().lower(),
+    )
+
+
 def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
+    all_adjustments = manual_adjustments.load_answer_adjustments()
+    adjustments_by_bot: dict[str, list[AnswerAdjustment]] = {}
+    for adjustment in all_adjustments:
+        adjustments_by_bot.setdefault(
+            normalize_name(adjustment.bot_name), []
+        ).append(adjustment)
+    applied_keys: set[tuple[str, str, str]] = set()
+
     features: list[RespondentFeatures] = []
     for respondent in respondents:
         answers = respondent.answers
@@ -111,20 +193,6 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
                 other=[other] if other else [],
             )
 
-        # Numeric midpoints attached to their ordinal cells
-        cells["iterations"].numeric = parsing.bucket_to_midpoint(
-            _canon(cells["iterations"]), config.ITERATIONS_MIDPOINT
-        )
-        cells["hours"].numeric = parsing.bucket_to_midpoint(
-            _canon(cells["hours"]), config.HOURS_MIDPOINT
-        )
-        cells["llm_calls"].numeric = parsing.bucket_to_midpoint(
-            _canon(cells["llm_calls"]), config.LLM_CALLS_MIDPOINT
-        )
-        cells["cost_per_q"].numeric = parsing.bucket_to_midpoint(
-            _canon(cells["cost_per_q"]), config.COST_MIDPOINT
-        )
-
         # Team size
         team_size, team_other = parsing.parse_team_size(answers.get("team_size", ""))
         cells["team_size"] = ParsedCell(
@@ -141,7 +209,6 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         support_models, support_ignored, support_unmatched = parsing.classify_models(
             answers.get("support_model", "")
         )
-        frontier = parsing.is_frontier_final(answers.get("final_model", ""))
         cells["final_model"] = ParsedCell(
             raw=answers.get("final_model", ""),
             matched=[m.display for m in final_models],
@@ -153,16 +220,52 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
             other=support_unmatched + support_ignored,
         )
 
+        # Manual adjustments, before anything is derived from the cells.
+        models_by_slug = {"final_model": final_models, "support_model": support_models}
+        ignored_by_slug = {"final_model": final_ignored, "support_model": support_ignored}
+        unmatched_by_slug = {"final_model": final_unmatched, "support_model": support_unmatched}
+        applied: list[AnswerAdjustment] = []
+        for adjustment in adjustments_by_bot.get(normalize_name(respondent.bot_name), []):
+            slug = adjustment.column_slug
+            is_model_column = slug in manual_adjustments.MODEL_COLUMN_SLUGS
+            found = _apply_answer_adjustment(
+                cells[slug],
+                adjustment,
+                models=models_by_slug[slug] if is_model_column else None,
+                ignored=ignored_by_slug[slug] if is_model_column else None,
+                unmatched=unmatched_by_slug[slug] if is_model_column else None,
+            )
+            if found:
+                applied.append(adjustment)
+                applied_keys.add(_adjustment_key(adjustment))
+                logger.info(
+                    "Manual adjustment applied for bot %r: %s",
+                    respondent.bot_name,
+                    adjustment.description,
+                )
+
+        # Numeric midpoints attached to their ordinal cells (post-adjustment)
+        cells["iterations"].numeric = parsing.bucket_to_midpoint(
+            _canon(cells["iterations"]), config.ITERATIONS_MIDPOINT
+        )
+        cells["hours"].numeric = parsing.bucket_to_midpoint(
+            _canon(cells["hours"]), config.HOURS_MIDPOINT
+        )
+        cells["llm_calls"].numeric = parsing.bucket_to_midpoint(
+            _canon(cells["llm_calls"]), config.LLM_CALLS_MIDPOINT
+        )
+        cells["cost_per_q"].numeric = parsing.bucket_to_midpoint(
+            _canon(cells["cost_per_q"]), config.COST_MIDPOINT
+        )
+
+        frontier = any(model.is_frontier for model in final_models)
+
         # Boolean habit features, matched against parsed options (not raw text)
         # so a write-in cannot spuriously trip a flag.
         booleans: dict[str, bool] = {}
         for feature in config.BOOLEAN_FEATURES:
             matched_options = cells[feature.column_slug].matched
             booleans[feature.key] = parsing.feature_present(matched_options, feature.match_substring)
-
-        n_research = parsing.count_research_sources(
-            answers.get("research", ""), config.RESEARCH_SOURCE_OPTIONS
-        )
 
         # Item non-response: a bot that left the source question blank is coded
         # None (missing), not a definitive "no", so it is dropped from that
@@ -175,7 +278,9 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         variables["frontier"] = (
             (1.0 if frontier else 0.0) if answers.get("final_model", "").strip() else None
         )
-        variables["n_research_sources"] = float(n_research) if answers.get("research") else None
+        variables["n_research_sources"] = (
+            float(len(cells["research"].matched)) if answers.get("research") else None
+        )
         variables["team_size"] = cells["team_size"].numeric
         variables["iterations_mid"] = cells["iterations"].numeric
         variables["hours_mid"] = cells["hours"].numeric
@@ -202,8 +307,18 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
                 support_ignored=support_ignored,
                 support_unmatched=support_unmatched,
                 frontier=frontier,
+                adjustments_applied=applied,
             )
         )
+
+    for adjustment in all_adjustments:
+        if _adjustment_key(adjustment) not in applied_keys:
+            logger.warning(
+                "Manual adjustment did NOT apply (stale write_in or unknown bot): "
+                "bot=%r, %s",
+                adjustment.bot_name,
+                adjustment.description,
+            )
     logger.info("Built features for %d respondents", len(features))
     return features
 

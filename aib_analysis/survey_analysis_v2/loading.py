@@ -16,11 +16,12 @@ import logging
 import re
 from dataclasses import dataclass, field
 
-from aib_analysis.survey_analysis_v2 import config
+from aib_analysis.survey_analysis_v2 import config, manual_adjustments
 from aib_analysis.survey_analysis_v2.leaderboard import (
     LeaderboardRow,
     get_leaderboard_rows,
 )
+from aib_analysis.survey_analysis_v2.manual_adjustments import WinnerOverride
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,10 @@ class PrizeOwner:
     aib_prize: float
     total_prize: float
 
+    @property
+    def won_any(self) -> bool:
+        return self.winner_count > 0 or self.aib_prize > 0
+
 
 @dataclass
 class Respondent:
@@ -58,12 +63,15 @@ class Respondent:
     sum_spot_peer: float | None = None
     question_count: int | None = None
     is_winner: bool = False
+    # Prize amounts are owner-level totals from the prize sheet (an owner with
+    # several bots reports one combined figure); only is_winner is bot-level.
     aib_prize: float = 0.0
     total_prize: float = 0.0
     is_top_10: bool = False
     leaderboard_match_kind: str = "none"
     prize_match_kind: str = "none"
     matched_owner: str | None = None
+    winner_source: str = "no_prize_match"
 
     @property
     def average_spot_peer(self) -> float | None:
@@ -101,15 +109,25 @@ def load_survey() -> list[dict[str, str]]:
             index_to_slug[index] = header_to_slug[name]
 
     records: list[dict[str, str]] = []
-    for row in raw_rows:
+    skipped_empty_rows = 0
+    for row_number, row in enumerate(raw_rows, start=2):
+        if not any(cell.strip() for cell in row):
+            skipped_empty_rows += 1
+            continue
         record = {slug: "" for slug in config.COLUMNS}
         for index, value in enumerate(row):
             slug = index_to_slug.get(index)
             if slug is not None:
                 record[slug] = value.strip()
         if not record["bot_name"]:
-            continue
+            raise ValueError(
+                f"Survey row {row_number} has answers but no bot name. Every response "
+                "must name its bot; a blank name means the export is broken or someone "
+                "skipped the identifying question, so this needs a manual look."
+            )
         records.append(record)
+    if skipped_empty_rows:
+        logger.info("Skipped %d fully empty survey rows", skipped_empty_rows)
     logger.info("Loaded %d survey respondents", len(records))
     return records
 
@@ -202,10 +220,45 @@ def _match_prize(
     return None, "none"
 
 
+def _resolve_winner(
+    bot_name: str, owner: PrizeOwner | None, override: WinnerOverride | None
+) -> tuple[bool, str]:
+    """Bot-level winner status, with the source of the decision for the audit.
+
+    The prize sheet is owner-level: for an owner with several bots it records
+    how many bots won, not which ones. A single-bot owner's status transfers to
+    the bot directly; a multi-bot owner with no wins means no bot won; a
+    multi-bot owner WITH wins is ambiguous and requires a manual override row.
+    """
+    if override is not None:
+        logger.info(
+            "Winner override applied for bot %r -> %s (%s)",
+            bot_name, override.is_winner, override.reason or "no reason given",
+        )
+        return override.is_winner, "manual_override"
+    if owner is None:
+        return False, "no_prize_match"
+    if len(owner.bot_usernames) <= 1:
+        return owner.won_any, "owner_single_bot"
+    if not owner.won_any:
+        return False, "owner_multi_bot_no_wins"
+    raise ValueError(
+        f"Cannot determine bot-level winner status for {bot_name!r}: owner "
+        f"{owner.owner_username!r} has {len(owner.bot_usernames)} bots and the prize sheet "
+        f"only records owner-level wins (winner_count={owner.winner_count}, "
+        f"aib_prize={owner.aib_prize}). Add a row for this bot to "
+        f"{config.MANUAL_WINNER_OVERRIDES_CSV}."
+    )
+
+
 def build_respondents(refresh: bool = False) -> list[Respondent]:
     survey_records = load_survey()
     owners = load_prize_owners()
     leaderboard_rows = get_leaderboard_rows(refresh=refresh)
+    overrides_by_name = {
+        normalize_name(override.bot_name): override
+        for override in manual_adjustments.load_winner_overrides()
+    }
 
     by_norm = {normalize_name(row.bot_name): row for row in leaderboard_rows}
     by_alnum = {_alnum_key(row.bot_name): row for row in leaderboard_rows}
@@ -215,6 +268,7 @@ def build_respondents(refresh: bool = False) -> list[Respondent]:
     }
 
     respondents: list[Respondent] = []
+    used_overrides: set[str] = set()
     for record in survey_records:
         bot_name = record["bot_name"]
         respondent = Respondent(bot_name=bot_name, answers=record)
@@ -234,10 +288,22 @@ def build_respondents(refresh: bool = False) -> list[Respondent]:
             respondent.matched_owner = owner.owner_username
             respondent.aib_prize = owner.aib_prize
             respondent.total_prize = owner.total_prize
-            respondent.is_winner = owner.winner_count > 0 or owner.aib_prize > 0
+
+        override = overrides_by_name.get(normalize_name(bot_name))
+        if override is not None:
+            used_overrides.add(normalize_name(bot_name))
+        respondent.is_winner, respondent.winner_source = _resolve_winner(
+            bot_name, owner, override
+        )
 
         respondents.append(respondent)
 
+    for name, override in overrides_by_name.items():
+        if name not in used_overrides:
+            logger.warning(
+                "Winner override for %r matched no survey respondent; stale entry?",
+                override.bot_name,
+            )
     _log_join_summary(respondents)
     return respondents
 

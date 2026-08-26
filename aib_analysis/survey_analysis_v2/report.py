@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import logging
 import os
+import string
 
-from aib_analysis.survey_analysis_v2 import config, plots, stats
+from aib_analysis.survey_analysis_v2 import config, loading, plots, season_notes, stats
 from aib_analysis.survey_analysis_v2.features import (
     NUMERIC_VARIABLE_SPECS,
     RespondentFeatures,
@@ -360,7 +361,7 @@ def generate_report(features: list[RespondentFeatures]) -> str:
     leaderboard_size = len(get_leaderboard_rows())
 
     lines: list[str] = []
-    lines.append("# Spring 2026 FutureEval bot-maker survey")
+    lines.append(f"# {season_notes.SEASON_LABEL} FutureEval bot-maker survey")
     lines.append("")
     lines.append(_intro(in_scope, excluded, corr_pool, counts, leaderboard_size))
     lines.append("")
@@ -392,7 +393,7 @@ def generate_report(features: list[RespondentFeatures]) -> str:
 
         if spec.correlations:
             for key in spec.correlations:
-                result = feature_results.get(key) or stats.correlate_with_score(scored, key)
+                result = feature_results[key]
                 chart, reason = _correlation_chart(scored, key, index)
                 sentence = _correlation_sentence(result, q_by_key.get(key))
                 if chart is None:
@@ -411,14 +412,14 @@ def generate_report(features: list[RespondentFeatures]) -> str:
 def _intro(in_scope, excluded, corr_pool, counts, leaderboard_size) -> str:
     total = len(in_scope) + len(excluded)
     parts = [
-        f"{total} bot makers answered the Spring 2026 survey. This report covers the "
+        f"{total} bot makers answered the {season_notes.SEASON_LABEL} survey. This report covers the "
         f"{len(in_scope)} whose bot competed in the scored FutureEval tournament. It shows, for each "
         "structured question, how answers were distributed and how they relate to bot performance.",
         "",
         f"A bot is called \"frontier\" if the model it used for its final prediction is high powered (a "
         f"flagship model, not a mini, flash, or fast variant) and was {config.FRONTIER_RELEASE_CUTOFF_LABEL}.",
         "",
-        "Performance is a bot's average spot peer score in the Spring 2026 FutureEval tournament. Its "
+        f"Performance is a bot's average spot peer score in the {season_notes.SEASON_LABEL} FutureEval tournament. Its "
         "spot peer score on a question compares its forecast at scoring time against the geometric mean "
         "of its peers; averaging over the bot's questions gives a per-question skill measure that does "
         "not reward simply answering more questions.",
@@ -463,14 +464,27 @@ def _intro(in_scope, excluded, corr_pool, counts, leaderboard_size) -> str:
         parts.append("")
         parts.append(
             f"{len(excluded)} respondents are excluded from this report: they made no forecasts in the "
-            "scored FutureEval tournament (MiniBench-only participants, plus one bot with no matching "
-            "tournament record). They are listed in the parsing review doc."
+            f"scored FutureEval tournament ({season_notes.EXCLUDED_RESPONDENTS_DETAIL}). They are "
+            "listed in the parsing review doc."
         )
     return "\n".join(parts)
 
 
 def _caveats_section(features, counts, leaderboard_size) -> str:
+    owners = loading.load_prize_owners()
+    winning_owners = sum(1 for owner in owners if owner.won_any)
+    respondent_winner_pct = round(100 * counts["winner"] / len(features)) if features else 0
+    field_winner_pct = round(100 * winning_owners / len(owners)) if owners else 0
     lines = ["## Caveats", ""]
+    lines.append(
+        f"- Self-selection. Only {len(features)} of the {leaderboard_size} scored bots answered the "
+        f"survey, and winners were far likelier to respond: {counts['winner']} of {len(features)} "
+        f"analyzed respondents won a prize ({respondent_winner_pct}%), versus {winning_owners} of "
+        f"{len(owners)} participating owners ({field_winner_pct}%). Every distribution and correlation "
+        "describes this self-selected group, not the full field, so a habit's popularity here can "
+        "differ from its popularity among all bots, and correlations can be distorted if the makers "
+        "who responded differ systematically from those who did not."
+    )
     lines.append(
         f"- Small samples. Only {counts['top_10']} top-10 bots answered the survey, so the orange "
         "bars move a lot with one response."
@@ -492,10 +506,8 @@ def _caveats_section(features, counts, leaderboard_size) -> str:
         "were decided on total score. The two rank bots similarly but not identically."
     )
     lines.append(
-        f"- Top 10 is the raw ranking. It uses total spot peer score over all {leaderboard_size} bots, so it can "
-        "include bots the official prize board marks ineligible: Preseen-Chestnut ranks 5th here but is "
-        "excluded there, which puts nostreambot at 11th (just outside) where the official board shows "
-        "it 10th. This shifts one bot in or out of the top-10 group."
+        "- "
+        + season_notes.TOP10_ELIGIBILITY_CAVEAT.format(leaderboard_size=leaderboard_size)
     )
     return "\n".join(lines)
 
@@ -508,12 +520,14 @@ def write_report(features: list[RespondentFeatures]) -> None:
     logger.info("Wrote report to %s", config.REPORT_MD)
 
 
-_INDEX_HTML = """<!DOCTYPE html>
+# string.Template ($season) rather than an f-string, because the CSS braces
+# would otherwise need escaping.
+_INDEX_HTML_TEMPLATE = string.Template("""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Spring 2026 FutureEval survey analysis</title>
+<title>$season FutureEval survey analysis</title>
 <style>
   :root { color-scheme: light dark; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -532,7 +546,7 @@ _INDEX_HTML = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-  <h1>Spring 2026 FutureEval bot-maker survey</h1>
+  <h1>$season FutureEval bot-maker survey</h1>
   <p class="sub">Analysis v2 &middot; generated from script</p>
 
   <a class="card" href="spring_survey_analysis.html">
@@ -549,7 +563,7 @@ _INDEX_HTML = """<!DOCTYPE html>
   </a>
 </body>
 </html>
-"""
+""")
 
 
 def write_index_html() -> None:
@@ -557,5 +571,5 @@ def write_index_html() -> None:
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
     index_path = os.path.join(config.OUTPUT_DIR, "index.html")
     with open(index_path, "w") as handle:
-        handle.write(_INDEX_HTML)
+        handle.write(_INDEX_HTML_TEMPLATE.substitute(season=season_notes.SEASON_LABEL))
     logger.info("Wrote index page to %s", index_path)

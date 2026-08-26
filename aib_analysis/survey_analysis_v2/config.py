@@ -28,6 +28,11 @@ SURVEY_CSV = os.path.join(
 PRIZE_STATS_CSV = os.path.join(
     INPUT_DIR, "Spring 2026 FutureEval Prize and participation stats.csv"
 )
+# Human-reviewed adjustment files (see manual_adjustments.py). They live in the
+# non-committed private input directory because they reference individual bots;
+# keeping them beside the raw survey data preserves them for reruns.
+MANUAL_WINNER_OVERRIDES_CSV = os.path.join(INPUT_DIR, "manual_winner_overrides.csv")
+MANUAL_ANSWER_ADJUSTMENTS_CSV = os.path.join(INPUT_DIR, "manual_answer_adjustments.csv")
 BOT_TOURNAMENT_JSON = os.path.join(
     REPO_ROOT, "local/spring_2026_simulations/2_bot_tournament.json"
 )
@@ -146,6 +151,7 @@ MODEL_REGISTRY: list[ModelInfo] = [
     _m("GPT-4o", high_power=True, release_date=date(2024, 5, 13)),
     _m("gpt 4.1", high_power=True, release_date=date(2025, 4, 14)),
     _m("o4-mini-deep-research", high_power=False, release_date=date(2025, 6, 26)),
+    _m("o4-mini", high_power=False, release_date=date(2025, 4, 16)),
     _m("o3", high_power=True, release_date=date(2025, 4, 16)),
     # Anthropic Claude
     _m("Claude Opus 4.8", high_power=True, release_date=date(2026, 5, 28)),
@@ -356,13 +362,13 @@ SINGLE_SELECT_VOCAB: dict[str, list[str]] = {
         "Academic Researcher(s)",
         "Commercial Entity",
     ],
+    # Exactly the buckets the Spring form offered: it jumps from 41-80hrs to the
+    # full-time-month options (no 81-160hrs / 161-320hrs, which were Fall buckets).
     "hours": [
         "0-8hrs",
         "9-15hrs",
         "16-40hrs",
         "41-80hrs",
-        "81-160hrs",
-        "161-320hrs",
         "2 full time weeks - 1 full time month",
         "1 full time month - 4 full time months",
         "4 full time months +",
@@ -397,20 +403,11 @@ SINGLE_SELECT_VOCAB: dict[str, list[str]] = {
 }
 
 # Ordinal ordering (low -> high) for single-selects that are ranked. Used for
-# Spearman correlation and for ordering chart categories.
+# Spearman correlation and for ordering chart categories. Must stay monotone
+# with the midpoint maps below (tested in test_config_integrity).
 ORDINAL_ORDER: dict[str, list[str]] = {
     "iterations": SINGLE_SELECT_VOCAB["iterations"],
-    "hours": [
-        "0-8hrs",
-        "9-15hrs",
-        "16-40hrs",
-        "41-80hrs",
-        "81-160hrs",
-        "161-320hrs",
-        "2 full time weeks - 1 full time month",
-        "1 full time month - 4 full time months",
-        "4 full time months +",
-    ],
+    "hours": SINGLE_SELECT_VOCAB["hours"],
     "llm_calls": SINGLE_SELECT_VOCAB["llm_calls"],
     "cost_per_q": SINGLE_SELECT_VOCAB["cost_per_q"],
     "research_vs_reasoning": SINGLE_SELECT_VOCAB["research_vs_reasoning"],
@@ -421,13 +418,15 @@ ORDINAL_ORDER: dict[str, list[str]] = {
 # Bucket -> numeric midpoint maps (for correlation against peer score).
 # Mixed-unit hours are converted to approximate total hours.
 # --------------------------------------------------------------------------- #
+# The full-time buckets are converted with 1 full-time week = 40 hours (so a
+# full-time month = 160 hours): "2 full time weeks - 1 full time month" = 80-160h
+# (mid 120), "1-4 full time months" = 160-640h (mid 400), "4 full time months +"
+# = 640h+ (open-ended, 700).
 HOURS_MIDPOINT: dict[str, float] = {
     "0-8hrs": 4,
     "9-15hrs": 12,
     "16-40hrs": 28,
     "41-80hrs": 60,
-    "81-160hrs": 120,
-    "161-320hrs": 240,
     "2 full time weeks - 1 full time month": 120,
     "1 full time month - 4 full time months": 400,
     "4 full time months +": 700,
