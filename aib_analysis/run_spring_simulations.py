@@ -55,7 +55,7 @@ def main(
         nonlocal local_counter
         local_counter += 1
         return local_counter
-    
+
     is_q3 = "q3" in output_folder.lower()
     is_q4 = "q4" in output_folder.lower()
     if force_unit_weights:
