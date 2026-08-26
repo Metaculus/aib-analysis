@@ -179,12 +179,26 @@ def _match_prize(
     for owner in owners:
         if any(_alnum_key(bot) == alnum for bot in owner.bot_usernames):
             return owner, "exact"
-    if len(alnum) >= 4:
-        for owner in owners:
-            for bot in owner.bot_usernames:
-                alnum_bot = _alnum_key(bot)
-                if len(alnum_bot) >= 4 and (alnum in alnum_bot or alnum_bot in alnum):
-                    return owner, "tokenized"
+    # Tokenized fallback: only when a single, unambiguous owner contains (or is
+    # contained by) the name, and only for names long enough to be distinctive.
+    # This feeds is_winner, so an ambiguous match is left unmatched rather than
+    # risk moving a respondent into the wrong group.
+    if len(alnum) >= 6:
+        candidates = {
+            owner.owner_username: owner
+            for owner in owners
+            for bot in owner.bot_usernames
+            if len(_alnum_key(bot)) >= 6
+            and (alnum in _alnum_key(bot) or _alnum_key(bot) in alnum)
+        }
+        if len(candidates) == 1:
+            owner = next(iter(candidates.values()))
+            logger.warning(
+                "Tokenized prize match for bot %r -> owner %r", bot_name, owner.owner_username
+            )
+            return owner, "tokenized"
+        if len(candidates) > 1:
+            logger.warning("Ambiguous tokenized prize match for bot %r; left unmatched", bot_name)
     return None, "none"
 
 

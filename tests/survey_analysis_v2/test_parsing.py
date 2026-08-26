@@ -55,10 +55,34 @@ def test_bucket_midpoint():
 
 def test_team_size():
     assert parsing.parse_team_size("1") == (1, None)
+    assert parsing.parse_team_size("12") == (12, None)
     assert parsing.parse_team_size("Not in a team") == (1, None)
     assert parsing.parse_team_size("") == (None, None)
-    size, other = parsing.parse_team_size("3 (two part time)")
-    assert size == 3 and other == "3 (two part time)"
+
+
+def test_team_size_messy_is_other_only_not_double_counted():
+    # A number with extra prose is treated purely as an Other write-in, never as
+    # both a counted size and an Other bar.
+    size, other = parsing.parse_team_size("3 (two of us part time)")
+    assert size is None
+    assert other == "3 (two of us part time)"
+
+
+def test_multiselect_short_option_not_matched_inside_a_word():
+    # "Exa" must not match inside "hexagon"; "Perplexity" is a real match.
+    matched, other = parsing.parse_multiselect(
+        "Perplexity, hexagon-search tool", config.MULTISELECT_VOCAB["research"]
+    )
+    assert "Exa" not in matched
+    assert "Perplexity" in matched
+    assert any("hexagon" in token for token in other)
+
+
+def test_multiselect_short_option_still_matches_as_real_segment():
+    matched, _other = parsing.parse_multiselect(
+        "Exa, Tavily", config.MULTISELECT_VOCAB["research"]
+    )
+    assert set(matched) == {"Exa", "Tavily"}
 
 
 def test_frontier_high_power_recent_is_frontier():

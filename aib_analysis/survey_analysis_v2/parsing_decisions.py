@@ -124,14 +124,17 @@ def generate_parsing_decisions() -> str:
     lines.append("## Habit features")
     lines.append("")
     lines.append(
-        "Each habit is a yes/no flag set when a substring appears in a multi-select column."
+        "Each habit is a yes/no flag set when the substring appears in one of the selected "
+        "(canonical) options of a multi-select column. Matching the parsed options rather than the "
+        "raw text means a free-text write-in cannot trip a flag."
     )
     lines.append("")
-    lines.append("| Feature | Column | Matched substring |")
-    lines.append("| --- | --- | --- |")
+    lines.append("| Feature | Yes means | Column | Matched substring |")
+    lines.append("| --- | --- | --- | --- |")
     for feature in config.BOOLEAN_FEATURES:
         lines.append(
-            f"| {feature.label} | {config.COLUMNS[feature.column_slug]} | `{feature.match_substring}` |"
+            f"| {feature.label} | {feature.definition} | {config.COLUMNS[feature.column_slug]} "
+            f"| `{feature.match_substring}` |"
         )
     lines.append("")
 

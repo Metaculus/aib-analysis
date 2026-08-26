@@ -39,8 +39,9 @@ def main(refresh: bool = False) -> None:
     logger.info("Step 2/5: building features")
     features = features_module.build_features(respondents)
 
-    logger.info("Step 3/5: writing analysis report and charts")
+    logger.info("Step 3/5: writing analysis report, charts, and index page")
     report.write_report(features)
+    report.write_index_html()
 
     logger.info("Step 4/5: writing parsing decisions doc")
     parsing_decisions.write_parsing_decisions()

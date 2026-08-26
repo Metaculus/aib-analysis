@@ -59,6 +59,11 @@ TOP_N_FOR_TOP_GROUP = 10
 # every in-scope participant.
 MIN_QUESTIONS_FOR_CORRELATION = 100
 
+# Evidence-summary threshold. "Significant" means the Benjamini-Hochberg q-value
+# (false-discovery-rate adjusted p, computed across all measured features) clears
+# this bar.
+EVIDENCE_SIGNIFICANT_Q = 0.05
+
 # --------------------------------------------------------------------------- #
 # Frontier model definition (confirmed with user)
 # --------------------------------------------------------------------------- #
@@ -468,28 +473,53 @@ class BooleanFeature:
     label: str
     column_slug: str
     match_substring: str
+    # `definition` states plainly what a "yes" means, so a reader of the yes/no
+    # chart knows which survey answer triggers it. It should complete the sentence
+    # "Yes = ...". The exact matched option text is the corresponding row of the
+    # research/strategy/etc. vocabulary in this file.
+    definition: str = ""
 
 
 BOOLEAN_FEATURES: list[BooleanFeature] = [
-    BooleanFeature("uses_asknews", "Uses AskNews", "research", "asknews"),
-    BooleanFeature("uses_exa", "Uses Exa", "research", "exa"),
-    BooleanFeature("uses_perplexity", "Uses Perplexity", "research", "perplexity"),
-    BooleanFeature("uses_openai_search", "Uses OpenAI web search", "research", "openai web search"),
-    BooleanFeature("uses_scraping", "Uses web scraping", "research", "scraping"),
-    BooleanFeature("uses_aggregation", "Aggregates multiple forecasts", "strategies", "median/mean/aggregate"),
-    BooleanFeature("uses_base_rates", "Explicit base rates", "strategies", "base rates"),
-    BooleanFeature("uses_scenarios", "Scenario analysis", "strategies", "future scenarios"),
-    BooleanFeature("uses_similar_qs", "Checks similar questions/markets", "strategies", "similar Metaculus questions"),
-    BooleanFeature("uses_capping", "Caps predictions", "strategies", "capping predictions"),
-    BooleanFeature("uses_extremizing", "Extremizes predictions", "strategies", "extremizing"),
-    BooleanFeature("uses_self_critique", "LLM self-critique / red team", "strategies", "self critiquing"),
-    BooleanFeature("uses_subquestions", "Researches subquestions", "strategies", "research subquestions"),
-    BooleanFeature("manual_review", "Manual review of outputs", "development", "manual review"),
-    BooleanFeature("uses_pastcasting", "Tests via pastcasting", "development", "pastcasting"),
-    BooleanFeature("vs_community", "Tests vs community prediction", "development", "community prediction"),
-    BooleanFeature("uses_minibench", "Uses MiniBench for design", "development", "minibench"),
-    BooleanFeature("used_verification_env", "Gave LLM a verification env", "verification_env", "yes,"),
-    BooleanFeature("varied_models", "Ensembles varied models", "aggregate", "varied models"),
+    BooleanFeature("uses_asknews", "Uses AskNews", "research", "asknews",
+                   "the bot's research used AskNews (AskNews DeepNews or Other AskNews)"),
+    BooleanFeature("uses_exa", "Uses Exa", "research", "exa",
+                   "the bot's research used Exa"),
+    BooleanFeature("uses_perplexity", "Uses Perplexity", "research", "perplexity",
+                   "the bot's research used Perplexity"),
+    BooleanFeature("uses_openai_search", "Uses OpenAI web search", "research", "openai web search",
+                   "the bot's research used OpenAI web search"),
+    BooleanFeature("uses_scraping", "Uses web scraping", "research", "scraping",
+                   "the bot's research used static or interactive web scraping"),
+    BooleanFeature("uses_aggregation", "Aggregates multiple forecasts", "strategies", "median/mean/aggregate",
+                   "the bot took the median, mean, or aggregate of multiple forecasts"),
+    BooleanFeature("uses_base_rates", "Uses explicit base rates", "strategies", "base rates",
+                   "the bot explicitly estimated base rates in a rigorous way"),
+    BooleanFeature("uses_scenarios", "Uses scenario analysis", "strategies", "future scenarios",
+                   "the bot explicitly considered or categorized future scenarios"),
+    BooleanFeature("uses_similar_qs", "Checks similar questions/markets", "strategies", "similar Metaculus questions",
+                   "the bot checked similar Metaculus questions or prediction markets"),
+    BooleanFeature("uses_capping", "Caps predictions", "strategies", "capping predictions",
+                   "the bot capped predictions at a max/min"),
+    BooleanFeature("uses_extremizing", "Extremizes predictions", "strategies", "extremizing",
+                   "the bot mathematically extremized predictions via code"),
+    BooleanFeature("uses_self_critique", "Uses LLM self-critique / red team", "strategies", "self critiquing",
+                   "the bot had the LLM self-critique or red-team its forecasts"),
+    BooleanFeature("uses_subquestions", "Researches subquestions", "strategies", "research subquestions",
+                   "the bot generated and researched subquestions"),
+    BooleanFeature("manual_review", "Does manual review of outputs", "development", "manual review",
+                   "the maker did significant manual review of bot outputs, beyond sanity checks"),
+    BooleanFeature("uses_pastcasting", "Tests via pastcasting", "development", "pastcasting",
+                   "the bot was tested via pastcasting (questions that already resolved)"),
+    BooleanFeature("vs_community", "Tests vs community prediction", "development", "community prediction",
+                   "the bot was tested against community predictions on prediction platforms"),
+    BooleanFeature("uses_minibench", "Uses MiniBench for design", "development", "minibench",
+                   "the maker ran the bot in MiniBench and used the results to inform design"),
+    BooleanFeature("used_verification_env", "Gave LLM a verification env", "verification_env", "yes,",
+                   "the maker answered 'Yes' (for any purpose) to giving an LLM a verification environment"),
+    BooleanFeature("varied_models", "Ensemble uses multiple models", "aggregate", "varied models",
+                   "the ensemble combined more than one model (answered 'Same prompt, varied models' or "
+                   "'Varied prompts AND varied models')"),
 ]
 
 # --------------------------------------------------------------------------- #

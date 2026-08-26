@@ -32,10 +32,6 @@ class CorrelationResult:
     n: int
     note: str = ""
 
-    @property
-    def is_significant(self) -> bool:
-        return self.p_value is not None and self.p_value < 0.05
-
     def direction_phrase(self) -> str:
         if self.coefficient is None:
             return "no estimate"
@@ -86,7 +82,10 @@ def correlate_with_score(
         )
 
     if spec.kind in ("binary", "continuous"):
-        # For a 0/1 trait this Pearson r is identical to the point-biserial r.
+        # Binary traits use Pearson (identical to point-biserial for a 0/1 trait).
+        # "continuous" is not used by any current variable (team size is ordinal),
+        # but is kept so a genuinely continuous trait added later gets Pearson, not
+        # rank correlation, by default.
         method = "Pearson"
         coef, p_value = stats.pearsonr(xs, ys)
     else:
@@ -103,61 +102,3 @@ def correlate_with_score(
         p_value=p_value_value,
         n=n,
     )
-
-
-@dataclass(frozen=True)
-class WinnerComparison:
-    key: str
-    label: str
-    winner_rate: float
-    non_winner_rate: float
-    fisher_p: float | None
-    n_winner: int
-    n_non_winner: int
-
-
-def compare_winner_rate(
-    features: list[RespondentFeatures], boolean_key: str, label: str
-) -> WinnerComparison:
-    winners_true = winners_false = non_true = non_false = 0
-    for feature in features:
-        present = feature.booleans.get(boolean_key)
-        if present is None:
-            continue
-        if feature.respondent.is_winner:
-            winners_true += int(present)
-            winners_false += int(not present)
-        else:
-            non_true += int(present)
-            non_false += int(not present)
-
-    table = [[winners_true, winners_false], [non_true, non_false]]
-    try:
-        _odds, fisher_p = stats.fisher_exact(table)
-    except ValueError:
-        fisher_p = None
-
-    n_winner = winners_true + winners_false
-    n_non_winner = non_true + non_false
-    return WinnerComparison(
-        key=boolean_key,
-        label=label,
-        winner_rate=winners_true / n_winner if n_winner else 0.0,
-        non_winner_rate=non_true / n_non_winner if n_non_winner else 0.0,
-        fisher_p=None if fisher_p is None or math.isnan(fisher_p) else float(fisher_p),
-        n_winner=n_winner,
-        n_non_winner=n_non_winner,
-    )
-
-
-def group_score_summary(
-    features: list[RespondentFeatures], group: str
-) -> tuple[int, float | None]:
-    scores = [
-        feature.score
-        for feature in features
-        if group in feature.respondent.groups and feature.score is not None
-    ]
-    if not scores:
-        return 0, None
-    return len(scores), sum(scores) / len(scores)

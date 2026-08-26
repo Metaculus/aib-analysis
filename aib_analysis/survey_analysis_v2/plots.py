@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import statistics
 import tempfile
 
 os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "mpl-survey-v2"))
@@ -16,9 +17,20 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from scipy.stats import t as t_dist
 
 from aib_analysis.survey_analysis_v2 import config
 from aib_analysis.survey_analysis_v2.features import RespondentFeatures
+
+
+def _ci_half_width(scores: list[float], confidence: float = 0.95) -> float:
+    """Half-width of the t-based confidence interval for a group's mean."""
+    n = len(scores)
+    if n < 2:
+        return 0.0
+    standard_error = statistics.stdev(scores) / (n ** 0.5)
+    critical = t_dist.ppf(0.5 + confidence / 2, df=n - 1)
+    return float(critical * standard_error)
 
 logger = logging.getLogger(__name__)
 
@@ -176,9 +188,9 @@ def _plot_grouped_horizontal(
     logger.info("Saved chart %s", os.path.basename(out_path))
 
 
-# Minimum respondents per bar. Bars for smaller groups are suppressed so no bar
-# can reveal an individual bot's public peer score.
-MIN_CELL_SIZE = 5
+# Minimum respondents per bar. Bars for smaller groups are suppressed so a bar
+# reflects at least a few bots rather than an individual's public peer score.
+MIN_CELL_SIZE = 3
 
 
 def plot_group_means(
@@ -200,11 +212,21 @@ def plot_group_means(
     shown = list(reversed(shown))  # first group at the top
     labels = [_wrap(f"{label} (n={len(scores)})", 34) for label, scores in shown]
     means = [sum(scores) / len(scores) for _label, scores in shown]
+    errors = [_ci_half_width(scores) for _label, scores in shown]
     positions = list(range(len(shown)))
 
     fig_height = max(2.4, 0.62 * len(shown) + 1.2)
     fig, axis = plt.subplots(figsize=(6.6, fig_height))
-    axis.barh(positions, means, color="#2f80ed", height=0.62)
+    axis.barh(
+        positions,
+        means,
+        color="#2f80ed",
+        height=0.62,
+        xerr=errors,
+        capsize=4,
+        ecolor="#1b2a4a",
+        error_kw={"linewidth": 1.1},
+    )
     axis.axvline(0, color="#667085", linewidth=0.8)
     axis.set_yticks(positions)
     axis.set_yticklabels(labels, fontsize=9)

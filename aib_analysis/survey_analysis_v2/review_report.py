@@ -60,13 +60,13 @@ def _join_audit(features: list[RespondentFeatures]) -> list[str]:
         features, key=lambda f: (f.respondent.rank is None, f.respondent.rank or 0)
     ):
         respondent = feature.respondent
-        rank = respondent.rank if respondent.rank is not None else "—"
-        score = f"{respondent.sum_spot_peer:.0f}" if respondent.sum_spot_peer is not None else "—"
+        rank = respondent.rank if respondent.rank is not None else "n/a"
+        score = f"{respondent.sum_spot_peer:.0f}" if respondent.sum_spot_peer is not None else "n/a"
         lines.append(
             f"| {_md_escape(respondent.bot_name)} "
-            f"| {_md_escape(respondent.matched_leaderboard_name or '—')} "
+            f"| {_md_escape(respondent.matched_leaderboard_name or 'n/a')} "
             f"| {respondent.leaderboard_match_kind} | {rank} | {score} "
-            f"| {_md_escape(respondent.matched_owner or '—')} | {respondent.prize_match_kind} "
+            f"| {_md_escape(respondent.matched_owner or 'n/a')} | {respondent.prize_match_kind} "
             f"| {_yn(respondent.is_winner)} | {_yn(respondent.is_top_10)} | {_yn(feature.frontier)} |"
         )
     lines.append("")
@@ -102,9 +102,9 @@ def _model_audit(features: list[RespondentFeatures]) -> list[str]:
     ]
     all_unmatched: list[str] = []
     for feature in features:
-        matched = "; ".join(model.display for model in feature.final_models) or "—"
-        ignored = "; ".join(feature.final_ignored) or "—"
-        unmatched = "; ".join(feature.final_unmatched) or "—"
+        matched = "; ".join(model.display for model in feature.final_models) or "n/a"
+        ignored = "; ".join(feature.final_ignored) or "n/a"
+        unmatched = "; ".join(feature.final_unmatched) or "n/a"
         all_unmatched.extend(feature.final_unmatched)
         raw = feature.cells["final_model"].raw or "(blank)"
         lines.append(
@@ -228,8 +228,20 @@ def generate_review_report(features: list[RespondentFeatures]) -> str:
     return "\n".join(lines)
 
 
+def _csv_safe(value: str) -> str:
+    """Neutralize spreadsheet formula injection in survey-controlled text.
+
+    A value that opens with =, +, -, or @ can execute as a formula when the CSV
+    is opened in spreadsheet software, so it is prefixed with a single quote.
+    Applied only to text fields, never to the numeric columns.
+    """
+    text = "" if value is None else str(value)
+    return "'" + text if text[:1] in ("=", "+", "-", "@") else text
+
+
 def write_respondent_audit_csv(features: list[RespondentFeatures]) -> None:
     os.makedirs(config.DATA_DIR, exist_ok=True)
+    all_slugs = list(config.COLUMNS)  # raw for every survey field (full dump)
     charted_slugs = [spec.slug for spec in config.QUESTION_SPECS]
     with open(RESPONDENT_AUDIT_CSV, "w", newline="") as handle:
         writer = csv.writer(handle)
@@ -242,6 +254,7 @@ def write_respondent_audit_csv(features: list[RespondentFeatures]) -> None:
             "is_top_10",
             "frontier",
         ]
+        header += [f"{slug}__raw" for slug in all_slugs]
         for slug in charted_slugs:
             header.append(f"{slug}__matched")
             header.append(f"{slug}__other")
@@ -249,18 +262,19 @@ def write_respondent_audit_csv(features: list[RespondentFeatures]) -> None:
         for feature in features:
             respondent = feature.respondent
             row = [
-                respondent.bot_name,
-                respondent.matched_leaderboard_name or "",
+                _csv_safe(respondent.bot_name),
+                _csv_safe(respondent.matched_leaderboard_name or ""),
                 respondent.rank if respondent.rank is not None else "",
                 f"{respondent.sum_spot_peer:.4f}" if respondent.sum_spot_peer is not None else "",
                 respondent.is_winner,
                 respondent.is_top_10,
                 feature.frontier,
             ]
+            row += [_csv_safe(respondent.answers.get(slug, "")) for slug in all_slugs]
             for slug in charted_slugs:
                 cell = feature.cells[slug]
-                row.append(" | ".join(cell.matched))
-                row.append(" | ".join(cell.other))
+                row.append(_csv_safe(" | ".join(cell.matched)))
+                row.append(_csv_safe(" | ".join(cell.other)))
             writer.writerow(row)
     logger.info("Wrote respondent audit CSV to %s", RESPONDENT_AUDIT_CSV)
 

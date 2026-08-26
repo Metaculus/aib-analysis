@@ -153,20 +153,28 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
             other=support_unmatched + support_ignored,
         )
 
-        # Boolean habit features
+        # Boolean habit features, matched against parsed options (not raw text)
+        # so a write-in cannot spuriously trip a flag.
         booleans: dict[str, bool] = {}
         for feature in config.BOOLEAN_FEATURES:
-            raw = answers.get(feature.column_slug, "")
-            booleans[feature.key] = parsing.feature_present(raw, feature.match_substring)
+            matched_options = cells[feature.column_slug].matched
+            booleans[feature.key] = parsing.feature_present(matched_options, feature.match_substring)
 
         n_research = parsing.count_research_sources(
             answers.get("research", ""), config.RESEARCH_SOURCE_OPTIONS
         )
 
-        variables: dict[str, float | None] = {
-            key: (1.0 if value else 0.0) for key, value in booleans.items()
-        }
-        variables["frontier"] = 1.0 if frontier else 0.0
+        # Item non-response: a bot that left the source question blank is coded
+        # None (missing), not a definitive "no", so it is dropped from that
+        # correlation exactly like a blank numeric answer. A non-blank answer with
+        # only a write-in still counts as "no" for the canonical habit.
+        variables: dict[str, float | None] = {}
+        for feature in config.BOOLEAN_FEATURES:
+            answered = bool(cells[feature.column_slug].raw.strip())
+            variables[feature.key] = (1.0 if booleans[feature.key] else 0.0) if answered else None
+        variables["frontier"] = (
+            (1.0 if frontier else 0.0) if answers.get("final_model", "").strip() else None
+        )
         variables["n_research_sources"] = float(n_research) if answers.get("research") else None
         variables["team_size"] = cells["team_size"].numeric
         variables["iterations_mid"] = cells["iterations"].numeric
