@@ -25,6 +25,14 @@ _MODEL_BY_DISPLAY: dict[str, ModelInfo] = {
     model.display: model for model in config.MODEL_REGISTRY
 }
 
+# Claude Opus 4.6 is the Opus release closest in time to GPT-5.4, so it is the
+# like-for-like Opus comparison used in the final-model charts.
+_OPUS_4_6: ModelInfo | None = next(
+    (m for m in config.MODEL_REGISTRY if m.display == "Claude Opus 4.6"), None
+)
+if _OPUS_4_6 is None:  # pragma: no cover - guards a registry rename
+    raise ValueError("Expected 'Claude Opus 4.6' in MODEL_REGISTRY for the Opus comparison")
+
 
 @dataclass
 class ParsedCell:
@@ -71,6 +79,12 @@ class VariableSpec:
 
 NUMERIC_VARIABLE_SPECS: list[VariableSpec] = [
     VariableSpec("frontier", "Frontier final model", "binary"),
+    VariableSpec("frontier_support", "Frontier supporting-role model", "binary"),
+    VariableSpec("gpt_5_4", "Used GPT-5.4 for its final model", "binary"),
+    VariableSpec("gpt_5x_high", "Used a flagship GPT-5.x for its final model", "binary"),
+    VariableSpec("opus", "Used a Claude Opus model for its final model", "binary"),
+    VariableSpec("opus_4_6", f"Used {_OPUS_4_6.display} for its final model", "binary"),
+    VariableSpec("final_model_release", "Final model release date (flagship models only)", "continuous"),
     VariableSpec("n_research_sources", "Number of research sources", "count"),
     VariableSpec("team_size", "Team size", "ordinal"),
     VariableSpec("iterations_mid", "Iterations that went live (midpoint)", "ordinal"),
@@ -78,7 +92,6 @@ NUMERIC_VARIABLE_SPECS: list[VariableSpec] = [
     VariableSpec("llm_calls_mid", "LLM calls per question (midpoint)", "ordinal"),
     VariableSpec("cost_mid", "Cost per question (midpoint)", "ordinal"),
     VariableSpec("research_vs_reasoning_ord", "Research vs reasoning (0=research..4=reasoning)", "ordinal"),
-    VariableSpec("writeup_rating_ord", "Write-up usefulness rating (0..2)", "ordinal"),
 ]
 
 
@@ -259,6 +272,7 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         )
 
         frontier = any(model.is_frontier for model in final_models)
+        frontier_support = any(model.is_frontier for model in support_models)
 
         # Boolean habit features, matched against parsed options (not raw text)
         # so a write-in cannot spuriously trip a flag.
@@ -275,9 +289,23 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         for feature in config.BOOLEAN_FEATURES:
             answered = bool(cells[feature.column_slug].raw.strip())
             variables[feature.key] = (1.0 if booleans[feature.key] else 0.0) if answered else None
-        variables["frontier"] = (
-            (1.0 if frontier else 0.0) if answers.get("final_model", "").strip() else None
+        final_answered = bool(answers.get("final_model", "").strip())
+        support_answered = bool(answers.get("support_model", "").strip())
+        variables["frontier"] = (1.0 if frontier else 0.0) if final_answered else None
+        variables["frontier_support"] = (
+            (1.0 if frontier_support else 0.0) if support_answered else None
         )
+        variables["gpt_5_4"] = (
+            (1.0 if _uses_gpt_5_4(final_models) else 0.0) if final_answered else None
+        )
+        variables["gpt_5x_high"] = (
+            (1.0 if _uses_high_power_gpt_5x(final_models) else 0.0) if final_answered else None
+        )
+        variables["opus"] = (1.0 if _uses_opus(final_models) else 0.0) if final_answered else None
+        variables["opus_4_6"] = (
+            (1.0 if _uses_opus_4_6(final_models) else 0.0) if final_answered else None
+        )
+        variables["final_model_release"] = _high_power_release_ordinal(final_models)
         variables["n_research_sources"] = (
             float(len(cells["research"].matched)) if answers.get("research") else None
         )
@@ -289,9 +317,6 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         variables["research_vs_reasoning_ord"] = _ordinal_index(
             _canon(cells["research_vs_reasoning"]),
             config.ORDINAL_ORDER["research_vs_reasoning"],
-        )
-        variables["writeup_rating_ord"] = _ordinal_index(
-            _canon(cells["writeup_rating"]), config.ORDINAL_ORDER["writeup_rating"]
         )
 
         features.append(
@@ -321,6 +346,43 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
             )
     logger.info("Built features for %d respondents", len(features))
     return features
+
+
+def _uses_gpt_5_4(models: list[ModelInfo]) -> bool:
+    """True if the exact GPT-5.4 flagship (not GPT-5.4 mini) is present."""
+    return any(model.display == "GPT-5.4" for model in models)
+
+
+def _uses_high_power_gpt_5x(models: list[ModelInfo]) -> bool:
+    """True if any full-size GPT-5 series model is present (GPT-5, 5.1, 5.2, 5.4, 5.5).
+
+    The mini/nano variants normalize to keys starting 'gpt5' too, but carry
+    high_power=False and so are excluded.
+    """
+    return any(
+        model.high_power and model.normalized_key.startswith("gpt5") for model in models
+    )
+
+
+def _uses_opus(models: list[ModelInfo]) -> bool:
+    """True if any Claude Opus model is present."""
+    return any("opus" in model.display.lower() for model in models)
+
+
+def _uses_opus_4_6(models: list[ModelInfo]) -> bool:
+    """True if Claude Opus 4.6 (the Opus closest in time to GPT-5.4) is present."""
+    return any(model.display == _OPUS_4_6.display for model in models)
+
+
+def _high_power_release_ordinal(models: list[ModelInfo]) -> float | None:
+    """Newest release date among high-powered final models, as a day ordinal.
+
+    Only high-powered models with a known release date count, so a bot whose
+    final model is a small variant or an undated generic bucket has no value and
+    drops out of this correlation.
+    """
+    dates = [m.release_date for m in models if m.high_power and m.release_date is not None]
+    return float(max(dates).toordinal()) if dates else None
 
 
 def _canon(cell: ParsedCell) -> str | None:

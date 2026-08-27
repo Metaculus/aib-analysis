@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def _model_registry_table() -> list[str]:
     lines = [
-        "| Model | Release date | High power | After cutoff | Frontier | Note |",
+        "| Model | Release date | Flagship | After cutoff | Frontier | Note |",
         "| --- | --- | --- | --- | --- | --- |",
     ]
     for model in config.MODEL_REGISTRY:
@@ -64,8 +64,8 @@ def generate_parsing_decisions() -> str:
     lines.append("## Frontier definition")
     lines.append("")
     lines.append(
-        f"A bot is frontier if its final-prediction model is high powered and "
-        f"{config.FRONTIER_RELEASE_CUTOFF_LABEL}. High power excludes mini, nano, flash, fast, haiku, "
+        f"A bot is frontier if its final-prediction model is a flagship model and "
+        f"{config.FRONTIER_RELEASE_CUTOFF_LABEL}. Flagship excludes mini, nano, flash, fast, haiku, "
         "free-tier, and other small variants. Release dates were looked up online in August 2026; "
         "`after cutoff` is computed from the date against the 2025-11-01 cutoff. A couple of dates are "
         "marked approximate in the note column. Fix any date below and rerun."

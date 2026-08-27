@@ -330,6 +330,8 @@ MULTISELECT_VOCAB: dict[str, list[str]] = {
         "Weighted average, weights based on research quality/source count",
         "LLM-as-aggregator (a model reads the others' outputs and decides)",
     ],
+    # Parsed (so reviewed write-in adjustments still resolve) but excluded from
+    # the report; see EXCLUDED_COLUMNS.
     "minibench": [
         "Yes, it is a valuable tool for iterating with my bot",
         "Yes, I wouldn't have joined otherwise, it was useful to get started",
@@ -395,6 +397,8 @@ SINGLE_SELECT_VOCAB: dict[str, list[str]] = {
         "No",
         "I didn't participate in the Fall tournament",
     ],
+    # Parsed (so reviewed write-in adjustments still resolve) but excluded from
+    # the report; see EXCLUDED_COLUMNS.
     "writeup_rating": [
         "Neglible: They did not impact my performance",
         "Useful: I would have probably done worse without them",
@@ -411,7 +415,6 @@ ORDINAL_ORDER: dict[str, list[str]] = {
     "llm_calls": SINGLE_SELECT_VOCAB["llm_calls"],
     "cost_per_q": SINGLE_SELECT_VOCAB["cost_per_q"],
     "research_vs_reasoning": SINGLE_SELECT_VOCAB["research_vs_reasoning"],
-    "writeup_rating": SINGLE_SELECT_VOCAB["writeup_rating"],
 }
 
 # --------------------------------------------------------------------------- #
@@ -536,20 +539,27 @@ class QuestionSpec:
 
 
 QUESTION_SPECS: list[QuestionSpec] = [
-    QuestionSpec("final_model", "Final-prediction models", "model", ["frontier"]),
-    QuestionSpec("support_model", "Supporting-role models", "model", []),
+    QuestionSpec(
+        "final_model",
+        "Final-prediction models",
+        "model",
+        ["frontier", "gpt_5_4", "gpt_5x_high", "opus", "opus_4_6", "final_model_release"],
+    ),
+    QuestionSpec("support_model", "Supporting-role models", "model", ["frontier_support"]),
     QuestionSpec("research", "How bots researched questions", "multiselect",
-                 ["n_research_sources", "uses_asknews"]),
+                 ["n_research_sources", "uses_asknews", "uses_exa", "uses_perplexity",
+                  "uses_openai_search", "uses_scraping"]),
     QuestionSpec("strategies", "Forecasting strategies used", "multiselect",
-                 ["uses_aggregation", "uses_base_rates"]),
+                 ["uses_aggregation", "uses_base_rates", "uses_similar_qs", "uses_subquestions",
+                  "uses_scenarios", "uses_self_critique", "uses_capping", "uses_extremizing"]),
     QuestionSpec("development", "What went into development", "multiselect",
-                 ["manual_review", "uses_minibench"]),
+                 ["manual_review", "uses_minibench", "uses_pastcasting", "vs_community"]),
     QuestionSpec("verification_env", "LLM self-experimentation (verification env)", "multiselect",
                  ["used_verification_env"]),
     QuestionSpec("aggregate", "Ensemble aggregation approach", "multiselect",
                  ["varied_models"]),
     QuestionSpec("combine", "Combining ensemble outputs", "multiselect", []),
-    QuestionSpec("iterations", "Iterations forecast live", "ordinal",
+    QuestionSpec("iterations", "Iterations that went live", "ordinal",
                  ["iterations_mid"]),
     QuestionSpec("role", "Who the makers are", "single_select", []),
     QuestionSpec("team_size", "Team size", "numeric", ["team_size"]),
@@ -559,9 +569,6 @@ QUESTION_SPECS: list[QuestionSpec] = [
     QuestionSpec("research_vs_reasoning", "Research vs reasoning optimization", "ordinal",
                  ["research_vs_reasoning_ord"]),
     QuestionSpec("changed_since_fall", "Changed approach since Fall", "single_select", []),
-    QuestionSpec("minibench", "Should we keep running MiniBench?", "multiselect", []),
-    QuestionSpec("writeup_rating", "Rating of Metaculus research write-ups", "ordinal",
-                 ["writeup_rating_ord"]),
 ]
 
 # Columns deliberately not charted, with the reason surfaced in the review doc.
@@ -575,6 +582,8 @@ EXCLUDED_COLUMNS: dict[str, str] = {
     "share_response_consent": "Consent field; gates sharing, not analyzed.",
     "lessons": "Open free text; not chartable.",
     "anything_else": "Open free text; not chartable.",
+    "minibench": "Opinion poll on whether to keep MiniBench; not a bot behavior, removed from the analysis.",
+    "writeup_rating": "Rating of Metaculus write-ups; removed from the analysis.",
 }
 
 # Group display config for split charts.

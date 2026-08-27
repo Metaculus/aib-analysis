@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import string
+from datetime import date
 
 from aib_analysis.survey_analysis_v2 import config, loading, plots, season_notes, stats
 from aib_analysis.survey_analysis_v2.features import (
@@ -21,6 +22,13 @@ from aib_analysis.survey_analysis_v2.features import (
 from aib_analysis.survey_analysis_v2.leaderboard import get_leaderboard_rows
 
 logger = logging.getLogger(__name__)
+
+
+# Stable Metaculus links (not season-specific). Season-specific links live in
+# season_notes.py.
+_FUTUREEVAL_URL = "https://www.metaculus.com/futureeval/"
+_PEER_SCORE_URL = "https://www.metaculus.com/help/scores-faq/#peer-score"
+_MINIBENCH_URL = "https://www.metaculus.com/aib/minibench/"
 
 
 def _rel(path: str) -> str:
@@ -114,10 +122,18 @@ _ORDINAL_SLUG_FOR_KEY: dict[str, str] = {
     "llm_calls_mid": "llm_calls",
     "cost_mid": "cost_per_q",
     "research_vs_reasoning_ord": "research_vs_reasoning",
-    "writeup_rating_ord": "writeup_rating",
 }
 # Correlation keys binned into numeric ranges (no clean answer bucket).
-_NUMERIC_BIN_KEYS: set[str] = {"n_research_sources"}
+_NUMERIC_BIN_KEYS: set[str] = {"n_research_sources", "final_model_release"}
+
+
+def _fmt_release_ordinal(value: float) -> str:
+    """Render a stored day-ordinal release date as a YYYY-MM bucket label."""
+    return date.fromordinal(int(value)).strftime("%Y-%m")
+
+
+# Per-key formatter for numeric bin labels; defaults to _fmt_num when absent.
+_NUMERIC_LABEL_FMT = {"final_model_release": _fmt_release_ordinal}
 
 
 def _labeled_scores_binary(
@@ -147,7 +163,7 @@ def _fmt_num(value: float) -> str:
 
 
 def _labeled_scores_numeric(
-    features: list[RespondentFeatures], key: str, n_bins: int = 3
+    features: list[RespondentFeatures], key: str, n_bins: int = 3, value_fmt=_fmt_num
 ) -> list[tuple[str, list[float]]]:
     pairs = sorted(
         (f.variables[key], f.score)
@@ -168,7 +184,7 @@ def _labeled_scores_numeric(
         if not chunk:
             continue
         value_min, value_max = chunk[0][0], chunk[-1][0]
-        label = _fmt_num(value_min) if value_min == value_max else f"{_fmt_num(value_min)} to {_fmt_num(value_max)}"
+        label = value_fmt(value_min) if value_min == value_max else f"{value_fmt(value_min)} to {value_fmt(value_max)}"
         if label not in merged:
             merged[label] = []
             order.append(label)
@@ -189,7 +205,9 @@ def _correlation_chart(
     elif key in _ORDINAL_SLUG_FOR_KEY:
         labeled = _labeled_scores_ordinal(features, _ORDINAL_SLUG_FOR_KEY[key])
     elif key in _NUMERIC_BIN_KEYS:
-        labeled = _labeled_scores_numeric(features, key)
+        labeled = _labeled_scores_numeric(
+            features, key, value_fmt=_NUMERIC_LABEL_FMT.get(key, _fmt_num)
+        )
     else:
         return None, "Graph excluded: this variable is not bucketed for a group chart"
 
@@ -269,55 +287,34 @@ def _feature_stats(
     return results, q_by_key
 
 
-def _ordered_feature_keys(ordered_specs, feature_results) -> list[str]:
-    """Every measured feature key, grouped by its source question in the same
-    order as the question sections, and by |r| within each question.
-
-    A question owns its numeric correlation(s) plus every boolean habit derived
-    from its column, so a question with several features keeps them together.
-    """
-    numeric_keys = {spec.key for spec in NUMERIC_VARIABLE_SPECS}
-
-    def effect(key: str) -> float:
-        coef = feature_results[key].coefficient
-        return abs(coef) if coef is not None else -1.0
-
-    ordered: list[str] = []
-    seen: set[str] = set()
-    for spec in ordered_specs:
-        keys = [key for key in spec.correlations if key in numeric_keys]
-        keys += [bf.key for bf in config.BOOLEAN_FEATURES if bf.column_slug == spec.slug]
-        group = [key for key in dict.fromkeys(keys) if key not in seen]
-        group.sort(key=lambda key: -effect(key))
-        for key in group:
-            seen.add(key)
-            ordered.append(key)
-    for key, _label in _all_feature_keys():  # safety net for any unassigned feature
-        if key not in seen:
-            seen.add(key)
-            ordered.append(key)
-    return ordered
-
-
 def _evidence_summary_section(
-    results: dict[str, "stats.CorrelationResult"], q_by_key: dict[str, float], ordered_specs
+    results: dict[str, "stats.CorrelationResult"], q_by_key: dict[str, float]
 ) -> str:
     tested = sum(1 for res in results.values() if res.p_value is not None)
     n_obs = max((res.n for res in results.values()), default=0)
     labels = dict(_all_feature_keys())
-    ordered_keys = _ordered_feature_keys(ordered_specs, results)
+
+    def effect(key: str) -> float:
+        coef = results[key].coefficient
+        return abs(coef) if coef is not None else -1.0
+
+    # Flat ordering by |r| descending; features with no estimate sort last. A
+    # stable sort keeps the _all_feature_keys() order among ties.
+    ordered_keys = sorted((key for key, _label in _all_feature_keys()), key=lambda key: -effect(key))
 
     lines = ["## Evidence summary", ""]
     lines.append(
-        "Every measured feature versus performance (average spot peer score), grouped by question in "
-        "the same order as the sections below, with a question's several features kept together. These "
-        "are the raw numbers, no recommendation; decide for yourself which are worth acting on."
+        "Below is a list of every measured survey feature versus performance (average spot peer "
+        "score), ordered by correlation magnitude."
     )
     lines.append("")
     lines.append(
-        f"r is the correlation (its sign is the direction), p is the uncorrected p-value, and q is the "
+        f"In the list, r is correlation, p is the uncorrected p-value, and q is the "
         f"Benjamini-Hochberg p-value adjusted for testing all {tested} features. \"Significant\" means "
-        f"q < {config.EVIDENCE_SIGNIFICANT_Q}."
+        f"q < {config.EVIDENCE_SIGNIFICANT_Q}. This analysis aims to be primarily hypothesis-generating. "
+        f"We can't conclude much with n ≈ {n_obs} bots and {tested} features tested. We also expect "
+        "many of these features to be confounded. However, FutureEval hosts the largest group of "
+        "publicly competing AI forecasters, and so the results are worth indexing on."
     )
     lines.append("")
     for key in ordered_keys:
@@ -365,17 +362,19 @@ def generate_report(features: list[RespondentFeatures]) -> str:
     lines.append("")
     lines.append(_intro(in_scope, excluded, corr_pool, counts, leaderboard_size))
     lines.append("")
+    lines.append(_caveats_section(in_scope, counts, leaderboard_size))
+    lines.append("")
     ordered_specs = sorted(
         config.QUESTION_SPECS,
         key=lambda spec: _spec_effect_size(spec, feature_results),
         reverse=True,
     )
-    lines.append(_evidence_summary_section(feature_results, q_by_key, ordered_specs))
+    lines.append(_evidence_summary_section(feature_results, q_by_key))
     lines.append("")
     lines.append(
         "The question sections below are ordered by their strongest correlation with performance "
-        "(largest |r| first); questions with no performance correlation come last. The evidence "
-        "summary above follows the same order."
+        "(largest |r| first). Questions with no performance correlation come last. The evidence "
+        "summary above is ordered by |r| alone."
     )
     lines.append("")
 
@@ -405,67 +404,91 @@ def generate_report(features: list[RespondentFeatures]) -> str:
                     lines.append("")
         lines.append("")
 
-    lines.append(_caveats_section(in_scope, counts, leaderboard_size))
     return "\n".join(lines)
+
+
+def _excluded_detail(excluded) -> str:
+    """Characterize the excluded respondents, computing the no-record tail.
+
+    Every excluded bot lacks a scored-leaderboard row; those that also match no
+    prize-sheet owner have no tournament record at all, and that count is derived
+    here so the sentence can never drift from the data.
+    """
+    no_record = sum(1 for f in excluded if f.respondent.prize_match_kind == "none")
+    detail = season_notes.EXCLUDED_MINIBENCH_LABEL.replace(
+        "MiniBench-only", f"[MiniBench-only]({_MINIBENCH_URL})", 1
+    )
+    if no_record == 1:
+        detail += ", plus one bot with no matching tournament record"
+    elif no_record > 1:
+        detail += f", plus {no_record} bots with no matching tournament record"
+    return detail
 
 
 def _intro(in_scope, excluded, corr_pool, counts, leaderboard_size) -> str:
     total = len(in_scope) + len(excluded)
+    takeaway_bullets = "\n".join(f"* {item}" for item in season_notes.MAIN_TAKEAWAYS)
     parts = [
+        f"Every season Metaculus sends out a survey to bot makers who participated in the "
+        f"[FutureEval]({_FUTUREEVAL_URL}) AI forecasting benchmark. This analysis compares answers to "
+        f"this survey with performance in the "
+        f"[{season_notes.TOURNAMENT_NAME}]({season_notes.TOURNAMENT_URL}) to help surface what works "
+        "and what doesn't when forecasting the future.",
+        "",
+        "Main takeaways:",
+        "",
+        takeaway_bullets,
+        "",
+        "## Methodology",
+        "",
         f"{total} bot makers answered the {season_notes.SEASON_LABEL} survey. This report covers the "
-        f"{len(in_scope)} whose bot competed in the scored FutureEval tournament. It shows, for each "
+        f"{len(in_scope)} whose bots competed in the scored FutureEval tournament. It shows, for each "
         "structured question, how answers were distributed and how they relate to bot performance.",
         "",
-        f"A bot is called \"frontier\" if the model it used for its final prediction is high powered (a "
-        f"flagship model, not a mini, flash, or fast variant) and was {config.FRONTIER_RELEASE_CUTOFF_LABEL}.",
+        "We show 2 types of graphs. The first is the raw distribution of answers for each option for "
+        "each question. The second compares the value of some feature of the survey with the "
+        "performance of the bot in the tournament.",
         "",
-        f"Performance is a bot's average spot peer score in the {season_notes.SEASON_LABEL} FutureEval tournament. Its "
-        "spot peer score on a question compares its forecast at scoring time against the geometric mean "
-        "of its peers; averaging over the bot's questions gives a per-question skill measure that does "
-        "not reward simply answering more questions.",
+        f"Performance is a bot's average spot peer score in the {season_notes.SEASON_LABEL} FutureEval "
+        f"tournament. Its spot [peer score]({_PEER_SCORE_URL}) on a question compares its forecast at "
+        "scoring time against the geometric mean of its peers. If it is positive, the prediction was "
+        "(on average) better than others. If it is negative, it was worse than others.",
         "",
-        "One label note: in the per-question performance charts below, each bar is the mean of the "
-        "individual bots' averages in that group (one bot, one vote), so a bar sits below any single "
-        "strong bot because it blends strong and weak bots. The axis is labeled \"Mean of bots' average "
-        "spot peer score\" to reflect this.",
+        "Three groups appear in the distribution charts:",
         "",
-        "Why bars, not scatter: the performance charts use grouped bars so no individual bot can be "
-        "identified from its public peer score. A bar shows only a group's average and hides the spread "
-        "within the group, so a clean-looking staircase of bars can still reflect a weak overall "
-        "correlation; each bar carries a 95% confidence interval to show that spread, and the r, p, and "
-        "q values, which use every bot, are the better guide.",
-        "",
-        "Three groups appear in every distribution chart:",
-        "",
-        f"- Non-winners: {counts['non_winner']} FutureEval participants who did not win an AIB prize.",
-        f"- Winners: {counts['winner']} participants who won an AIB prize.",
-        f"- Top 10 (peer score): {counts['top_10']} participants whose bot placed in the top 10 of "
+        f"* Non-winners: {counts['non_winner']} FutureEval participants who did not perform well enough "
+        "to win a prize.",
+        f"* Winners: {counts['winner']} participants who won prize money in the tournament.",
+        f"* Top 10 (by peer score): {counts['top_10']} participants whose bot placed in the top 10 of "
         f"the full {leaderboard_size}-bot leaderboard by total score. This group overlaps with winners.",
         "",
         "Charts show the share within each group, since the groups differ in size.",
         "",
-        f"Correlations use a stricter set: the {len(corr_pool)} bots that forecast at least "
+        f"Correlations use a stricter set of the {len(corr_pool)} bots that forecast at least "
         f"{config.MIN_QUESTIONS_FOR_CORRELATION} scored questions, so a bot with only a few questions "
-        "cannot swing a result with one lucky forecast. The distributions above still use all "
-        f"{len(in_scope)} participants; only the performance correlations apply the question floor.",
+        "cannot swing a result due to lucky forecasting. The distributions above still use all "
+        f"{len(in_scope)} participants, and only the performance correlations apply the question floor.",
         "",
-        "Methodology: each feature is correlated with a bot's average spot peer score using Pearson's r "
-        "for yes/no traits and Spearman's rank correlation for ordered or counted ones. Because many "
-        "features are tested at once, every p-value also carries a Benjamini-Hochberg q-value (its p "
-        "adjusted for the false-discovery rate across all tested features), and a result is called "
-        "\"significant\" only when q < 0.05.",
+        "Each feature is correlated with a bot's average spot peer score using Pearson's r for yes/no "
+        "traits and Spearman's rank correlation for ordered or counted ones. Because many features are "
+        "tested at once, every p-value also carries a Benjamini-Hochberg q-value (its p adjusted for "
+        "the false-discovery rate across all tested features), and a result is called \"significant\" "
+        "only when q < 0.05.",
+        "",
+        "For the frontier model chart, a bot is called \"frontier\" if the model it used for its final "
+        "prediction is a flagship model (not a mini, flash, or fast variant) and was "
+        f"{config.FRONTIER_RELEASE_CUTOFF_LABEL}.",
         "",
         "How to read the correlations: r runs from -1 to +1. Values near 0 mean no relationship, "
-        "positive means the trait goes with a higher average peer score, negative with a lower one. A "
-        "low p-value means the pattern is unlikely to be chance, but with many features tested, lean on "
-        "the q-value for significance. With this few bots, treat single results as suggestive, not proof.",
+        "positive means the trait is associated with a higher average peer score, and negative with a "
+        "lower one. A low p-value means the pattern is unlikely to be chance, but due to the number of "
+        "features being tested, lean on the q-value for significance.",
     ]
     if excluded:
         parts.append("")
         parts.append(
-            f"{len(excluded)} respondents are excluded from this report: they made no forecasts in the "
-            f"scored FutureEval tournament ({season_notes.EXCLUDED_RESPONDENTS_DETAIL}). They are "
-            "listed in the parsing review doc."
+            f"{len(excluded)} respondents are excluded from this report since they made no forecasts "
+            f"in the scored FutureEval tournament ({_excluded_detail(excluded)})."
         )
     return "\n".join(parts)
 
@@ -477,37 +500,40 @@ def _caveats_section(features, counts, leaderboard_size) -> str:
     field_winner_pct = round(100 * winning_owners / len(owners)) if owners else 0
     lines = ["## Caveats", ""]
     lines.append(
-        f"- Self-selection. Only {len(features)} of the {leaderboard_size} scored bots answered the "
-        f"survey, and winners were far likelier to respond: {counts['winner']} of {len(features)} "
-        f"analyzed respondents won a prize ({respondent_winner_pct}%), versus {winning_owners} of "
-        f"{len(owners)} participating owners ({field_winner_pct}%). Every distribution and correlation "
-        "describes this self-selected group, not the full field, so a habit's popularity here can "
-        "differ from its popularity among all bots, and correlations can be distorted if the makers "
-        "who responded differ systematically from those who did not."
+        f"- Self-selection: Only {len(features)} of the {leaderboard_size} scored bots answered the "
+        "survey, and winners were far likelier to respond since the survey was required to receive "
+        f"prizes. {counts['winner']} of {len(features)} analyzed respondents won a prize "
+        f"({respondent_winner_pct}%), versus {winning_owners} of {len(owners)} participating owners "
+        f"({field_winner_pct}%). The distributions and correlations describe this self-selected group, "
+        "so a habit's popularity here can differ from its popularity among all bots, and correlations "
+        "can be distorted if the makers who responded differ systematically from those who did not."
     )
     lines.append(
-        f"- Small samples. Only {counts['top_10']} top-10 bots answered the survey, so the orange "
-        "bars move a lot with one response."
+        f"- Small samples: At {len(features)} survey responses, this analysis is generally "
+        "underpowered, so results should be treated as suggestive."
     )
     lines.append(
-        "- Overlapping groups. Nearly every top-10 bot is also a winner, so those two series are not "
-        "independent."
+        "- Self-reported answers: Bot makers can misunderstand questions, accidentally click options, "
+        "or intentionally skip options."
     )
     lines.append(
-        "- Self-reported answers. Model names, hours, and costs are what makers typed, cleaned to "
-        "fixed options. Write-in answers show up as an \"Other (write-in)\" bar in the distributions "
-        "but are left out of the correlations."
+        "- Implementation rigor: Just because someone says they did something doesn't necessitate that "
+        "they did it well. If something is effective when done well, but is easy to do wrong, it will "
+        "get a low correlation."
     )
     lines.append(
-        "- Correlation only. None of these links prove that a habit caused a better score."
+        "- Correlation is not causation: None of these links prove that a survey feature caused a better score. "
+        "For instance, if it is only compute on a forecast that matters, teams with more money to "
+        "spend on compute may also fine-tune an open source model. This may exaggerate the correlation "
+        "of finetuned models with score."
     )
     lines.append(
-        "- Metric vs groups. Performance here is average spot peer score, while winners and the top 10 "
-        "were decided on total score. The two rank bots similarly but not identically."
-    )
-    lines.append(
-        "- "
-        + season_notes.TOP10_ELIGIBILITY_CAVEAT.format(leaderboard_size=leaderboard_size)
+        "- Bar chart averages: In the per-question performance charts, each bar is the mean of the "
+        "individual bots' averages in that group. Consequently, a bar sits below the strongest bots in "
+        "the group because it blends strong and weak bots. A bar shows only a group's average and "
+        "hides the spread within the group, so a clean-looking staircase of bars can still reflect a "
+        "weak overall correlation. Each bar carries a 95% confidence interval to show that spread. The "
+        "r, p, and q values are a better guide."
     )
     return "\n".join(lines)
 

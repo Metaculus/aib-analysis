@@ -82,9 +82,8 @@ def correlate_with_score(
 
     if spec.kind in ("binary", "continuous"):
         # Binary traits use Pearson (identical to point-biserial for a 0/1 trait).
-        # "continuous" is not used by any current variable (team size is ordinal),
-        # but is kept so a genuinely continuous trait added later gets Pearson, not
-        # rank correlation, by default.
+        # "continuous" is used by the final-model release-date variable, and gets
+        # Pearson rather than rank correlation.
         method = "Pearson"
         coef, p_value = stats.pearsonr(xs, ys)
     else:

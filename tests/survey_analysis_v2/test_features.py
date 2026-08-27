@@ -29,7 +29,6 @@ def test_full_answer_derives_expected_features():
         llm_calls="2-5",
         cost_per_q="$1-2.99",
         team_size="3",
-        writeup_rating="Useful: I would have probably done worse without them",
         research_vs_reasoning="Strong reasoning lean",
     )
     feature = build_features([respondent])[0]
@@ -46,8 +45,6 @@ def test_full_answer_derives_expected_features():
     assert feature.variables["team_size"] == 3.0
     # research_vs_reasoning ordinal index: "Strong reasoning lean" is last (=4).
     assert feature.variables["research_vs_reasoning_ord"] == 4.0
-    # writeup rating ordinal index: "Useful..." is second option (=1).
-    assert feature.variables["writeup_rating_ord"] == 1.0
 
 
 def test_blank_answers_yield_false_booleans_and_none_numerics():
@@ -64,8 +61,7 @@ def test_blank_answers_yield_false_booleans_and_none_numerics():
     assert feature.variables["n_research_sources"] is None
     assert feature.variables["hours_mid"] is None
     assert feature.variables["llm_calls_mid"] is None
-    assert feature.variables["team_size"] is None
-    assert feature.variables["writeup_rating_ord"] is None
+    assert feature.variables["team_size"] is None  # blank team_size answer -> None
 
 
 def test_not_in_a_team_becomes_solo_one():

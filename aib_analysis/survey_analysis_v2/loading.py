@@ -16,7 +16,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 
-from aib_analysis.survey_analysis_v2 import config, manual_adjustments
+from aib_analysis.survey_analysis_v2 import config, manual_adjustments, season_notes
 from aib_analysis.survey_analysis_v2.leaderboard import (
     LeaderboardRow,
     get_leaderboard_rows,
@@ -272,8 +272,12 @@ def build_respondents(refresh: bool = False) -> list[Respondent]:
     for record in survey_records:
         bot_name = record["bot_name"]
         respondent = Respondent(bot_name=bot_name, answers=record)
+        # A reviewed alias lets a survey name join to its tournament entry when
+        # the automatic matcher cannot safely bridge the two; the respondent's
+        # displayed name stays exactly what they typed.
+        match_name = season_notes.BOT_NAME_ALIASES.get(bot_name, bot_name)
 
-        lb_row, lb_kind = _match_leaderboard(bot_name, by_norm, by_alnum)
+        lb_row, lb_kind = _match_leaderboard(match_name, by_norm, by_alnum)
         respondent.leaderboard_match_kind = lb_kind
         if lb_row is not None:
             respondent.matched_leaderboard_name = lb_row.bot_name
@@ -282,7 +286,7 @@ def build_respondents(refresh: bool = False) -> list[Respondent]:
             respondent.question_count = lb_row.question_count
             respondent.is_top_10 = normalize_name(lb_row.bot_name) in top_10_names
 
-        owner, prize_kind = _match_prize(bot_name, owners)
+        owner, prize_kind = _match_prize(match_name, owners)
         respondent.prize_match_kind = prize_kind
         if owner is not None:
             respondent.matched_owner = owner.owner_username

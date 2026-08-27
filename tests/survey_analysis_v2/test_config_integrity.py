@@ -113,6 +113,22 @@ def test_every_question_spec_slug_is_a_real_column():
         assert spec.slug in config.COLUMNS, spec.slug
 
 
+def test_charted_correlations_cover_every_measured_feature():
+    # The evidence-summary bullets and the in-body correlation charts must be the
+    # same set: every measured feature is charted under exactly one question, and
+    # no question charts a feature that is not a measured feature. This keeps the
+    # summary list and the body one-to-one so neither can silently gain an entry
+    # the other lacks.
+    measured = {f.key for f in config.BOOLEAN_FEATURES}
+    measured |= {s.key for s in NUMERIC_VARIABLE_SPECS}
+    charted = [key for spec in config.QUESTION_SPECS for key in spec.correlations]
+
+    assert len(charted) == len(set(charted)), "a feature is charted under more than one question"
+    assert set(charted) == measured, (
+        f"charted-only: {set(charted) - measured}; bullet-only: {measured - set(charted)}"
+    )
+
+
 def test_numeric_variable_specs_have_known_kinds():
     for spec in NUMERIC_VARIABLE_SPECS:
         assert spec.kind in {"binary", "count", "ordinal", "continuous"}
