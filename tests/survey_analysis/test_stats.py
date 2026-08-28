@@ -1,4 +1,4 @@
-"""Statistics correctness for survey_analysis_v2.stats.
+"""Statistics correctness for survey_analysis.stats.
 
 The report leans entirely on these numbers, so each test pins a specific
 guarantee: the right test is chosen per variable kind, the coefficient matches
@@ -14,10 +14,10 @@ import math
 import pytest
 from scipy import stats as sps
 
-from aib_analysis.survey_analysis_v2 import stats
-from aib_analysis.survey_analysis_v2.stats import CorrelationResult
+from aib_analysis.survey_analysis import stats
+from aib_analysis.survey_analysis.stats import CorrelationResult
 
-from tests.survey_analysis_v2.conftest import make_feature
+from tests.survey_analysis.conftest import make_feature
 
 
 # --------------------------------------------------------------------------- #

@@ -7,7 +7,7 @@ risk, and team-size oddities. Runs without env vars or local data.
 
 from __future__ import annotations
 
-from aib_analysis.survey_analysis_v2 import config, parsing
+from aib_analysis.survey_analysis import config, parsing
 
 
 # --------------------------------------------------------------------------- #

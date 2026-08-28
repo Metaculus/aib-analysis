@@ -11,8 +11,8 @@ from __future__ import annotations
 import re
 from datetime import timedelta
 
-from aib_analysis.survey_analysis_v2 import config, parsing
-from aib_analysis.survey_analysis_v2.config import MODEL_REGISTRY, FRONTIER_RELEASE_CUTOFF
+from aib_analysis.survey_analysis import config, parsing
+from aib_analysis.survey_analysis.config import MODEL_REGISTRY, FRONTIER_RELEASE_CUTOFF
 
 
 # --------------------------------------------------------------------------- #

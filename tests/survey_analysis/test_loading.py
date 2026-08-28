@@ -12,9 +12,9 @@ import csv
 
 import pytest
 
-from aib_analysis.survey_analysis_v2 import config
-from aib_analysis.survey_analysis_v2.leaderboard import LeaderboardRow
-from aib_analysis.survey_analysis_v2.loading import (
+from aib_analysis.survey_analysis import config
+from aib_analysis.survey_analysis.leaderboard import LeaderboardRow
+from aib_analysis.survey_analysis.loading import (
     PrizeOwner,
     Respondent,
     _alnum_key,
@@ -27,7 +27,7 @@ from aib_analysis.survey_analysis_v2.loading import (
     load_survey,
     normalize_name,
 )
-from aib_analysis.survey_analysis_v2.manual_adjustments import WinnerOverride
+from aib_analysis.survey_analysis.manual_adjustments import WinnerOverride
 
 
 # --------------------------------------------------------------------------- #

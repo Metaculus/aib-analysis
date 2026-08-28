@@ -2,14 +2,14 @@
 # Render the three survey-analysis markdown docs to self-contained HTML (Quarto)
 # and to PDF (headless Chrome printing the rendered HTML, so the PDF matches the
 # HTML exactly, charts included). Run this after
-# `python -m aib_analysis.survey_analysis_v2.run`.
+# `python -m aib_analysis.survey_analysis.run`.
 #
 # Cache dirs are redirected to a temp location so this works inside a sandbox
 # where the default Quarto/Deno cache path is not writable.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-OUT_DIR="$REPO_ROOT/local/spring_survey_analysis_v2"
+OUT_DIR="$REPO_ROOT/local/spring_survey_analysis"
 
 CACHE_BASE="${TMPDIR:-/tmp}/quarto_survey_v2"
 export XDG_CACHE_HOME="$CACHE_BASE/cache"

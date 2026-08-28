@@ -1,12 +1,12 @@
 """Run the full Spring 2026 survey analysis v2.
 
-Generates, under local/spring_survey_analysis_v2/:
+Generates, under local/spring_survey_analysis/:
 - spring_survey_analysis.md  (the report + charts/)
 - parsing_decisions.md       (the rules)
 - parsing_review.md          (the audit + data/respondent_audit.csv)
 
 Usage:
-    poetry run python -m aib_analysis.survey_analysis_v2.run [--refresh]
+    poetry run python -m aib_analysis.survey_analysis.run [--refresh]
 
 --refresh recomputes the leaderboard from the 327MB bot tournament JSON instead
 of using the cached CSV.
@@ -17,7 +17,7 @@ from __future__ import annotations
 import argparse
 import logging
 
-from aib_analysis.survey_analysis_v2 import (
+from aib_analysis.survey_analysis import (
     config,
     features as features_module,
     loading,

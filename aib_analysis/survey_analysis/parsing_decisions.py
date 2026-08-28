@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import os
 
-from aib_analysis.survey_analysis_v2 import config
+from aib_analysis.survey_analysis import config
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ def generate_parsing_decisions() -> str:
     lines.append("")
     lines.append(
         "This doc lists every rule used to turn the raw Google Forms export into the numbers behind "
-        "the report. It is generated from `aib_analysis/survey_analysis_v2/config.py`, so it always "
+        "the report. It is generated from `aib_analysis/survey_analysis/config.py`, so it always "
         "matches the code that ran."
     )
     lines.append("")

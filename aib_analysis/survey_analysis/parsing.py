@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 
-from aib_analysis.survey_analysis_v2.config import (
+from aib_analysis.survey_analysis.config import (
     MODEL_REGISTRY,
     MODEL_TOKENS_IGNORED,
     ModelInfo,

@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from aib_analysis.survey_analysis_v2 import config
-from aib_analysis.survey_analysis_v2.features import NUMERIC_VARIABLE_SPECS, variable_spec
+from aib_analysis.survey_analysis import config
+from aib_analysis.survey_analysis.features import NUMERIC_VARIABLE_SPECS, variable_spec
 
 
 # --------------------------------------------------------------------------- #

@@ -19,8 +19,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy.stats import t as t_dist
 
-from aib_analysis.survey_analysis_v2 import config
-from aib_analysis.survey_analysis_v2.features import RespondentFeatures
+from aib_analysis.survey_analysis import config
+from aib_analysis.survey_analysis.features import RespondentFeatures
 
 
 def _ci_half_width(scores: list[float], confidence: float = 0.95) -> float:

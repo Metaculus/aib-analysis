@@ -16,12 +16,12 @@ import logging
 import re
 from dataclasses import dataclass
 
-from aib_analysis.survey_analysis_v2 import config, manual_adjustments, season_notes
-from aib_analysis.survey_analysis_v2.leaderboard import (
+from aib_analysis.survey_analysis import config, manual_adjustments, season_notes
+from aib_analysis.survey_analysis.leaderboard import (
     LeaderboardRow,
     get_leaderboard_rows,
 )
-from aib_analysis.survey_analysis_v2.manual_adjustments import WinnerOverride
+from aib_analysis.survey_analysis.manual_adjustments import WinnerOverride
 
 logger = logging.getLogger(__name__)
 

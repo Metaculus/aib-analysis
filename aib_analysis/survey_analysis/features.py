@@ -14,10 +14,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from aib_analysis.survey_analysis_v2 import config, manual_adjustments, parsing
-from aib_analysis.survey_analysis_v2.config import ModelInfo
-from aib_analysis.survey_analysis_v2.loading import Respondent, normalize_name
-from aib_analysis.survey_analysis_v2.manual_adjustments import AnswerAdjustment
+from aib_analysis.survey_analysis import config, manual_adjustments, parsing
+from aib_analysis.survey_analysis.config import ModelInfo
+from aib_analysis.survey_analysis.loading import Respondent, normalize_name
+from aib_analysis.survey_analysis.manual_adjustments import AnswerAdjustment
 
 logger = logging.getLogger(__name__)
 

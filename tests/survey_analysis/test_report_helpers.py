@@ -7,9 +7,9 @@ to break silently. Runs without env vars or local data.
 
 from __future__ import annotations
 
-from aib_analysis.survey_analysis_v2 import plots, report
+from aib_analysis.survey_analysis import plots, report
 
-from tests.survey_analysis_v2.conftest import make_cell, make_feature
+from tests.survey_analysis.conftest import make_cell, make_feature
 
 
 # --------------------------------------------------------------------------- #
@@ -27,7 +27,7 @@ def test_fmt_num_integer_vs_decimal():
 
 
 def test_correlation_sentence_shows_q_and_significance_from_q():
-    from aib_analysis.survey_analysis_v2.stats import CorrelationResult
+    from aib_analysis.survey_analysis.stats import CorrelationResult
 
     # One flowing sentence; significance is based on the q-value, and q is shown.
     sig = CorrelationResult("k", "Trait", "Pearson", 0.4, 0.01, 30)

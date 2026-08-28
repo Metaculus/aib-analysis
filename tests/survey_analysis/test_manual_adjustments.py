@@ -12,9 +12,9 @@ import logging
 
 import pytest
 
-from aib_analysis.survey_analysis_v2 import config, manual_adjustments
-from aib_analysis.survey_analysis_v2.features import build_features
-from aib_analysis.survey_analysis_v2.loading import Respondent
+from aib_analysis.survey_analysis import config, manual_adjustments
+from aib_analysis.survey_analysis.features import build_features
+from aib_analysis.survey_analysis.loading import Respondent
 
 HEADER = "bot_name,column_slug,write_in,action,canonical_option,reason"
 SCRAPING_OPTION = "Static web scraping (Only HTML, possibly converted to markdown)"

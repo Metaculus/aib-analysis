@@ -8,9 +8,9 @@ the documented treatment of blank answers. Runs without env vars or local data.
 
 from __future__ import annotations
 
-from aib_analysis.survey_analysis_v2 import config
-from aib_analysis.survey_analysis_v2.features import build_features
-from aib_analysis.survey_analysis_v2.loading import Respondent
+from aib_analysis.survey_analysis import config
+from aib_analysis.survey_analysis.features import build_features
+from aib_analysis.survey_analysis.loading import Respondent
 
 
 def _respondent(**answers: str) -> Respondent:

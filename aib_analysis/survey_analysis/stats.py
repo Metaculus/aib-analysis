@@ -16,7 +16,7 @@ from dataclasses import dataclass
 
 from scipy import stats
 
-from aib_analysis.survey_analysis_v2.features import RespondentFeatures, variable_spec
+from aib_analysis.survey_analysis.features import RespondentFeatures, variable_spec
 
 MIN_N_FOR_CORRELATION = 8
 

@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from aib_analysis.data_structures.custom_types import ScoreType
 from aib_analysis.data_structures.simulated_tournament import SimulatedTournament
 from aib_analysis.main_logic.process_tournament import get_leaderboard
-from aib_analysis.survey_analysis_v2 import config
+from aib_analysis.survey_analysis import config
 
 logger = logging.getLogger(__name__)
 

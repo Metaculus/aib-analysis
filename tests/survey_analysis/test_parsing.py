@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from aib_analysis.survey_analysis_v2 import config, parsing
-from aib_analysis.survey_analysis_v2.loading import _alnum_key, _match_prize, PrizeOwner
+from aib_analysis.survey_analysis import config, parsing
+from aib_analysis.survey_analysis.loading import _alnum_key, _match_prize, PrizeOwner
 
 
 def test_multiselect_matches_options_with_embedded_commas():

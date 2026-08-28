@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from aib_analysis.survey_analysis_v2 import config, report
-from aib_analysis.survey_analysis_v2.stats import CorrelationResult
+from aib_analysis.survey_analysis import config, report
+from aib_analysis.survey_analysis.stats import CorrelationResult
 
 
 # --------------------------------------------------------------------------- #
@@ -118,7 +118,7 @@ def test_fmt_pq_small_values():
 # _feature_stats: one shared q across the whole tested family
 # --------------------------------------------------------------------------- #
 def test_all_feature_keys_are_unique_and_resolvable():
-    from aib_analysis.survey_analysis_v2.features import variable_spec
+    from aib_analysis.survey_analysis.features import variable_spec
 
     pairs = report._all_feature_keys()
     keys = [key for key, _label in pairs]
@@ -128,7 +128,7 @@ def test_all_feature_keys_are_unique_and_resolvable():
 
 
 def test_feature_stats_assigns_q_only_to_estimable_features():
-    from tests.survey_analysis_v2.conftest import make_feature
+    from tests.survey_analysis.conftest import make_feature
 
     # A pool where every feature is estimable; q map should cover the same keys
     # that produced a p-value, and every q sits in [0, 1].

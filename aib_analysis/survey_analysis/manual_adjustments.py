@@ -32,7 +32,7 @@ import logging
 import os
 from dataclasses import dataclass
 
-from aib_analysis.survey_analysis_v2 import config
+from aib_analysis.survey_analysis import config
 
 logger = logging.getLogger(__name__)
 

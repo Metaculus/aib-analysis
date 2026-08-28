@@ -13,13 +13,13 @@ import os
 import string
 from datetime import date
 
-from aib_analysis.survey_analysis_v2 import config, loading, plots, season_notes, stats
-from aib_analysis.survey_analysis_v2.features import (
+from aib_analysis.survey_analysis import config, loading, plots, season_notes, stats
+from aib_analysis.survey_analysis.features import (
     NUMERIC_VARIABLE_SPECS,
     RespondentFeatures,
     variable_spec,
 )
-from aib_analysis.survey_analysis_v2.leaderboard import get_leaderboard_rows
+from aib_analysis.survey_analysis.leaderboard import get_leaderboard_rows
 
 logger = logging.getLogger(__name__)
 

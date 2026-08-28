@@ -37,7 +37,7 @@ BOT_TOURNAMENT_JSON = os.path.join(
     REPO_ROOT, "local/spring_2026_simulations/2_bot_tournament.json"
 )
 
-OUTPUT_DIR = os.path.join(REPO_ROOT, "local/spring_survey_analysis_v2")
+OUTPUT_DIR = os.path.join(REPO_ROOT, "local/spring_survey_analysis")
 CHARTS_DIR = os.path.join(OUTPUT_DIR, "charts")
 DATA_DIR = os.path.join(OUTPUT_DIR, "data")
 LEADERBOARD_CACHE_CSV = os.path.join(DATA_DIR, "spring_leaderboard.csv")

@@ -1,4 +1,4 @@
-"""Shared helpers for survey_analysis_v2 tests.
+"""Shared helpers for survey_analysis tests.
 
 These build lightweight stand-ins for RespondentFeatures so the statistics and
 report helpers can be exercised without loading the 327MB tournament JSON, the

@@ -16,7 +16,7 @@ import os
 
 import pytest
 
-from aib_analysis.survey_analysis_v2 import config
+from aib_analysis.survey_analysis import config
 
 _DATA_PRESENT = os.path.exists(config.SURVEY_CSV) and os.path.exists(
     config.LEADERBOARD_CACHE_CSV
@@ -33,7 +33,7 @@ def features():
     import logging
 
     logging.disable(logging.CRITICAL)
-    from aib_analysis.survey_analysis_v2 import features as fmod, loading
+    from aib_analysis.survey_analysis import features as fmod, loading
 
     respondents = loading.build_respondents(refresh=False)
     return fmod.build_features(respondents)
@@ -86,7 +86,7 @@ def test_every_final_model_token_is_classified(features):
 
 
 def test_frontier_flag_only_true_with_a_frontier_model(features):
-    from aib_analysis.survey_analysis_v2 import parsing
+    from aib_analysis.survey_analysis import parsing
 
     for f in features:
         if f.frontier:
