@@ -14,7 +14,7 @@ from __future__ import annotations
 import csv
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from aib_analysis.survey_analysis_v2 import config, manual_adjustments, season_notes
 from aib_analysis.survey_analysis_v2.leaderboard import (

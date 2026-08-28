@@ -329,12 +329,6 @@ def _evidence_summary_section(
             f"- **{label}**: r = {res.coefficient:+.2f} · p = {_fmt_pq(res.p_value)} · "
             f"q = {_fmt_pq(q_value)} · significant: {'yes' if significant else 'no'}"
         )
-    lines.append("")
-    lines.append(
-        f"Hypothesis-generating only. With n ≈ {n_obs} bots and {tested} features tested, nothing here "
-        "is proof. Correlation is not causation, and some correlates (hours, frontier model) may track "
-        "a maker's skill or budget rather than being the lever."
-    )
     return "\n".join(lines)
 
 
@@ -460,7 +454,7 @@ def _intro(in_scope, excluded, corr_pool, counts, leaderboard_size) -> str:
         "to win a prize.",
         f"* Winners: {counts['winner']} participants who won prize money in the tournament.",
         f"* Top 10 (by peer score): {counts['top_10']} participants whose bot placed in the top 10 of "
-        f"the full {leaderboard_size}-bot leaderboard by total score. This group overlaps with winners.",
+        f"the full {leaderboard_size}-bot leaderboard by sum of spot peer score. This group overlaps with winners.",
         "",
         "Charts show the share within each group, since the groups differ in size.",
         "",

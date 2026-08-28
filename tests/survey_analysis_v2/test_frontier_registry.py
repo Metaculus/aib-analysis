@@ -129,6 +129,6 @@ def test_frontier_final_ignored_artifact_is_false():
 
 def test_kimi_generic_left_unknown_and_not_frontier():
     # Config note: generic 'Kimi' has an unspecified version -> not counted frontier.
-    matched, ignored, unmatched = parsing.classify_models("Chinese SOTAs (GLM, Kimi, etc)")
+    matched, _ignored, _unmatched = parsing.classify_models("Chinese SOTAs (GLM, Kimi, etc)")
     assert any(m.display == "Kimi" for m in matched)
     assert parsing.is_frontier_final("Chinese SOTAs (GLM, Kimi, etc)") is False
