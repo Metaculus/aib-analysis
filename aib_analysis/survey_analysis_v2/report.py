@@ -453,8 +453,9 @@ def _intro(in_scope, excluded, corr_pool, counts, leaderboard_size) -> str:
         f"* Non-winners: {counts['non_winner']} FutureEval participants who did not perform well enough "
         "to win a prize.",
         f"* Winners: {counts['winner']} participants who won prize money in the tournament.",
-        f"* Top 10 (by peer score): {counts['top_10']} participants whose bot placed in the top 10 of "
-        f"the full {leaderboard_size}-bot leaderboard by sum of spot peer score. This group overlaps with winners.",
+        f"* Top 10 (by peer score): {counts['top_10']} participants who filled the survey and whose bot "
+        f"placed in the top 10 of the full {leaderboard_size}-bot leaderboard by sum of spot peer score. "
+        "This group overlaps with winners.",
         "",
         "Charts show the share within each group, since the groups differ in size.",
         "",
