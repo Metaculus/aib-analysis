@@ -236,7 +236,7 @@ def test_top_10_spread_takeaway() -> None:
     assert phrasing.top_10_spread_takeaway(overlapping).startswith("**No one leads the pack:**")
     separated = _field([(25.0, 35.0)] + [(10.0, 20.0)] * 9)
     text = phrasing.top_10_spread_takeaway(separated)
-    assert text.startswith("**A few top bots separated from the rest of the top 10:**")
+    assert text.startswith("**Some top-10 bots are clearly separated from others:**")
     assert "9 of the 45 pairs" in text
 
 

@@ -414,7 +414,7 @@ def top_10_spread_takeaway(field: FieldSummary) -> str:
         )
     pair_count = len(field.top_10) * (len(field.top_10) - 1) // 2
     return (
-        f"**A few top bots separated from the rest of the top {TOP_N}:** {spread}. {separated_pairs} of the "
+        f"**Some top-{TOP_N} bots are clearly separated from others:** {spread}. {separated_pairs} of the "
         f"{pair_count} pairs of top-{TOP_N} bots have non-overlapping 95% confidence intervals."
     )
 
