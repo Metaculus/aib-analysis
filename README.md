@@ -53,6 +53,16 @@ poetry run streamlit run aib_analysis/front_end.py
 
 In the UI, set the tournaments folder to the simulation output path (e.g. `local/spring_2026_simulations_teams_comparison`). Restart Streamlit or use **Clear cache** in the ⋮ menu after changing underlying JSON or loading/scoring code.
 
+## Pros vs bots write-up
+
+To draft the season's results post from the same simulation outputs:
+
+```
+poetry run python -m aib_analysis.pro_vs_bot_writeup.run --season spring_2026 --html
+```
+
+It reads `local/<season>_simulations/` and writes `local/<season>_pro_vs_bot_writeup/`: `writeup.md` (precommitted result sentences plus `[===Fill me===]` blocks with reminders), PNG charts, CSV leaderboards, and `pro_name_key.csv` (maps Pro aliases to usernames; keep it local). Add a new season, and anything the data can't provide, in `aib_analysis/pro_vs_bot_writeup/season_config.py`.
+
 ## Structure
 
 The project is built around `SimulatedTournament` (see `data_models.py` / `simulated_tournament.py`). It is initialized from `Forecast` objects and derives users, scores, etc. Most analyses are filtered, aggregated, or combined tournaments built from those forecasts.
