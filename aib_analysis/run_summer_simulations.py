@@ -117,15 +117,7 @@ def main(
 
     # ------------------------- Subdivisions of Bot Tournament -------------------------
 
-    metac_bot_users = [
-        user
-        for user in bot_tournament.users
-        if user.is_metac_bot and user.name not in NON_TEMPLATE_METAC_BOT_NAMES
-    ]
-    logger.info(
-        f"Metac Bot Tournament: {len(metac_bot_users)} Metac Bots "
-        f"(excluding non-template bots {sorted(NON_TEMPLATE_METAC_BOT_NAMES)})"
-    )
+    metac_bot_users = [user for user in bot_tournament.users if user.is_metac_bot]
     metac_bot_forecasts = [
         forecast
         for user in metac_bot_users
@@ -444,14 +436,6 @@ SPRING_2026_TOP_BOT_NAMES: set[str] = {
     "pgodzinai",
     "mmBot",
     "jonahsingerbot",
-}
-
-# Metaculus-run bots that do not use the standard template prompt, so they are left out of
-# the same-prompt LLM comparison. Exact names only: Fall 2026 "metac-agent-<model>" bots may
-# be template bots.
-NON_TEMPLATE_METAC_BOT_NAMES: set[str] = {
-    "metac-agent",
-    "metac-azimuth",
 }
 
 
