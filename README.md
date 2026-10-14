@@ -61,7 +61,7 @@ To draft the season's results post from the same simulation outputs:
 poetry run python -m aib_analysis.pro_vs_bot_writeup.run --season spring_2026 --html
 ```
 
-It reads `local/<season>_simulations/` and writes `local/<season>_pro_vs_bot_writeup/`: `writeup.md` (precommitted result sentences plus `[===Fill me===]` blocks with reminders), PNG charts, CSV leaderboards, and `pro_name_key.csv` (maps Pro aliases to usernames; keep it local). Add a new season, and anything the data can't provide, in `aib_analysis/pro_vs_bot_writeup/season_config.py`.
+It reads `local/<season>_simulations/` and writes `local/<season>_pro_vs_bot_writeup/`: `writeup.md` (precommitted result sentences plus `[===Fill me===]` blocks with reminders), `writeup_preview.md` (the same text with charts embedded, for viewers that won't load local images), PNG charts, CSV leaderboards, and `pro_name_key.csv` (maps Pro aliases to usernames; keep it local). Add a new season, and anything the data can't provide, in `aib_analysis/pro_vs_bot_writeup/season_config.py`.
 
 ## Structure
 

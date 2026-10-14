@@ -60,7 +60,12 @@ def test_run_writes_all_outputs(pros_ahead_folder: Path, synthetic_config: Seaso
     monkeypatch.setitem(season_config.SEASONS, "synthetic", synthetic_config)
     output_folder = tmp_path / "output"
     run.main("synthetic", pros_ahead_folder, output_folder, html=False)
-    assert (output_folder / "writeup.md").exists()
+    writeup = (output_folder / "writeup.md").read_text()
+    preview = (output_folder / "writeup_preview.md").read_text()
+    chart_count = len(dataclasses.fields(ChartFiles))
+    assert writeup.count("](charts/") == chart_count
+    assert preview.count("](data:image/png;base64,") == chart_count
+    assert "](charts/" not in preview
     assert (output_folder / "pro_name_key.csv").read_text().startswith("alias,username")
     for data_file in ("bot_leaderboard.csv", "individual_leaderboard.csv", "metac_same_prompt_leaderboard.csv", "team_sizes.csv"):
         assert (output_folder / "data" / data_file).exists()

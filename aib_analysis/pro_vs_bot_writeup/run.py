@@ -4,16 +4,20 @@ Usage:
     poetry run python -m aib_analysis.pro_vs_bot_writeup.run --season summer_2026
         [--simulations-folder PATH] [--output-folder PATH] [--html]
 
-Writes writeup.md, charts/*.png, data/*.csv, and pro_name_key.csv (maps Pro aliases to
-usernames; keep it local). --html also renders writeup.html with Quarto for previewing.
+Writes writeup.md (links to charts/*.png, for pasting into a post), writeup_preview.md (the
+same text with the charts embedded, for markdown viewers that won't load local images),
+data/*.csv, and pro_name_key.csv (maps Pro aliases to usernames; keep it local). --html also
+renders writeup.html with Quarto.
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
 import csv
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -48,6 +52,7 @@ CHART_FILES = ChartFiles(
     field="charts/bot_field.png",
     metac="charts/metac_bots.png",
 )
+CHART_LINK_PATTERN = re.compile(r"!\[(?P<alt>[^\]]*)\]\((?P<path>charts/[^)]+\.png)\)")
 
 
 def write_charts(results: SeasonResults, config: SeasonConfig, output_folder: Path) -> int:
@@ -110,6 +115,16 @@ def write_data_files(results: SeasonResults, output_folder: Path) -> None:
         writer.writerows(sorted((alias, name) for name, alias in results.individuals.pro_aliases.items()))
 
 
+def embed_charts(writeup: str, output_folder: Path) -> str:
+    """Replace each chart link with a base64 data URI of the PNG."""
+
+    def to_data_uri(match: re.Match[str]) -> str:
+        encoded = base64.b64encode((output_folder / match.group("path")).read_bytes()).decode("ascii")
+        return f"![{match.group('alt')}](data:image/png;base64,{encoded})"
+
+    return CHART_LINK_PATTERN.sub(to_data_uri, writeup)
+
+
 def render_html(output_folder: Path) -> None:
     if shutil.which("quarto") is None:
         raise FileNotFoundError("--html needs Quarto on PATH (https://quarto.org)")
@@ -146,6 +161,9 @@ def main(season_key: str, simulations_folder: Path | None, output_folder: Path |
     writeup_path = output_folder / "writeup.md"
     writeup_path.write_text(writeup)
     logger.info(f"Wrote {writeup_path} ({writeup.count(phrasing.FILL_ME)} Fill me blocks)")
+    preview_path = output_folder / "writeup_preview.md"
+    preview_path.write_text(embed_charts(writeup, output_folder))
+    logger.info(f"Wrote {preview_path} (charts embedded)")
 
     logger.info("Step 4/4: HTML preview" if html else "Step 4/4: skipped HTML preview (pass --html)")
     if html:
