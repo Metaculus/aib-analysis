@@ -17,7 +17,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
+top_level_dir = os.path.abspath(os.path.join(current_dir, "../../"))
 sys.path.append(top_level_dir)
 
 from aib_analysis.math.stats import (
@@ -363,7 +363,7 @@ def overview_section(
         "",
         (
             f"- Bots with at least one scored forecast: {len(bots_with_scores)} "
-            f"({len(metac_bots)} Metac Bots, {len(bots_with_scores) - len(metac_bots)} non-Metaculus bots). "
+            f"({len(metac_bots)} Metaculus-run bots, {len(bots_with_scores) - len(metac_bots)} non-Metaculus bots). "
             f"{len(bot_tournament.forecasting_user_names())} accounts forecast at all (including on annulled questions only)."
         ),
         (
@@ -432,7 +432,9 @@ def metac_section(metac_tournament: RawTournament, output_folder: Path) -> str:
     return "\n".join(lines)
 
 
-def bot_leaderboard_section(bot_tournament: RawTournament, output_folder: Path, top_n: int) -> str:
+def bot_leaderboard_section(
+    bot_tournament: RawTournament, template_metac_names: set[str], output_folder: Path, top_n: int
+) -> str:
     results = [r for r in ranked(bot_tournament.spot_peer_results()) if r.user_type == "bot"]
     plot_leaderboard(
         results[:10], "Bot tournament: top 10 by sum of spot peer scores",
@@ -446,6 +448,9 @@ def bot_leaderboard_section(bot_tournament: RawTournament, output_folder: Path, 
     metac_ranks = [
         (rank, result.name) for rank, result in enumerate(results, start=1) if result.is_metac_bot
     ]
+    template_metac_ranks = [
+        (rank, name) for rank, name in metac_ranks if name in template_metac_names
+    ]
     lines = [
         f"## Which bot strategy is best? (Bot tournament, {len(results)} bots)",
         "",
@@ -453,8 +458,12 @@ def bot_leaderboard_section(bot_tournament: RawTournament, output_folder: Path, 
         "",
         markdown_table(LEADERBOARD_HEADERS, leaderboard_rows(results[:top_n])),
         "",
-        f"- Best Metac Bot: {metac_ranks[0][1]} in {metac_ranks[0][0]}th place",
-        f"- Metac Bots in the top 20: {sum(1 for rank, _ in metac_ranks if rank <= 20)}",
+        f"- Best Metaculus-run bot: {metac_ranks[0][1]} at rank {metac_ranks[0][0]}",
+        (
+            f"- Best template Metac Bot (from the LLM comparison set): {template_metac_ranks[0][1]} "
+            f"at rank {template_metac_ranks[0][0]}"
+        ),
+        f"- Metaculus-run bots in the top 20: {sum(1 for rank, _ in metac_ranks if rank <= 20)}",
         "",
         "![Top 10 bots](bot_leaderboard_top10.png)",
         "",
@@ -768,8 +777,14 @@ def main(simulations_folder: Path, output_folder: Path, season_name: str, top_n:
     sections = [overview_section(bot_tournament, pro_tournament, combined, bot_only)]
     logger.info("Overview done")
 
-    sections.append(metac_section(RawTournament(find_single_file(simulations_folder, "metac_bot_tournament.json")), output_folder))
-    sections.append(bot_leaderboard_section(bot_tournament, output_folder, top_n))
+    metac_tournament = RawTournament(find_single_file(simulations_folder, "metac_bot_tournament.json"))
+    sections.append(metac_section(metac_tournament, output_folder))
+    sections.append(
+        bot_leaderboard_section(
+            bot_tournament, metac_tournament.forecasting_user_names(), output_folder, top_n
+        )
+    )
+    del metac_tournament
     del bot_tournament
     logger.info("Bot leaderboards done")
 

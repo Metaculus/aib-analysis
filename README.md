@@ -56,7 +56,7 @@ In the UI, set the tournaments folder to the simulation output path (e.g. `local
 To get a markdown results summary (leaderboards, Pro vs bot head-to-head, per-type and team-size breakdowns, charts) from the same JSON outputs:
 
 ```
-poetry run python aib_analysis/summarize_season_results.py --simulations-folder local/summer_2026_simulations --season-name "Summer 2026"
+poetry run python aib_analysis/utils/summarize_season_results.py --simulations-folder local/summer_2026_simulations --season-name "Summer 2026"
 ```
 
 That writes `results_summary.md`, CSV leaderboards, and PNG charts to `local/summer_2026_simulations/results_summary/`.
