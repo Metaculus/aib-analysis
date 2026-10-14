@@ -24,6 +24,7 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     TOP_N,
     LeaderboardRow,
     SeasonResults,
+    SeasonTrend,
     split_baseline_name,
 )
 from aib_analysis.pro_vs_bot_writeup.season_config import (
@@ -152,6 +153,19 @@ def _leaderboard_table(rows: list[LeaderboardRow], name_header: str) -> str:
     return "\n".join(lines)
 
 
+def _season_trend_table(trend: SeasonTrend) -> str:
+    lines = [
+        "| Season | Bot team head-to-head score | 95% CI | Result |",
+        "| --- | --- | --- | --- |",
+    ]
+    for point in trend.points:
+        lines.append(
+            f"| {point.season_label} | {phrasing.format_compact(point.mean)} | {format_ci(point.ci, compact=True)} | "
+            f"{phrasing.season_result(point)} |"
+        )
+    return "\n".join(lines)
+
+
 def _title_block(results: SeasonResults, config: SeasonConfig) -> str:
     head_to_head = results.head_to_head
     suggestion = TITLE_SUGGESTIONS[(head_to_head.leader, head_to_head.evidence)]
@@ -247,6 +261,7 @@ def _pros_vs_bots_section(results: SeasonResults, config: SeasonConfig, charts: 
             "### Team performance over seasons",
             phrasing.trend_paragraph(results.season_trend),
             _image(charts.season_trend),
+            _season_trend_table(results.season_trend),
             trend_reminder,
             "### Pros and bots as individuals",
             phrasing.individuals_paragraph(results.individuals, INDIVIDUAL_CHART_ROWS),

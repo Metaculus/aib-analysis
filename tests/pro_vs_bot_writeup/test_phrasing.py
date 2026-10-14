@@ -106,8 +106,15 @@ def _trend(previous_mean: float, current_mean: float, change_p_value: float) -> 
 def test_trend_takeaway_branches(previous_mean: float, current_mean: float, change_p_value: float, heading: str) -> None:
     text = phrasing.trend_takeaway(_trend(previous_mean, current_mean, change_p_value))
     assert text.startswith(heading)
-    assert "-20.03 in Q2 2025 (95% CI: [-28.63, -11.41])" in text
+    assert "-20.03 in Q2 2025, " in text
+    assert "95% CI" not in text
     assert phrasing.HEAD_TO_HEAD_REMINDER in text
+
+
+def test_trend_takeaway_states_clear_winners_and_change() -> None:
+    text = phrasing.trend_takeaway(_trend(-1.25, -0.26, 0.784))
+    assert "Pros won clearly in Q2 2025; the other seasons had no clear winner." in text
+    assert "The change from Spring 2026 (-1.25) is not statistically significant (p = 0.784)." in text
 
 
 def test_trend_takeaway_without_history() -> None:
@@ -117,9 +124,19 @@ def test_trend_takeaway_without_history() -> None:
 
 def test_trend_paragraph_lists_clear_wins_and_skipped_seasons() -> None:
     text = phrasing.trend_paragraph(_trend(5.0, 12.0, 0.04))
-    assert "Clear wins by the Pros (defined as the 95% confidence interval being wholly below zero) occurred in Q2 2025." in text
-    assert "Clear wins by the bots (defined as the 95% confidence interval being wholly above zero) occurred in Spring 2026 and Summer 2026." in text
+    assert "when its 95% confidence interval is entirely on one side of zero." in text
+    assert "Pros won clearly in Q2 2025 and bots won clearly in Spring 2026 and Summer 2026." in text
     assert "Fall 2025 compared bots with the Metaculus community prediction instead of Pros, so it is not shown." in text
+
+
+def test_clear_wins_sentence_without_clear_winners() -> None:
+    trend = SeasonTrend(
+        points=[SeasonTrendPoint("Spring 2026", -1.25, (-4.87, 2.37), 99, False), SeasonTrendPoint("Summer 2026", -0.26, (-6.47, 5.96), 97, True)],
+        change_p_value=0.784,
+        skipped_seasons=(),
+    )
+    assert phrasing.clear_wins_sentence(trend) == "No season had a clear winner."
+    assert [phrasing.season_result(point) for point in trend.points] == ["No clear winner", "No clear winner"]
 
 
 def _individuals(order: list[str]) -> IndividualResults:

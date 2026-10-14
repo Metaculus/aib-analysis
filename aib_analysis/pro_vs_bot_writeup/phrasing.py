@@ -174,8 +174,29 @@ def question_wins_sentence(head_to_head: HeadToHeadResult) -> str:
     return sentence
 
 
-def _season_value(point: SeasonTrendPoint) -> str:
-    return f"{format_compact(point.mean)} in {point.season_label} (95% CI: {format_ci(point.ci, compact=True)})"
+def season_result(point: SeasonTrendPoint) -> str:
+    """A season is a clear win when its 95% CI sits entirely on one side of zero."""
+    if point.ci[1] < 0:
+        return "Pros clearly ahead"
+    if point.ci[0] > 0:
+        return "Bots clearly ahead"
+    return "No clear winner"
+
+
+def clear_wins_sentence(trend: SeasonTrend) -> str:
+    pro_wins = [point.season_label for point in trend.points if season_result(point) == "Pros clearly ahead"]
+    bot_wins = [point.season_label for point in trend.points if season_result(point) == "Bots clearly ahead"]
+    clauses = []
+    if pro_wins:
+        clauses.append(f"Pros won clearly in {join_names(pro_wins)}")
+    if bot_wins:
+        clauses.append(f"{'bots' if clauses else 'Bots'} won clearly in {join_names(bot_wins)}")
+    if not clauses:
+        return "No season had a clear winner."
+    sentence = " and ".join(clauses)
+    if len(pro_wins) + len(bot_wins) < len(trend.points):
+        sentence += "; the other seasons had no clear winner"
+    return f"{sentence}."
 
 
 def season_change_clause(trend: SeasonTrend) -> str | None:
@@ -185,20 +206,18 @@ def season_change_clause(trend: SeasonTrend) -> str | None:
     significance = "statistically significant" if trend.change_p_value < SIGNIFICANCE_LEVEL else "not statistically significant"
     return (
         f"The change from {previous.season_label} ({format_compact(previous.mean)}) is {significance} "
-        f"(two-sided {format_p(trend.change_p_value)})."
+        f"({format_p(trend.change_p_value)})."
     )
 
 
 def trend_takeaway(trend: SeasonTrend) -> str:
     current = trend.current
     previous = trend.previous
-    current_text = (
-        f"{format_compact(current.mean)} this season (95% CI: {format_ci(current.ci, compact=True)})"
-    )
+    current_text = f"{format_compact(current.mean)} this season"
     if previous is None or trend.change_p_value is None:
         return (
             f"**The bot team scored {format_compact(current.mean)} against Pros:** The bot team's head-to-head "
-            f"score against Pros was {current_text}. {HEAD_TO_HEAD_REMINDER}"
+            f"score against Pros was {current_text}. {HEAD_TO_HEAD_REMINDER} {clear_wins_sentence(trend)}"
         )
     if trend.change_p_value >= SIGNIFICANCE_LEVEL:
         heading = f"No clear change in the bot team's standing since {previous.season_label}"
@@ -206,31 +225,21 @@ def trend_takeaway(trend: SeasonTrend) -> str:
         heading = f"The bot team improved clearly relative to Pros since {previous.season_label}"
     else:
         heading = f"The bot team fell back relative to Pros since {previous.season_label}"
-    earlier = ", ".join(_season_value(point) for point in trend.points[:-1])
+    earlier = ", ".join(f"{format_compact(point.mean)} in {point.season_label}" for point in trend.points[:-1])
     return (
         f"**{heading}:** The bot team's head-to-head score against Pros was {earlier}, and {current_text}. "
-        f"{HEAD_TO_HEAD_REMINDER} {season_change_clause(trend)}"
+        f"{HEAD_TO_HEAD_REMINDER} {clear_wins_sentence(trend)} {season_change_clause(trend)}"
     )
 
 
 def trend_paragraph(trend: SeasonTrend) -> str:
     sentences = [
-        "Below is the bot team's head-to-head score against the Pro team in each season, with 95% confidence "
+        "Below are the bot team's head-to-head scores against the Pro team in each season, with 95% confidence "
         "intervals. A score of zero means the teams' performance was equal. Negative means the Pros performed "
-        "better, and positive means the bots performed better."
+        "better, and positive means the bots performed better. We count a season as a clear win when its 95% "
+        "confidence interval is entirely on one side of zero.",
+        clear_wins_sentence(trend),
     ]
-    pro_clear_wins = [point.season_label for point in trend.points if point.ci[1] < 0]
-    bot_clear_wins = [point.season_label for point in trend.points if point.ci[0] > 0]
-    if pro_clear_wins:
-        sentences.append(
-            "Clear wins by the Pros (defined as the 95% confidence interval being wholly below zero) occurred in "
-            f"{join_names(pro_clear_wins)}."
-        )
-    if bot_clear_wins:
-        sentences.append(
-            "Clear wins by the bots (defined as the 95% confidence interval being wholly above zero) occurred in "
-            f"{join_names(bot_clear_wins)}."
-        )
     change_clause = season_change_clause(trend)
     if change_clause:
         sentences.append(change_clause)
