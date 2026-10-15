@@ -37,6 +37,7 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     SeasonTrend,
     TeamAccuracy,
     TeamSizeResult,
+    is_metac_bot,
 )
 
 logger = logging.getLogger(__name__)
@@ -240,6 +241,24 @@ def individual_leaderboard_chart(individuals: IndividualResults, shown_count: in
         f"Pros and bots as individuals: top {shown_count}",
         f"On the {individuals.question_count} shared questions, ranked by sum of spot peer scores",
         [_dot(PRO_COLOR, "Pro forecaster"), _dot(BOT_COLOR, "Bot")],
+    )
+    _save(figure, path)
+
+
+def top_bots_chart(field: FieldSummary, shown_count: int, path: Path) -> None:
+    rows = field.rows[:shown_count]
+    labels = [f"{row.rank}. {row.name}" for row in rows]
+    figure, axes = _new_figure(
+        0.25 * len(rows) + 1.75, left_inches=_left_margin_for_labels(labels), right_inches=COUNT_COLUMN_INCHES, has_legend=True
+    )
+    _dot_interval_rows(axes, rows, [DEEMPHASIS if is_metac_bot(row.name) else BOT_COLOR for row in rows])
+    axes.set_xlabel("Average spot peer score (95% CI)")
+    _style_grid(axes, "x")
+    _add_titles(
+        figure,
+        f"Bot tournament: top {len(rows)} of {len(field.rows)} bots",
+        f"On {field.scored_question_count} questions, ranked by sum of spot peer scores",
+        [_dot(BOT_COLOR, "Bot maker's bot"), _dot(DEEMPHASIS, "Metac Bot (run by Metaculus)")],
     )
     _save(figure, path)
 

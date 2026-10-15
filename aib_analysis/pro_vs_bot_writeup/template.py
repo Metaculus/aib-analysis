@@ -59,6 +59,7 @@ TITLE_SUGGESTIONS = {
     ("bots", "none"): "Bots Edge Out Pros, Without Statistical Significance",
 }
 INDIVIDUAL_CHART_ROWS = 20
+TOP_BOTS_CHART_ROWS = 20
 METAC_CHART_ROWS = 15
 METAC_BOT_PROMPT = """You are a professional forecaster interviewing for a job.
 
@@ -95,6 +96,7 @@ class ChartFiles:
     team_size: str
     individuals: str
     accuracy: str
+    top_bots: str
     field: str
     metac: str
 
@@ -286,8 +288,10 @@ def _top_bots_section(results: SeasonResults, config: SeasonConfig, charts: Char
         [
             "## Which bots did best?",
             f"The bot tournament pitted all {len(field.rows)} bots (both bot makers' bots and in-house Metac Bots) "
-            f"against one another on {field.scored_question_count} questions. {leaderboard_link} Below are the top "
-            f"{TOP_N} bots ranked by the sum of their spot peer scores.",
+            f"against one another on {field.scored_question_count} questions. {leaderboard_link} The chart below "
+            f"shows the top {TOP_BOTS_CHART_ROWS} bots ranked by the sum of their spot peer scores, and the table "
+            f"gives exact numbers for the top {TOP_N}.",
+            _image(charts.top_bots),
             _leaderboard_table(field.top_10, "Bot"),
             "### The whole field",
             phrasing.field_paragraph(field, FIELD_CHART_MIN_QUESTIONS, field_hidden_count),

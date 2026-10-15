@@ -37,6 +37,7 @@ from aib_analysis.pro_vs_bot_writeup.season_config import (
 from aib_analysis.pro_vs_bot_writeup.template import (
     INDIVIDUAL_CHART_ROWS,
     METAC_CHART_ROWS,
+    TOP_BOTS_CHART_ROWS,
     ChartFiles,
     render_writeup,
 )
@@ -49,6 +50,7 @@ CHART_FILES = ChartFiles(
     team_size="charts/team_size.png",
     individuals="charts/individual_leaderboard.png",
     accuracy="charts/accuracy.png",
+    top_bots="charts/top_bots.png",
     field="charts/bot_field.png",
     metac="charts/metac_bots.png",
 )
@@ -65,6 +67,7 @@ def write_charts(results: SeasonResults, config: SeasonConfig, output_folder: Pa
     charts.team_size_chart(results.team_sizes, config.main_bot_team_size, output_folder / CHART_FILES.team_size)
     charts.individual_leaderboard_chart(results.individuals, INDIVIDUAL_CHART_ROWS, output_folder / CHART_FILES.individuals)
     charts.accuracy_chart(results.bot_field_accuracy, results.team_accuracy, output_folder / CHART_FILES.accuracy)
+    charts.top_bots_chart(results.field, TOP_BOTS_CHART_ROWS, output_folder / CHART_FILES.top_bots)
     charts.metac_chart(results.metac, METAC_CHART_ROWS, output_folder / CHART_FILES.metac)
     hidden_bots = charts.field_chart(results.field, FIELD_CHART_MIN_QUESTIONS, output_folder / CHART_FILES.field)
     return len(hidden_bots)
