@@ -21,6 +21,7 @@ class Tournament(Enum):
     Q2_2025 = "q2_2025"
     Fall_2025 = "fall_2025"
     Spring_2026 = "spring_2026"
+    Summer_2026 = "summer_2026"
 
 
 class ProblemQuestion(BaseModel):
@@ -126,6 +127,32 @@ force_match_questions: list[ProblemQuestion] = [
         ),
         proposed_action="Force match (exclude annulled 42063)",
         tournament=Tournament.Spring_2026,
+    ),
+    # Summer 2026
+    ProblemQuestion(
+        question_text="Will the Strait of Hormuz Monitor show the strait continuously closed through August 31, 2026?",
+        question_1_url="https://www.metaculus.com/questions/44665/",
+        question_2_url="https://www.metaculus.com/questions/44651/",
+        notes=(
+            "Title mismatch only: pro 'the strait continuously closed' vs bot "
+            "'the strait with a status of Closed continuously'. Same resolution (Yes), "
+            "close time, and weight."
+        ),
+        proposed_action="Force match",
+        tournament=Tournament.Summer_2026,
+    ),
+    ProblemQuestion(
+        question_text="How much will Minions & Monsters gross domestically during its opening weekend?",
+        question_1_url="https://www.metaculus.com/questions/43811/",
+        question_2_url="https://www.metaculus.com/questions/43717/",
+        notes=(
+            "Bot title has a '(Minions & Monsters)' suffix. Resolutions differ in form only: "
+            "pro 'below_lower_bound' vs bot 37003505.0 (range min is 75000000, so both score "
+            "as below the lower bound). Bot weight 0.85 vs pro 1.0 (pro weight used), spot "
+            "scoring times 1.5 hours apart."
+        ),
+        proposed_action="Force match",
+        tournament=Tournament.Summer_2026,
     ),
 ]
 

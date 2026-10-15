@@ -54,8 +54,8 @@ WHERE q.title NOT ILIKE '%[practice]%'
 -- AND p.default_project_id = 3673 -- Q4 AIB PRO Tournament
 -- AND p.default_project_id = 32631 -- Q1 AIB PRO Tournament
 -- AND p.default_project_id = 32761 -- Q2 AIB PRO Tournament
-AND p.default_project_id = 32930 -- Pro Forecasters - AI Forecasting Benchmark 2026 Spring
--- AND p.default_project_id = 33025 -- Pro Forecasters - FutureEval 2026 Summer
+-- AND p.default_project_id = 32930 -- Pro Forecasters - AI Forecasting Benchmark 2026 Spring
+AND p.default_project_id = 33025 -- Pro Forecasters - FutureEval 2026 Summer
 -- AND p.default_project_id = 32827 -- MiniBench sept 1
 -- AND p.default_project_id = 32830 -- MiniBench Sept 15
 --AND p.default_project_id = 32630 -- Q1 Quarterly Cup

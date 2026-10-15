@@ -217,10 +217,10 @@ def main(
         bot_team_in_combined = [
             user for user in pro_with_bot_tourn.users if user.name in bot_team_names
         ]
-        fall_2025_bots_in_combined = [
+        spring_2026_bots_in_combined = [
             user
             for user in pro_with_bot_tourn.users
-            if user.name in FALL_2025_TOP_BOT_NAMES
+            if user.name in SPRING_2026_TOP_BOT_NAMES
         ]
         non_commercial_bots_in_combined = [
             user
@@ -237,19 +237,17 @@ def main(
                 f"Expected {len(bot_team_names)} bot-team members in combined tournament, "
                 f"found {len(bot_team_in_combined)}"
             )
-        missing_fall_2025_bots = FALL_2025_TOP_BOT_NAMES - {
-            user.name for user in fall_2025_bots_in_combined
+        missing_spring_2026_bots = SPRING_2026_TOP_BOT_NAMES - {
+            user.name for user in spring_2026_bots_in_combined
         }
-        if missing_fall_2025_bots:
-            raise ValueError(
-                f"Fall 2025 top bots missing from combined tournament: "
-                f"{sorted(missing_fall_2025_bots)}"
+        if missing_spring_2026_bots:
+            logger.warning(
+                "Spring 2026 top bots missing from combined tournament, so the "
+                "'Spring 2026 Top Bots' aggregate only uses the bots present: "
+                f"missing {sorted(missing_spring_2026_bots)}"
             )
-        if len(fall_2025_bots_in_combined) != len(FALL_2025_TOP_BOT_NAMES):
-            raise ValueError(
-                f"Expected {len(FALL_2025_TOP_BOT_NAMES)} Fall 2025 top bots, "
-                f"found {len(fall_2025_bots_in_combined)}"
-            )
+        if len(spring_2026_bots_in_combined) == 0:
+            raise ValueError("No Spring 2026 top bots found in combined tournament")
         missing_commercial_bots = COMMERCIAL_BOT_NAMES - {
             user.name for user in pro_with_bot_tourn.users if user.type == UserType.BOT
         }
@@ -262,8 +260,8 @@ def main(
             raise ValueError("No non-commercial bots found for aggregate")
 
         logger.info(
-            f"Fall 2025 Bot Team: aggregating {len(fall_2025_bots_in_combined)} bots "
-            f"({sorted(FALL_2025_TOP_BOT_NAMES)})"
+            f"Spring 2026 Bot Team: aggregating {len(spring_2026_bots_in_combined)} bots "
+            f"({sorted(user.name for user in spring_2026_bots_in_combined)})"
         )
         logger.info(
             f"Non-Commercial Bot Team: aggregating "
@@ -277,7 +275,7 @@ def main(
         for team_users, team_name in [
             (pro_team_in_combined, "Pro Team"),
             (bot_team_in_combined, "Bot Team"),
-            (fall_2025_bots_in_combined, "Fall 2025 Top Bots"),
+            (spring_2026_bots_in_combined, "Spring 2026 Top Bots"),
             (non_commercial_bots_in_combined, "Non-Commercial Bot Team"),
         ]:
             team_aggregate = create_aggregated_user_at_spot_time(
@@ -417,6 +415,7 @@ def grab_tournament_data(
 COMMERCIAL_BOT_NAMES: set[str] = {
     "Preseen-Atlas",
     "Preseen-Chestnut",
+    "preseen",  # Summer 2026 account of the same company as the two Preseen bots above
     "manticAI",
     "cassi",
     "futuresearch",
@@ -424,26 +423,27 @@ COMMERCIAL_BOT_NAMES: set[str] = {
     "Upskillbot",
 }
 
-# Top 10 bots from Fall 2025 AIB leaderboard (used as a fixed team in Spring comparisons).
-FALL_2025_TOP_BOT_NAMES: set[str] = {
-    "Preseen-Atlas",
-    "manticAI",
+# Top 10 bots from the official Spring 2026 bot leaderboard (used as a fixed team in
+# Summer comparisons). Bots that did not compete in Summer are skipped with a warning.
+SPRING_2026_TOP_BOT_NAMES: set[str] = {
     "GreeneiBot2",
-    "mmBot",
+    "Preseen-Atlas",
+    "SynapseSeer",
+    "manticAI",
+    "Preseen-Chestnut",
+    "cassi",
     "CumulativeBot",
-    "Panshul42",
-    "AUTOMATIC",
-    "laertes",
-    "nostreambot",
-    "metac-asknews-deepnews[research-only]",
+    "pgodzinai",
+    "mmBot",
+    "jonahsingerbot",
 }
 
 
 if __name__ == "__main__":
     main(
-        pro_path="local/private_input_data/pro_forecasts_2026_spring.csv",
-        bot_path="local/private_input_data/bot_forecasts_2026_spring.csv",
+        pro_path="local/private_input_data/pro_forecasts_2026_summer.csv",
+        bot_path="local/private_input_data/bot_forecasts_2026_summer.csv",
         quarterly_cup_path=None,
-        output_folder="local/spring_2026_simulations/",
+        output_folder="local/summer_2026_simulations/",
         force_unit_weights=False,
     )
