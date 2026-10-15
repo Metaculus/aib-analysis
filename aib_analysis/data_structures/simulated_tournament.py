@@ -35,6 +35,12 @@ class SimulatedTournament(BaseModel):
     name: str | None = None
     forecasts: list[Forecast] = Field(default_factory=list)
     scores_cache: dict[str, Score] = Field(default_factory=dict)  # score_id -> Score
+    peer_baseline_exclusions: dict[int, set[str]] = Field(
+        default_factory=dict, exclude=True
+    )
+    """question_id -> user names left out of that question's peer baseline (they are still
+    scored). Models flags that differed when Metaculus scored a question. Not serialized and
+    not carried over to tournaments built from this one's forecasts."""
 
     @model_validator(mode="after")
     def initialize_tournament(self) -> Self:
@@ -49,6 +55,7 @@ class SimulatedTournament(BaseModel):
 
         self._initialize_spot_forecast_cache()
         self._initialize_user_and_question_caches()
+        self._validate_peer_baseline_exclusions()
         if len(self.scores_cache) == 0:
             self._initialize_scores_cache()
 
@@ -226,10 +233,14 @@ class SimulatedTournament(BaseModel):
         )
         # Metaculus includes the scored forecaster in the geometric mean, then applies
         # N/(N-1). It also excludes non-primary bots and blacklisted users.
+        excluded_user_names = self.peer_baseline_exclusions.get(
+            forecast_to_score.question.question_id, set()
+        )
         peer_baseline_forecasts = [
             forecast
             for forecast in spot_forecasts
             if forecast.user.contributes_to_peer_baseline
+            and forecast.user.name not in excluded_user_names
         ]
 
         spot_peer_score = forecast_to_score.get_spot_peer_score(
@@ -238,6 +249,29 @@ class SimulatedTournament(BaseModel):
         spot_baseline_score = forecast_to_score.get_spot_baseline_score(resolution)
         scores = [spot_peer_score, spot_baseline_score]
         return scores
+
+    def _validate_peer_baseline_exclusions(self) -> None:
+        if not self.peer_baseline_exclusions:
+            return
+        unknown_question_ids = set(self.peer_baseline_exclusions) - set(
+            self._question_cache
+        )
+        if unknown_question_ids:
+            raise ValueError(
+                f"Peer baseline exclusions reference questions not in the tournament: "
+                f"{sorted(unknown_question_ids)}"
+            )
+        excluded_user_names = set().union(*self.peer_baseline_exclusions.values())
+        unknown_user_names = excluded_user_names - set(self._user_cache)
+        if unknown_user_names:
+            raise ValueError(
+                f"Peer baseline exclusions reference users not in the tournament: "
+                f"{sorted(unknown_user_names)}"
+            )
+        logger.info(
+            f"Applying peer baseline exclusions for {sorted(excluded_user_names)} "
+            f"on {len(self.peer_baseline_exclusions)} questions"
+        )
 
     def _validate_one_user_question_per_spot_score(self) -> None:
         # Group scores by question_id, user_name, and score_type
