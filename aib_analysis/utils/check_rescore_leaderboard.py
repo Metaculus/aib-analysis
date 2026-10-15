@@ -32,6 +32,7 @@ from conftest import initialize_logging
 logger = logging.getLogger(__name__)
 
 SCORE_TOLERANCE = 1e-6
+EXCLUDED_FROM_RANKING_STATUS = 2
 QuestionUserKey = tuple[int, str]
 
 
@@ -136,34 +137,105 @@ def baseline_exclusions_at(
     return exclusions
 
 
-def write_comparison(
-    official_board: list[OfficialLeaderboardEntry],
+@dataclass(frozen=True)
+class OfficialLeaderboardRow:
+    score: float
+    rank: int
+    exclusion_status: int
+
+
+def load_official_leaderboard(official_leaderboard_path: Path) -> dict[str, OfficialLeaderboardRow]:
+    with open(official_leaderboard_path) as file_handle:
+        rows = json.load(file_handle)
+    return {
+        row["user"]: OfficialLeaderboardRow(
+            score=row["score"], rank=row["rank"], exclusion_status=row["exclusion_status"]
+        )
+        for row in rows
+    }
+
+
+def compare_leaderboard(
+    official_leaderboard: dict[str, OfficialLeaderboardRow],
+    reproduced_board: list[OfficialLeaderboardEntry],
+) -> list[str]:
+    reproduced_by_user = {entry.user_name: entry for entry in reproduced_board}
+    if reproduced_by_user.keys() != official_leaderboard.keys():
+        only_official = sorted(official_leaderboard.keys() - reproduced_by_user.keys())
+        only_reproduced = sorted(reproduced_by_user.keys() - official_leaderboard.keys())
+        return [f"Leaderboard users differ: only official {only_official}, only reproduced {only_reproduced}"]
+    score_differences = {
+        user_name: abs(row.score - reproduced_by_user[user_name].score)
+        for user_name, row in official_leaderboard.items()
+    }
+    rank_mismatches = sorted(
+        user_name for user_name, row in official_leaderboard.items()
+        if row.rank != reproduced_by_user[user_name].rank
+    )
+    logger.info(
+        f"Official leaderboard vs flags at scoring time: {len(official_leaderboard)} entries, "
+        f"max |score diff| = {max(score_differences.values()):.2e}, rank mismatches: {len(rank_mismatches)}"
+    )
+    problems = []
+    over_tolerance = sorted(user for user, difference in score_differences.items() if difference > SCORE_TOLERANCE)
+    if over_tolerance:
+        problems.append(f"Leaderboard scores differ for {over_tolerance}")
+    if rank_mismatches:
+        problems.append(f"Leaderboard ranks differ for {rank_mismatches}")
+    return problems
+
+
+def write_leaderboard_comparison(
+    official_leaderboard: dict[str, OfficialLeaderboardRow],
+    reproduced_board: list[OfficialLeaderboardEntry],
     predicted_board: list[OfficialLeaderboardEntry],
     path: Path,
 ) -> None:
+    reproduced_by_user = {entry.user_name: entry for entry in reproduced_board}
     predicted_by_user = {entry.user_name: entry for entry in predicted_board}
     with open(path, "w", newline="") as file_handle:
         writer = csv.writer(file_handle)
         writer.writerow(
-            ["user", "excluded_from_ranking", "official_rank", "official_score",
-             "predicted_rank", "predicted_score", "rank_change", "score_change"]
+            ["user", "exclusion_status", "official_rank", "official_score",
+             "reproduced_rank", "reproduced_score", "predicted_rank", "predicted_score",
+             "rank_change", "score_change"]
         )
-        for entry in official_board:
-            predicted = predicted_by_user.get(entry.user_name)
-            if predicted is None:
-                writer.writerow([entry.user_name, entry.is_excluded_from_ranking, entry.rank,
-                                 f"{entry.score:.4f}", "", "", "", ""])
-                continue
+        for user_name, row in sorted(official_leaderboard.items(), key=lambda item: -item[1].score):
+            reproduced = reproduced_by_user[user_name]
+            predicted = predicted_by_user[user_name]
             writer.writerow(
-                [entry.user_name, entry.is_excluded_from_ranking, entry.rank, f"{entry.score:.4f}",
-                 predicted.rank, f"{predicted.score:.4f}", entry.rank - predicted.rank,
-                 f"{predicted.score - entry.score:.4f}"]
+                [user_name, row.exclusion_status, row.rank, f"{row.score:.6f}",
+                 reproduced.rank, f"{reproduced.score:.6f}", predicted.rank, f"{predicted.score:.6f}",
+                 row.rank - predicted.rank, f"{predicted.score - row.score:.6f}"]
+            )
+
+
+def write_question_comparison(
+    official_scores: dict[QuestionUserKey, float],
+    reproduced_scores: dict[QuestionUserKey, float],
+    predicted_scores: dict[QuestionUserKey, float],
+    exclusions: dict[int, set[str]],
+    path: Path,
+) -> None:
+    with open(path, "w", newline="") as file_handle:
+        writer = csv.writer(file_handle)
+        writer.writerow(
+            ["question_id", "user", "official_score", "reproduced_score", "predicted_score",
+             "left_out_of_baseline_at_scoring"]
+        )
+        for question_id, user_name in sorted(official_scores):
+            key = (question_id, user_name)
+            writer.writerow(
+                [question_id, user_name, f"{official_scores[key]:.9f}",
+                 f"{reproduced_scores[key]:.9f}", f"{predicted_scores[key]:.9f}",
+                 ";".join(sorted(exclusions.get(question_id, set())))]
             )
 
 
 def main(
     bot_csv_path: Path,
     official_scores_path: Path,
+    official_leaderboard_path: Path,
     exclusion_windows: list[BaselineExclusionWindow],
     saved_simulation_path: Path | None,
     output_folder: Path,
@@ -200,45 +272,43 @@ def main(
         peer_baseline_exclusions=exclusions,
     )
 
-    problems += compare_scores(
-        "Official vs flags at scoring time", official_scores, spot_peer_scores(flags_at_scoring_time)
-    )
+    reproduced_scores = spot_peer_scores(flags_at_scoring_time)
+    problems += compare_scores("Official vs flags at scoring time", official_scores, reproduced_scores)
     predicted_scores = spot_peer_scores(current_flags)
     if saved_simulation_path is not None:
         problems += compare_scores(
             "Saved simulation vs current flags", saved_spot_peer_scores(saved_simulation_path), predicted_scores
         )
 
+    official_leaderboard = load_official_leaderboard(official_leaderboard_path)
     excluded_from_ranking = {
-        user.name
-        for user in current_flags.users
-        if user.type != UserType.BOT or user.is_primary_bot is False
+        user_name
+        for user_name, row in official_leaderboard.items()
+        if row.exclusion_status >= EXCLUDED_FROM_RANKING_STATUS
     }
-    logger.info(
-        f"Excluded from ranking (humans are assumed excluded; non-primary bots always are): "
-        f"{sorted(excluded_from_ranking)}"
-    )
-    official_board = build_official_leaderboard(total_by_user(official_scores), excluded_from_ranking)
-    reproduced_board = build_official_leaderboard(
-        total_by_user(spot_peer_scores(flags_at_scoring_time)), excluded_from_ranking
-    )
+    logger.info(f"Using the official exclusion statuses: {len(excluded_from_ranking)} entries do not use up a rank")
+    reproduced_board = build_official_leaderboard(total_by_user(reproduced_scores), excluded_from_ranking)
     predicted_board = build_official_leaderboard(total_by_user(predicted_scores), excluded_from_ranking)
-    reproduced_ranks = {entry.user_name: entry.rank for entry in reproduced_board}
-    rank_mismatches = [entry.user_name for entry in official_board if reproduced_ranks.get(entry.user_name) != entry.rank]
-    if rank_mismatches:
-        problems.append(f"Ranks from flags at scoring time differ from official totals for {rank_mismatches}")
+    problems += compare_leaderboard(official_leaderboard, reproduced_board)
 
-    comparison_path = output_folder / "official_vs_predicted_leaderboard.csv"
-    write_comparison(official_board, predicted_board, comparison_path)
+    leaderboard_path = output_folder / "official_vs_predicted_leaderboard.csv"
+    question_path = output_folder / "official_vs_reproduced_scores_by_question.csv"
+    write_leaderboard_comparison(official_leaderboard, reproduced_board, predicted_board, leaderboard_path)
+    write_question_comparison(official_scores, reproduced_scores, predicted_scores, exclusions, question_path)
     predicted_ranks = {entry.user_name: entry.rank for entry in predicted_board}
-    ranked_entries = [entry for entry in official_board if not entry.is_excluded_from_ranking]
-    changed = [entry for entry in ranked_entries if predicted_ranks.get(entry.user_name, entry.rank) != entry.rank]
-    first_changed_rank = min((entry.rank for entry in changed), default=None)
-    largest_move = max((abs(predicted_ranks[entry.user_name] - entry.rank) for entry in changed), default=0)
+    ranked_users = [user_name for user_name in official_leaderboard if user_name not in excluded_from_ranking]
+    changed = [
+        user_name for user_name in ranked_users
+        if predicted_ranks[user_name] != official_leaderboard[user_name].rank
+    ]
+    first_changed_rank = min((official_leaderboard[user_name].rank for user_name in changed), default=None)
+    largest_move = max(
+        (abs(predicted_ranks[user_name] - official_leaderboard[user_name].rank) for user_name in changed), default=0
+    )
     logger.info(
-        f"After rescoring: {len(changed)} of {len(ranked_entries)} ranked bots change rank "
+        f"After rescoring: {len(changed)} of {len(ranked_users)} ranked entries change rank "
         f"(first change at official rank {first_changed_rank}, largest move {largest_move}). "
-        f"Wrote {comparison_path}"
+        f"Wrote {leaderboard_path} and {question_path}"
     )
 
     if problems:
@@ -254,10 +324,16 @@ if __name__ == "__main__":
         help="JSON list of official spot peer scores: question_id, user, score (unweighted), edited_at",
     )
     parser.add_argument(
+        "--official-leaderboard", required=True, type=Path,
+        help="JSON list of official leaderboard entries: user, score, rank, exclusion_status",
+    )
+    parser.add_argument(
         "--baseline-exclusion", required=True, action="append", nargs=3,
         metavar=("USER", "FROM", "UNTIL"),
-        help="Leave USER out of the peer baseline on questions resolved in [FROM, UNTIL). "
-        "FROM is an ISO time or 'start'. Repeat for several users or windows.",
+        help=(
+            "Leave USER out of the peer baseline on questions Metaculus scored in [FROM, UNTIL). "
+            "FROM is an ISO time or 'start'. Repeat for several users or windows."
+        ),
     )
     parser.add_argument("--saved-simulation", type=Path, default=None)
     parser.add_argument("--output-folder", required=True, type=Path)
@@ -265,6 +341,7 @@ if __name__ == "__main__":
     main(
         bot_csv_path=arguments.bot_csv,
         official_scores_path=arguments.official_scores,
+        official_leaderboard_path=arguments.official_leaderboard,
         exclusion_windows=[
             BaselineExclusionWindow.from_arguments(*window_arguments)
             for window_arguments in arguments.baseline_exclusion
