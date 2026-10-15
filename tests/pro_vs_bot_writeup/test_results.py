@@ -247,6 +247,11 @@ def test_accuracy_results_on_synthetic_folder(pros_ahead_folder: Path, synthetic
     assert 0 <= field_accuracy.share_below_base_rate <= 1
     team_accuracy = results.team_accuracy
     assert team_accuracy.binary_question_count == results.head_to_head.question_type_counts["binary"]
+    percent_correct = results.percent_correct
+    assert percent_correct.at_50.always_no == pytest.approx(1 - field_accuracy.yes_rate)
+    assert percent_correct.at_yes_rate.always_no == percent_correct.at_50.always_no
+    assert percent_correct.at_yes_rate.bot_cutoff == pytest.approx(field_accuracy.yes_rate)
+    assert set(percent_correct.at_50.eligible_bots) == {bot.name for bot in field_accuracy.eligible_bots}
     assert team_accuracy.bot_to_pro_ratio == pytest.approx(
         team_accuracy.bot_team_probability / team_accuracy.pro_team_probability
     )

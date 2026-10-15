@@ -20,6 +20,7 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     IndividualResults,
     LeaderboardRow,
     MetacResults,
+    PercentCorrectResults,
     SeasonResults,
     SeasonTrend,
     SeasonTrendPoint,
@@ -468,11 +469,8 @@ def top_10_spread_takeaway(field: FieldSummary) -> str:
 
 def field_paragraph(field: FieldSummary, chart_min_questions: int, hidden_count: int) -> str:
     sentences = [
-        "The chart below shows every bot with at least "
-        f"{chart_min_questions} scored questions: its average spot peer score against the number of questions it "
-        "forecast. The shaded band shows where a bot with no skill advantage over the field would land 95% of the "
-        "time by luck alone. Points further right have more questions behind them, so their averages are more "
-        "trustworthy.",
+        f"The first chart below shows every bot with at least {chart_min_questions} scored questions in leaderboard "
+        "order, with its average spot peer score and 95% confidence interval.",
         f"Among the {field.eligible_count} bots that forecast on at least half of the "
         f"{field.scored_question_count} questions, the highest average was "
         f"{format_score(field.best_eligible.average_score)} ({field.best_eligible.name}), the median was "
@@ -487,7 +485,7 @@ def field_paragraph(field: FieldSummary, chart_min_questions: int, hidden_count:
     if field.promising:
         names = [f"{row.name} ({row.question_count} questions)" for row in field.promising]
         sentences.append(
-            f"{len(field.promising)} {plural(len(field.promising), 'bot')} forecast on between "
+            f"{len(field.promising)} {plural(len(field.promising), 'bot')} (in green) forecast on between "
             f"{field.promising_min_questions} and {field.eligible_min_questions - 1} questions but averaged more "
             f"than the {ordinal(TOP_N)}-place bot ({format_score(field.tenth_place.average_score)}): "
             f"{join_names(names)}. With more questions, some of these might prove to be strong, though lucky streaks "
@@ -496,6 +494,49 @@ def field_paragraph(field: FieldSummary, chart_min_questions: int, hidden_count:
     if hidden_count:
         sentences.append(f"({hidden_count} {plural(hidden_count, 'bot')} with fewer than {chart_min_questions} scored questions are not shown.)")
     return " ".join(sentences)
+
+
+def field_band_paragraph() -> str:
+    return (
+        "The second chart plots each bot's average against how many questions it forecast. The shaded band shows "
+        "how much luck alone moves an average: a bot exactly as good as the typical bot in the field (a true average "
+        "of 0) would land inside the band 95% of the time, given how much bot scores vary from question to "
+        "question. The band is wide on the left because an average over a few questions swings a lot, and narrow on "
+        "the right because more questions even out the luck. Bots above the band did better than luck alone "
+        "explains. Lines show 95% confidence intervals for the highlighted bots."
+    )
+
+
+def percent_correct_paragraph(results: PercentCorrectResults) -> str:
+    at_50 = results.at_50
+    at_yes_rate = results.at_yes_rate
+    gaming = (
+        "Percent correct isn't a proper scoring rule, so it can be gamed. Forecasting 1% on every question would be "
+        f"right on {format_whole_percent(at_50.always_no)} of binary questions"
+    )
+    if at_50.share_of_bots_below_always_no > 0:
+        gaming += f", better than {format_whole_percent(at_50.share_of_bots_below_always_no)} of regular bots"
+    gaming += (
+        ", while putting almost no probability on every question that resolved Yes. It also ignores confidence: a "
+        "51% forecast and a 99% forecast count the same. Moving the cutoff to the Yes rate doesn't fix this; always "
+        f"forecasting 1% still scores {format_whole_percent(at_yes_rate.always_no)}."
+    )
+    return " ".join(
+        [
+            "Many readers know percent correct: the share of binary questions where a forecast was on the right side "
+            "of 50%. The chart shows it for the same forecasters, and again with the cutoff moved to the season's "
+            "Yes rate.",
+            gaming,
+            f"By this measure, the top bot was right on {format_whole_percent(at_50.top_bot)} of binary questions, "
+            f"the median bot on {format_whole_percent(at_50.median)}, and the lowest-scoring bot on "
+            f"{format_whole_percent(at_50.worst_bot)}. On the shared questions, the Pro team was right on "
+            f"{format_whole_percent(at_50.pro_team)} and the bot team on {format_whole_percent(at_50.bot_team)}.",
+        ]
+    )
+
+
+def format_whole_percent(share: float) -> str:
+    return f"{100 * share:.0f}%"
 
 
 def format_percent(probability: float) -> str:

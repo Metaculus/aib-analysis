@@ -23,7 +23,6 @@ from matplotlib.artist import Artist
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
 from matplotlib.ticker import FixedLocator, NullFormatter
 
 from aib_analysis.pro_vs_bot_writeup.phrasing import format_compact
@@ -34,6 +33,8 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     IndividualResults,
     LeaderboardRow,
     MetacResults,
+    PercentCorrectAtCutoff,
+    PercentCorrectResults,
     SeasonTrend,
     TeamAccuracy,
     TeamSizeResult,
@@ -51,6 +52,7 @@ BASELINE = "#c3c2b7"
 BOT_COLOR = "#2a78d6"
 BOT_COLOR_LIGHT = "#86b6ef"
 PRO_COLOR = "#eb6834"
+PROMISING_COLOR = "#1baf7a"
 DEEMPHASIS = "#b9b7af"
 BAND_FILL = "#efeee9"
 FIGURE_WIDTH_INCHES = 7.2
@@ -355,20 +357,143 @@ def accuracy_chart(field_accuracy: BotFieldAccuracy, team_accuracy: TeamAccuracy
     _save(figure, path)
 
 
+def _percent_correct_rows(results: PercentCorrectResults, cutoff: PercentCorrectAtCutoff) -> list[_AccuracyRow]:
+    return [
+        _AccuracyRow(f"Bot tournament: {results.binary_question_count} binary questions", [], is_header=True),
+        _AccuracyRow(
+            f"All {len(cutoff.eligible_bots)} regular bots", [100 * value for value in cutoff.eligible_bots.values()], color=DEEMPHASIS
+        ),
+        _AccuracyRow(f"Top bot ({results.top_bot_name})", [100 * cutoff.top_bot], color=BOT_COLOR),
+        _AccuracyRow("Median bot", [100 * cutoff.median], color=BOT_COLOR),
+        _AccuracyRow("Lowest-scoring bot", [100 * cutoff.worst_bot], color=BOT_COLOR),
+        _AccuracyRow("Always forecast 1%", [100 * cutoff.always_no], marker="D"),
+        _AccuracyRow(f"Pro comparison: {results.shared_binary_question_count} shared binary questions", [], is_header=True),
+        _AccuracyRow("Pro team", [100 * cutoff.pro_team], color=PRO_COLOR),
+        _AccuracyRow("Bot team", [100 * cutoff.bot_team], color=BOT_COLOR),
+        _AccuracyRow("Always forecast 1%", [100 * cutoff.team_always_no], marker="D"),
+    ]
+
+
+def percent_correct_chart(results: PercentCorrectResults, path: Path) -> None:
+    panels = [
+        ("Cutoff at 50%", results.at_50),
+        (
+            f"Cutoff at the Yes rate ({100 * results.at_yes_rate.bot_cutoff:.0f}% / {100 * results.at_yes_rate.team_cutoff:.0f}%)",
+            results.at_yes_rate,
+        ),
+    ]
+    row_sets = [_percent_correct_rows(results, cutoff) for _title, cutoff in panels]
+    labels = [row.label for row in row_sets[0]]
+    height_inches = 0.34 * len(labels) + 1.9
+    figure, axes_pair = plt.subplots(1, 2, sharey=True, figsize=(FIGURE_WIDTH_INCHES, height_inches))
+    left_inches = _left_margin_for_labels(labels)
+    figure.subplots_adjust(
+        left=left_inches / FIGURE_WIDTH_INCHES,
+        right=1 - 0.2 / FIGURE_WIDTH_INCHES,
+        bottom=0.6 / height_inches,
+        top=1 - (TITLE_BLOCK_INCHES + 0.3) / height_inches,
+        wspace=0.12,
+    )
+    jitter = np.random.default_rng(0)
+    all_values = [value for rows in row_sets for row in rows for value in row.percents]
+    for axes, (panel_title, _cutoff), rows in zip(axes_pair, panels, row_sets):
+        for position, row in enumerate(rows):
+            if row.is_header or not row.percents:
+                continue
+            if len(row.percents) > 1:
+                offsets = jitter.uniform(-0.22, 0.22, len(row.percents))
+                axes.scatter(row.percents, position + offsets, s=9, color=row.color, edgecolors=SURFACE, linewidths=0.4, zorder=3)
+                continue
+            value = row.percents[0]
+            axes.plot(value, position, row.marker, color=row.color, markersize=6 if row.marker == "o" else 5, markeredgecolor=SURFACE, markeredgewidth=1, zorder=4)
+            axes.annotate(f"{value:.0f}%", xy=(value, position), xytext=(5, 0), textcoords="offset points", ha="left", va="center", fontsize=8, color=TEXT_PRIMARY)
+        axes.axvline(50, color=BASELINE, linewidth=1, zorder=1)
+        axes.set_xlim(min(min(all_values), 50) - 3, max(all_values) + 9)
+        axes.xaxis.set_major_formatter(lambda value, _position: f"{value:.0f}%")
+        axes.set_title(panel_title, loc="left", fontsize=9, color=TEXT_PRIMARY, pad=6)
+        _style_grid(axes, "x")
+    axes_pair[0].set_yticks(range(len(labels)), labels)
+    for tick_label, row in zip(axes_pair[0].get_yticklabels(), row_sets[0]):
+        tick_label.set_color(TEXT_PRIMARY)
+        if row.is_header:
+            tick_label.set_fontweight("bold")
+    axes_pair[0].set_ylim(len(labels) - 0.4, -0.6)
+    figure.supxlabel("Share of binary questions forecast on the correct side of the cutoff", fontsize=9, color=TEXT_SECONDARY, x=0.6)
+    _add_titles(
+        figure,
+        "Percent correct (not a proper score)",
+        f"It can be gamed: always forecasting 1% scores {100 * results.at_50.always_no:.0f}% here, beating "
+        f"{100 * results.at_50.share_of_bots_below_always_no:.0f}% of regular bots",
+    )
+    _save(figure, path)
+
+
+def _field_color(row: LeaderboardRow, field: FieldSummary) -> str:
+    if row in field.top_10:
+        return BOT_COLOR
+    if row in field.promising:
+        return PROMISING_COLOR
+    return DEEMPHASIS
+
+
+def _field_legend() -> list[Artist]:
+    return [
+        _dot(BOT_COLOR, f"Top {TOP_N} by sum of scores"),
+        _dot(PROMISING_COLOR, "Fewer questions, high average"),
+        _dot(DEEMPHASIS, "Other bots"),
+    ]
+
+
+def field_rank_chart(field: FieldSummary, min_questions: int, path: Path) -> None:
+    shown = [row for row in field.rows if row.question_count >= min_questions]
+    figure, axes = _new_figure(4.6, has_legend=True)
+    for position, row in enumerate(shown, start=1):
+        color = _field_color(row, field)
+        emphasized = color != DEEMPHASIS
+        if row.ci is not None:
+            axes.plot([position, position], row.ci, color=color, linewidth=1.6 if emphasized else 0.8, alpha=0.6 if emphasized else 0.45, zorder=3 if emphasized else 2)
+        axes.plot(position, row.average_score, "o", color=color, markersize=4.5 if emphasized else 2.5, zorder=4 if emphasized else 2)
+    for label_index, row in enumerate(row for row in shown if row in field.promising):
+        position = shown.index(row) + 1
+        above = label_index % 2 == 0
+        anchor = row.ci[1 if above else 0] if row.ci is not None else row.average_score
+        axes.annotate(
+            f"{row.name} ({row.question_count} questions)", xy=(position, anchor), xytext=(0, 4 if above else -4),
+            textcoords="offset points", ha="left", va="bottom" if above else "top", fontsize=7.5, color=TEXT_PRIMARY,
+            bbox={"facecolor": SURFACE, "edgecolor": "none", "pad": 1, "alpha": 0.85}, zorder=5,
+        )
+    _zero_line(axes, horizontal=True)
+    axes.set_xlim(0, len(shown) + 1)
+    axes.set_xlabel("Leaderboard rank (by sum of spot peer scores)")
+    axes.set_ylabel("Average spot peer score (95% CI)")
+    _style_grid(axes, "y")
+    _add_titles(
+        figure,
+        f"Every bot in leaderboard order ({len(shown)} bots)",
+        f"Bots with at least {min_questions} scored questions; lines are 95% confidence intervals",
+        _field_legend(),
+    )
+    _save(figure, path)
+
+
 def field_chart(field: FieldSummary, min_questions: int, path: Path) -> list[LeaderboardRow]:
     """Plot every bot with at least min_questions scored questions; returns the bots left out."""
     shown = [row for row in field.rows if row.question_count >= min_questions]
     hidden = [row for row in field.rows if row.question_count < min_questions]
-    figure, axes = _new_figure(4.7, has_legend=True)
+    figure, axes = _new_figure(4.8, has_legend=True)
     question_grid = np.linspace(min_questions, max(row.question_count for row in shown) * 1.03, 200)
     band = Z_95 * field.per_question_score_sd / np.sqrt(question_grid)
     axes.fill_between(question_grid, -band, band, color=BAND_FILL, linewidth=0, zorder=1)
     _zero_line(axes, horizontal=True)
-    top_names = {row.name for row in field.top_10}
-    others = [row for row in shown if row.name not in top_names]
-    leaders = [row for row in shown if row.name in top_names]
-    axes.scatter([row.question_count for row in others], [row.average_score for row in others], s=16, color=DEEMPHASIS, edgecolors=SURFACE, linewidths=0.6, zorder=3)
-    axes.scatter([row.question_count for row in leaders], [row.average_score for row in leaders], s=30, color=BOT_COLOR, edgecolors=SURFACE, linewidths=0.8, zorder=4)
+    for row in shown:
+        color = _field_color(row, field)
+        emphasized = color != DEEMPHASIS
+        if emphasized and row.ci is not None:
+            axes.plot([row.question_count, row.question_count], row.ci, color=color, linewidth=1.6, alpha=0.6, zorder=3)
+        axes.plot(
+            row.question_count, row.average_score, "o", color=color, markersize=5 if emphasized else 3.2,
+            markeredgecolor=SURFACE, markeredgewidth=0.6, zorder=4 if emphasized else 2,
+        )
     labeled = [row for row in field.promising if row.question_count >= min_questions][:MAX_FIELD_LABELS]
     if field.uniform_reference is not None:
         labeled.append(field.uniform_reference)
@@ -383,13 +508,9 @@ def field_chart(field: FieldSummary, min_questions: int, path: Path) -> list[Lea
     _style_grid(axes, "y")
     _add_titles(
         figure,
-        f"The whole bot field ({len(shown)} bots)",
-        f"Average spot peer score against questions forecast, for bots with at least {min_questions} scored questions",
-        [
-            _dot(BOT_COLOR, f"Top {TOP_N} by sum of scores"),
-            _dot(DEEMPHASIS, "Other bots"),
-            Patch(facecolor=BAND_FILL, label="Where luck alone puts an average bot, 95% of the time"),
-        ],
+        "Average score vs questions forecast",
+        "Shaded band: where 95% of bots exactly as good as the typical bot would land, by luck alone",
+        _field_legend(),
     )
     _save(figure, path)
     return hidden

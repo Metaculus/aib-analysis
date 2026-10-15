@@ -44,6 +44,9 @@ def test_writeup_sections_charts_and_fill_mes(pros_ahead_folder: Path, synthetic
     assert "Appendix A: Methodology** at the end of this post" in writeup
     assert "with questions closing between May 2 and May 2, 2026" in writeup
     assert "linkpost" not in writeup
+    percent_correct_section = writeup[writeup.index("### Percent correct (not a proper score)") : writeup.index("## Which bots did best?")]
+    assert "should we keep this section?" in percent_correct_section
+    assert "![](charts/percent_correct.png)" in percent_correct_section
     assert "**Pro forecasters" in writeup
     assert re.search(r"\bNone\b(?! of)|\bnan\b", writeup) is None
     assert "—" not in writeup

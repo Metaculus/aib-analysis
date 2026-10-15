@@ -9,6 +9,7 @@ from aib_analysis.math.accuracy import (
     geometric_mean_probability,
     geometric_mean_probability_ci,
     paired_probability_ratio,
+    percent_correct,
     yes_rate,
 )
 
@@ -54,6 +55,15 @@ def test_base_rate_forecaster() -> None:
     expected = math.exp((math.log(0.25) + 3 * math.log(0.75)) / 4)
     assert base_rate_geometric_mean_probability(resolutions) == pytest.approx(expected)
     assert base_rate_geometric_mean_probability(resolutions) > 0.5
+
+
+def test_percent_correct() -> None:
+    forecasts = [(0.9, True), (0.2, False), (0.6, False), (0.5, True)]
+    assert percent_correct(forecasts, 0.5) == pytest.approx(2.5 / 4)
+    assert percent_correct([(0.01, False), (0.01, False), (0.01, True)], 0.5) == pytest.approx(2 / 3)
+    assert percent_correct([(0.45, True), (0.3, False)], 0.38) == pytest.approx(1.0)
+    with pytest.raises(ValueError):
+        percent_correct([], 0.5)
 
 
 def test_field_probability_multiplier_undoes_numeric_halving() -> None:

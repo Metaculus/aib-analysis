@@ -73,6 +73,20 @@ def base_rate_geometric_mean_probability(resolutions: list[bool], weights: list[
     )
 
 
+def percent_correct(forecasts: list[tuple[float, bool]], cutoff: float) -> float:
+    """Share of (P(Yes), resolved Yes) forecasts on the correct side of the cutoff; exactly at the cutoff is half right.
+
+    This is an improper score: it ignores confidence and rewards pushing every forecast to one side.
+    """
+    if not forecasts:
+        raise ValueError("Need at least one forecast")
+    credit = sum(
+        0.5 if probability_yes == cutoff else float((probability_yes > cutoff) == resolved_yes)
+        for probability_yes, resolved_yes in forecasts
+    )
+    return credit / len(forecasts)
+
+
 def field_probability_multiplier(peer_scores: list[float], weights: list[float], is_continuous: list[bool]) -> float:
     """How many times the field's probability a forecaster put on the outcome, from its spot peer scores.
 
