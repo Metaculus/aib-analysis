@@ -114,6 +114,7 @@ def test_season_change_uses_normal_critical_value_without_question_count() -> No
         ("metac-gpt-4-1+asknews[optimized-prompt]", False),
         ("metac-asknews-deepnews[research-only]", False),
         ("metac-agent", False),
+        ("metac-autocast", False),
         ("metac-uniform-probability-bot", False),
         ("GreeneiBot2", False),
     ],
