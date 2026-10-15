@@ -176,7 +176,6 @@ def _title_block(results: SeasonResults, config: SeasonConfig) -> str:
                 "a short headline for the top finding. Past titles: \"Pros Beat Bots, but the Gap is Nearly Gone\" "
                 f"(Spring 2026) and \"Pros Maintain Clear Lead\" (Q2 2025). Precommitted suggestion: \"{suggestion}\""
             ),
-            f"This is a linkpost for {fill_me('the Metaculus notebook URL for this analysis, or delete this line')}",
         ]
     )
 
@@ -211,27 +210,16 @@ def _takeaways_section(results: SeasonResults, config: SeasonConfig) -> str:
 def _introduction_section(results: SeasonResults, config: SeasonConfig) -> str:
     overview = results.overview
     head_to_head = results.head_to_head
-    period = _value_or_fill_me(
-        config.period_description,
-        "the season's dates, e.g. \"the first third of 2026 (January 7th through April 15th)\"",
-    )
-    series_ordinal = _value_or_fill_me(config.series_ordinal, "which tournament this is in the series, e.g. \"sixth\"")
     prize_pool = _value_or_fill_me(config.prize_pool, "the prize pool, e.g. \"$50,000\"")
-    if config.companion_posts:
-        companion_links = join_names([f"[{title}]({url})" for title, url in config.companion_posts])
-        companion = f" It is complementary to the {companion_links}."
-    else:
-        companion = " " + fill_me(
-            "link this season's companion posts (bot maker survey analysis, advice from bot makers), or delete this"
-        )
+    question_dates = phrasing.format_date_range(overview.first_question_close, overview.last_question_close)
     return "\n\n".join(
         [
             "## Introduction",
-            f"In {period}, Metaculus ran the {series_ordinal} tournament in our FutureEval series. It had two aims: "
-            "1) comparing AI bots to the best human forecasters and 2) evaluating the best forecasting bots against "
-            f"one another. This is the primary analysis post for {config.label} FutureEval, and it focuses "
-            f"especially on comparing the rankings of Pros and bots.{companion} You can find our past research on "
-            f"the [FutureEval resources page]({RESOURCES_URL}).",
+            f"Metaculus ran the {config.label} FutureEval tournament, with questions closing between "
+            f"{question_dates}. It had two aims: 1) comparing AI bots to the best human forecasters and 2) evaluating "
+            f"the best forecasting bots against one another. This is the primary analysis post for {config.label} "
+            "FutureEval, and it focuses especially on comparing the rankings of Pros and bots. You can find our "
+            f"other research on the [FutureEval resources page]({RESOURCES_URL}).",
             f"There were {overview.bot_count} bots ({overview.non_metac_bot_count} excluding the ones run by "
             f"Metaculus) forecasting on {overview.bot_scored_count} scored questions. The non-Metaculus bot makers "
             f"competed for a prize pool of {prize_pool}. A team of {head_to_head.pro_member_count} Metaculus Pro "
@@ -239,7 +227,7 @@ def _introduction_section(results: SeasonResults, config: SeasonConfig) -> str:
             f"the bots that finished in the top {len(head_to_head.bot_team_members)} of the leaderboard on the "
             "bot-only questions.",
             "For how the questions, scoring, and teams work, see **Appendix A: Methodology** at the end of this "
-            f"post. See a full overview of Metaculus's AI forecasting benchmark at its [FutureEval home page]({FUTUREEVAL_URL}).",
+            f"post. See a full overview of Metaculus's AI forecasting benchmark at the [FutureEval home page]({FUTUREEVAL_URL}).",
         ]
     )
 
@@ -319,7 +307,7 @@ def _top_bots_section(results: SeasonResults, config: SeasonConfig, charts: Char
             ),
             "### The best same-prompt Metac Bot",
             f"The top-scoring same-prompt Metac Bot was {standing.bot_name}, which placed {ordinal(standing.rank)} "
-            f"of {standing.bot_count} in the bot tournament. Its prompt is in Appendix B. "
+            f"of {standing.bot_count} in the bot tournament. The prompt it used is in Appendix B. "
             + fill_me("link an example question page showing its research and reasoning"),
         ]
     )
@@ -525,7 +513,7 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
                     "pro_team_prediction).",
                     f"* {weights_text}",
                     "* **Typical probability on the outcome:** On a binary question that resolved Yes, a forecaster's "
-                    "probability on the outcome is its forecast P(Yes); if it resolved No, it is 1 − P(Yes). A "
+                    "probability on the outcome is the P(Yes) it forecast; if it resolved No, it is 1 − P(Yes). A "
                     "forecaster's typical probability on the outcome is the geometric mean of these across the binary "
                     "questions it forecast, exp(Σ wᵢ ln pᵢ / Σ wᵢ), using the same question weights wᵢ as the "
                     "leaderboards. It is the exponentiated log score, so it rewards honest forecasts, and it tracks "

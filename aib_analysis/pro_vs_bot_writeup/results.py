@@ -13,6 +13,7 @@ import re
 import statistics
 from collections import Counter
 from dataclasses import dataclass, replace
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -119,6 +120,8 @@ class TournamentOverview:
     pro_question_count: int
     pro_scored_count: int
     pro_weighted_question_count: int
+    first_question_close: date
+    last_question_close: date
 
     @property
     def bot_annulled_count(self) -> int:
@@ -326,21 +329,39 @@ class MetacResults:
     scored_question_count: int
     average_questions_per_baseline_bot: float
     baseline_history: list[BaselineRankPoint]
+    first_question_close: date
+    first_scored_close_by_name: dict[str, date]
 
     @property
     def top_baseline(self) -> LeaderboardRow:
         return self.baseline_rows[0]
+
+    def higher_average_on_fewer_questions(self) -> list[LeaderboardRow]:
+        """Same-prompt bots that beat the top bot's average but rank lower by sum because they forecast less."""
+        top = self.top_baseline
+        return sorted(
+            (
+                row
+                for row in self.baseline_rows[1:]
+                if row.average_score > top.average_score and row.question_count < top.question_count
+            ),
+            key=lambda row: row.average_score,
+            reverse=True,
+        )
+
+    def days_after_season_start(self, name: str) -> int:
+        return (self.first_scored_close_by_name[name] - self.first_question_close).days
 
     @property
     def current_standing(self) -> BaselineRankPoint:
         return self.baseline_history[-1]
 
     def close_to_top(self) -> list[LeaderboardRow]:
-        """Baseline bots whose average falls inside the top bot's 95% CI."""
-        top_ci = self.top_baseline.ci
-        if top_ci is None:
+        """Baseline bots whose average is at or below the top bot's but inside its 95% CI."""
+        top = self.top_baseline
+        if top.ci is None:
             return []
-        return [row for row in self.baseline_rows[1:] if row.average_score >= top_ci[0]]
+        return [row for row in self.baseline_rows[1:] if top.ci[0] <= row.average_score <= top.average_score]
 
 
 @dataclass(frozen=True)
@@ -452,6 +473,21 @@ def questions_by_id(raw: dict[str, Any]) -> dict[int, dict[str, Any]]:
 
 def is_scored(question: dict[str, Any]) -> bool:
     return question["resolution"] is not None and question["unscored_resolution_reason"] is None
+
+
+def close_date(question: dict[str, Any]) -> date:
+    return datetime.fromisoformat(question["spot_scoring_time"]).date()
+
+
+def first_scored_close_by_name(raw: dict[str, Any]) -> dict[str, date]:
+    first_closes: dict[str, date] = {}
+    for score in raw["scores_cache"].values():
+        if score["type"] != "spot_peer":
+            continue
+        name = score["forecast"]["user"]["name"]
+        question_close = close_date(score["forecast"]["question"])
+        first_closes[name] = min(first_closes.get(name, question_close), question_close)
+    return first_closes
 
 
 def is_metac_bot(name: str) -> bool:
@@ -736,6 +772,8 @@ def compute_metac(metac_raw: dict[str, Any], bot_rows: list[LeaderboardRow], sea
         scored_question_count=scored_question_count,
         average_questions_per_baseline_bot=statistics.fmean(row.question_count for row in baseline_rows),
         baseline_history=history,
+        first_question_close=min(close_date(question) for question in questions_by_id(metac_raw).values()),
+        first_scored_close_by_name=first_scored_close_by_name(metac_raw),
     )
 
 
@@ -990,6 +1028,8 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
         pro_weighted_question_count=sum(
             1 for question in pro_questions.values() if is_scored(question) and question["weight"] < 1
         ),
+        first_question_close=min(close_date(question) for question in bot_questions.values()),
+        last_question_close=max(close_date(question) for question in bot_questions.values()),
     )
     logger.info(
         f"{overview.bot_count} bots, {overview.bot_scored_count} scored bot questions, {overview.pro_count} Pros, "

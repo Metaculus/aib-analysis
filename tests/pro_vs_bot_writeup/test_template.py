@@ -42,6 +42,8 @@ def test_writeup_sections_charts_and_fill_mes(pros_ahead_folder: Path, synthetic
     assert len(re.findall(r"!\[\]\(", writeup)) == len(dataclasses.fields(ChartFiles))
     assert writeup.count(FILL_ME) == writeup.count(f"{FILL_ME} _(Reminder:") + writeup.count(f"Results: {FILL_ME}")
     assert "Appendix A: Methodology** at the end of this post" in writeup
+    assert "with questions closing between May 2 and May 2, 2026" in writeup
+    assert "linkpost" not in writeup
     assert "**Pro forecasters" in writeup
     assert re.search(r"\bNone\b(?! of)|\bnan\b", writeup) is None
     assert "—" not in writeup

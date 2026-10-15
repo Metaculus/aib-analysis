@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import itertools
 import math
+from datetime import date
 
 from aib_analysis.pro_vs_bot_writeup.results import (
     SIGNIFICANCE_LEVEL,
@@ -203,11 +204,19 @@ def season_change_clause(trend: SeasonTrend) -> str | None:
     previous = trend.previous
     if previous is None or trend.change_p_value is None:
         return None
-    significance = "statistically significant" if trend.change_p_value < SIGNIFICANCE_LEVEL else "not statistically significant"
-    return (
-        f"The change from {previous.season_label} ({format_compact(previous.mean)}) is {significance} "
-        f"({format_p(trend.change_p_value)})."
+    move = (
+        f"The bot team's score went from {format_compact(previous.mean)} in {previous.season_label} to "
+        f"{format_compact(trend.current.mean)} this season"
     )
+    if trend.change_p_value < SIGNIFICANCE_LEVEL:
+        return f"{move}, a statistically significant change ({format_p(trend.change_p_value)})."
+    return f"{move}, a change too small to be statistically significant ({format_p(trend.change_p_value)})."
+
+
+def format_date_range(start: date, end: date) -> str:
+    if start.year == end.year:
+        return f"{start:%B} {start.day} and {end:%B} {end.day}, {end.year}"
+    return f"{start:%B} {start.day}, {start.year} and {end:%B} {end.day}, {end.year}"
 
 
 def trend_takeaway(trend: SeasonTrend) -> str:
@@ -345,7 +354,7 @@ def top_baseline_takeaway(metac: MetacResults) -> str:
     top = metac.top_baseline
     standing = metac.current_standing
     sentence = (
-        f"**The highest-scoring same-prompt Metac Bot was {top.name}:** Metaculus ran "
+        f"**The top-ranked same-prompt Metac Bot was {top.name}:** Metaculus ran "
         f"{len(metac.baseline_rows)} bots that used the same prompt but different LLMs or search setups. "
         f"{top.name} finished first among these, and {ordinal(standing.rank)} of {standing.bot_count} overall in "
         "the bot tournament."
@@ -353,6 +362,13 @@ def top_baseline_takeaway(metac: MetacResults) -> str:
     close_rows = metac.close_to_top()
     if close_rows:
         sentence += f" {close_to_top_sentence(close_rows)}"
+    higher_average_rows = metac.higher_average_on_fewer_questions()
+    if higher_average_rows:
+        standout = higher_average_rows[0]
+        sentence += (
+            f" {standout.name} had a higher average ({format_score(standout.average_score)}) but forecast on "
+            f"{standout.question_count} questions{_late_start_clause(metac, standout)}."
+        )
     return sentence
 
 
@@ -362,8 +378,30 @@ def close_to_top_sentence(close_rows: list[LeaderboardRow], max_names: int = 3) 
     if remaining:
         names.append(f"{remaining} {plural(remaining, 'other')}")
     return (
-        f"However, its lead over {join_names(names)} is within its 95% confidence interval, so it's hard to declare "
-        'its setup "the best."'
+        f"However, {join_names(names)} scored within the top bot's 95% confidence interval, so it's hard to declare "
+        'any one setup "the best."'
+    )
+
+
+def _late_start_clause(metac: MetacResults, row: LeaderboardRow) -> str:
+    weeks_late = round(metac.days_after_season_start(row.name) / 7)
+    if weeks_late < 2:
+        return ""
+    return f", starting {weeks_late} weeks into the season"
+
+
+def higher_average_on_fewer_questions_sentence(metac: MetacResults) -> str | None:
+    rows = metac.higher_average_on_fewer_questions()
+    if not rows:
+        return None
+    descriptions = [
+        f"{row.name} ({format_score(row.average_score)} on {row.question_count} questions{_late_start_clause(metac, row)})"
+        for row in rows
+    ]
+    return (
+        f"{join_names(descriptions)} {plural(len(rows), 'had a higher average', 'had higher averages')} than "
+        f"{metac.top_baseline.name} but forecast on fewer questions, so {plural(len(rows), 'it ranks', 'they rank')} "
+        "lower by sum. Averages over fewer questions are less certain."
     )
 
 
@@ -572,11 +610,16 @@ def experiment_fact_lines(results: SeasonResults) -> list[str]:
 
 def metac_comparison_sentence(metac: MetacResults) -> str:
     top = metac.top_baseline
-    sentence = f"{top.name} scored highest, with an average spot peer score of {format_score(top.average_score)}"
+    sentence = (
+        f"{top.name} ranked first by sum of spot peer scores, with an average of {format_score(top.average_score)}"
+    )
     sentence += f" (95% CI: {format_ci(top.ci)})." if top.ci is not None else "."
     close_rows = metac.close_to_top()
     if close_rows:
         sentence += f" {close_to_top_sentence(close_rows)}"
-    else:
-        sentence += " Every other same-prompt bot's average falls below its 95% confidence interval."
+    elif not metac.higher_average_on_fewer_questions():
+        sentence += " Every other same-prompt bot's average falls below the top bot's 95% confidence interval."
+    higher_average_sentence = higher_average_on_fewer_questions_sentence(metac)
+    if higher_average_sentence:
+        sentence += f" {higher_average_sentence}"
     return sentence

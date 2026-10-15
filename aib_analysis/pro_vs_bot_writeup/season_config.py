@@ -35,11 +35,8 @@ class PublishedBaselineBotRank:
 class SeasonConfig:
     key: str
     label: str
-    period_description: str | None
-    series_ordinal: str | None
     prize_pool: str | None
     bot_tournament_url: str | None
-    companion_posts: tuple[tuple[str, str], ...]
     bot_question_interval_hours: float | None
     bot_question_open_hours: float | None
     pro_forecast_window_days: int | None
@@ -83,11 +80,8 @@ SEASONS: dict[str, SeasonConfig] = {
     "spring_2026": SeasonConfig(
         key="spring_2026",
         label="Spring 2026",
-        period_description="the first third of 2026 (January 7th through April 15th)",
-        series_ordinal="fifth",
         prize_pool="$50,000",
         bot_tournament_url="https://www.metaculus.com/tournament/spring-aib-2026/",
-        companion_posts=(),
         bot_question_interval_hours=2,
         bot_question_open_hours=1.5,
         pro_forecast_window_days=3,
@@ -99,11 +93,8 @@ SEASONS: dict[str, SeasonConfig] = {
     "summer_2026": SeasonConfig(
         key="summer_2026",
         label="Summer 2026",
-        period_description=None,
-        series_ordinal=None,
         prize_pool=None,
         bot_tournament_url=None,
-        companion_posts=(),
         bot_question_interval_hours=None,
         bot_question_open_hours=None,
         pro_forecast_window_days=None,

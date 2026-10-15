@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 import pytest
 
 from aib_analysis.pro_vs_bot_writeup import phrasing
@@ -114,7 +116,10 @@ def test_trend_takeaway_branches(previous_mean: float, current_mean: float, chan
 def test_trend_takeaway_states_clear_winners_and_change() -> None:
     text = phrasing.trend_takeaway(_trend(-1.25, -0.26, 0.784))
     assert "Pros won clearly in Q2 2025; the other seasons had no clear winner." in text
-    assert "The change from Spring 2026 (-1.25) is not statistically significant (p = 0.784)." in text
+    assert (
+        "The bot team's score went from -1.25 in Spring 2026 to -0.26 this season, a change too small to be "
+        "statistically significant (p = 0.784)." in text
+    )
 
 
 def test_trend_takeaway_without_history() -> None:
@@ -189,20 +194,29 @@ def test_team_size_takeaway_when_top_bot_or_all_bots_win() -> None:
     assert "Merely increasing" not in text
 
 
-def _metac(history: list[BaselineRankPoint], close: bool) -> MetacResults:
+def _metac(history: list[BaselineRankPoint], close: bool, late_starter_average: float | None = None) -> MetacResults:
     top_ci = (5.0, 15.0)
     second_average = 9.0 if close else 2.0
     rows = [
-        _row(1, "metac-model-a+asknews", average=10.0, ci=top_ci),
-        _row(2, "metac-model-b+asknews", average=second_average),
+        _row(1, "metac-model-a+asknews", average=10.0, ci=top_ci, questions=300),
+        _row(2, "metac-model-b+asknews", average=second_average, questions=300),
     ]
+    if late_starter_average is not None:
+        rows.append(_row(3, "metac-model-c+asknews", average=late_starter_average, questions=150))
+    season_start = date(2026, 5, 18)
     return MetacResults(
         baseline_rows=rows,
         other_rows=[],
-        metac_bot_count=2,
+        metac_bot_count=len(rows),
         scored_question_count=300,
         average_questions_per_baseline_bot=280.0,
         baseline_history=history,
+        first_question_close=season_start,
+        first_scored_close_by_name={
+            "metac-model-a+asknews": season_start,
+            "metac-model-b+asknews": season_start,
+            "metac-model-c+asknews": season_start + timedelta(days=23),
+        },
     )
 
 
@@ -210,8 +224,27 @@ def test_top_baseline_takeaway_mentions_close_competitors() -> None:
     history = [BaselineRankPoint("Summer 2026", 24, 282, "metac-model-a+asknews")]
     text = phrasing.top_baseline_takeaway(_metac(history, close=True))
     assert "24th of 282 overall" in text
-    assert "its lead over metac-model-b+asknews is within its 95% confidence interval" in text
-    assert "its lead" not in phrasing.top_baseline_takeaway(_metac(history, close=False))
+    assert "However, metac-model-b+asknews scored within the top bot's 95% confidence interval" in text
+    assert "scored within" not in phrasing.top_baseline_takeaway(_metac(history, close=False))
+
+
+def test_higher_average_bots_that_started_late_are_called_out() -> None:
+    history = [BaselineRankPoint("Summer 2026", 24, 282, "metac-model-a+asknews")]
+    metac = _metac(history, close=True, late_starter_average=12.84)
+    takeaway = phrasing.top_baseline_takeaway(metac)
+    assert "metac-model-c+asknews had a higher average (12.84) but forecast on 150 questions, starting 3 weeks into the season." in takeaway
+    section = phrasing.metac_comparison_sentence(metac)
+    assert section.startswith("metac-model-a+asknews ranked first by sum of spot peer scores, with an average of 10.00")
+    assert (
+        "metac-model-c+asknews (12.84 on 150 questions, starting 3 weeks into the season) had a higher average than "
+        "metac-model-a+asknews but forecast on fewer questions, so it ranks lower by sum." in section
+    )
+    assert "had a higher average" not in phrasing.metac_comparison_sentence(_metac(history, close=True))
+
+
+def test_format_date_range() -> None:
+    assert phrasing.format_date_range(date(2026, 5, 18), date(2026, 8, 20)) == "May 18 and August 20, 2026"
+    assert phrasing.format_date_range(date(2025, 12, 1), date(2026, 3, 2)) == "December 1, 2025 and March 2, 2026"
 
 
 @pytest.mark.parametrize(
