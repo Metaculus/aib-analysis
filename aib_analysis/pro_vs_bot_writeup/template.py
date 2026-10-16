@@ -96,7 +96,6 @@ class ChartFiles:
     team_size: str
     individuals: str
     accuracy: str
-    percent_correct: str
     top_bots: str
     field_rank: str
     field: str
@@ -274,13 +273,6 @@ def _accuracy_section(results: SeasonResults, charts: ChartFiles) -> str:
             phrasing.bot_field_accuracy_paragraph(results.bot_field_accuracy),
             phrasing.team_accuracy_paragraph(results.team_accuracy),
             phrasing.peer_score_translation_paragraph(results.bot_field_accuracy),
-            "### Percent correct (not a proper score)",
-            fill_me(
-                "should we keep this section? Percent correct is familiar to readers but is not a proper score. "
-                "To remove it, delete from this heading through its chart"
-            ),
-            phrasing.percent_correct_paragraph(results.percent_correct),
-            _image(charts.percent_correct),
         ]
     )
 

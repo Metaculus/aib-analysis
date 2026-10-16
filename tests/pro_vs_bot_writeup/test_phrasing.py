@@ -15,8 +15,6 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     IndividualResults,
     LeaderboardRow,
     MetacResults,
-    PercentCorrectAtCutoff,
-    PercentCorrectResults,
     SeasonTrend,
     SeasonTrendPoint,
     TeamAccuracy,
@@ -243,35 +241,6 @@ def test_higher_average_bots_that_started_late_are_called_out() -> None:
         "metac-model-a+asknews but forecast on fewer questions, so it ranks lower by sum." in section
     )
     assert "had a higher average" not in phrasing.metac_comparison_sentence(_metac(history, close=True))
-
-
-def _percent_correct(bots_below_always_no: int) -> PercentCorrectResults:
-    eligible = {f"bot-{index}": (0.55 if index < bots_below_always_no else 0.75) for index in range(10)}
-
-    def cutoff(bot_cutoff: float) -> PercentCorrectAtCutoff:
-        return PercentCorrectAtCutoff(
-            bot_cutoff=bot_cutoff,
-            team_cutoff=bot_cutoff,
-            eligible_bots=eligible,
-            top_bot=0.78,
-            worst_bot=0.53,
-            always_no=0.617,
-            pro_team=0.804,
-            bot_team=0.761,
-            team_always_no=0.609,
-        )
-
-    return PercentCorrectResults(
-        top_bot_name="laertes", binary_question_count=167, shared_binary_question_count=46, at_50=cutoff(0.5), at_yes_rate=cutoff(0.383)
-    )
-
-
-def test_percent_correct_paragraph_explains_gaming() -> None:
-    text = phrasing.percent_correct_paragraph(_percent_correct(bots_below_always_no=2))
-    assert "isn't a proper scoring rule, so it can be gamed" in text
-    assert "Forecasting 1% on every question would be right on 62% of binary questions, better than 20% of regular bots" in text
-    assert "the Pro team was right on 80% and the bot team on 76%" in text
-    assert "better than" not in phrasing.percent_correct_paragraph(_percent_correct(bots_below_always_no=0))
 
 
 def test_format_date_range() -> None:

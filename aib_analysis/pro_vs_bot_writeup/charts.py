@@ -33,8 +33,6 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     IndividualResults,
     LeaderboardRow,
     MetacResults,
-    PercentCorrectAtCutoff,
-    PercentCorrectResults,
     SeasonTrend,
     TeamAccuracy,
     TeamSizeResult,
@@ -353,77 +351,6 @@ def accuracy_chart(field_accuracy: BotFieldAccuracy, team_accuracy: TeamAccuracy
         figure,
         "How much probability forecasters put on what happened",
         "Binary questions only. Higher is better; values are only comparable within each group of questions",
-    )
-    _save(figure, path)
-
-
-def _percent_correct_rows(results: PercentCorrectResults, cutoff: PercentCorrectAtCutoff) -> list[_AccuracyRow]:
-    return [
-        _AccuracyRow(f"Bot tournament: {results.binary_question_count} binary questions", [], is_header=True),
-        _AccuracyRow(
-            f"All {len(cutoff.eligible_bots)} regular bots", [100 * value for value in cutoff.eligible_bots.values()], color=DEEMPHASIS
-        ),
-        _AccuracyRow(f"Top bot ({results.top_bot_name})", [100 * cutoff.top_bot], color=BOT_COLOR),
-        _AccuracyRow("Median bot", [100 * cutoff.median], color=BOT_COLOR),
-        _AccuracyRow("Lowest-scoring bot", [100 * cutoff.worst_bot], color=BOT_COLOR),
-        _AccuracyRow("Always forecast 1%", [100 * cutoff.always_no], marker="D"),
-        _AccuracyRow(f"Pro comparison: {results.shared_binary_question_count} shared binary questions", [], is_header=True),
-        _AccuracyRow("Pro team", [100 * cutoff.pro_team], color=PRO_COLOR),
-        _AccuracyRow("Bot team", [100 * cutoff.bot_team], color=BOT_COLOR),
-        _AccuracyRow("Always forecast 1%", [100 * cutoff.team_always_no], marker="D"),
-    ]
-
-
-def percent_correct_chart(results: PercentCorrectResults, path: Path) -> None:
-    panels = [
-        ("Cutoff at 50%", results.at_50),
-        (
-            f"Cutoff at the Yes rate ({100 * results.at_yes_rate.bot_cutoff:.0f}% / {100 * results.at_yes_rate.team_cutoff:.0f}%)",
-            results.at_yes_rate,
-        ),
-    ]
-    row_sets = [_percent_correct_rows(results, cutoff) for _title, cutoff in panels]
-    labels = [row.label for row in row_sets[0]]
-    height_inches = 0.34 * len(labels) + 1.9
-    figure, axes_pair = plt.subplots(1, 2, sharey=True, figsize=(FIGURE_WIDTH_INCHES, height_inches))
-    left_inches = _left_margin_for_labels(labels)
-    figure.subplots_adjust(
-        left=left_inches / FIGURE_WIDTH_INCHES,
-        right=1 - 0.2 / FIGURE_WIDTH_INCHES,
-        bottom=0.6 / height_inches,
-        top=1 - (TITLE_BLOCK_INCHES + 0.3) / height_inches,
-        wspace=0.12,
-    )
-    jitter = np.random.default_rng(0)
-    all_values = [value for rows in row_sets for row in rows for value in row.percents]
-    for axes, (panel_title, _cutoff), rows in zip(axes_pair, panels, row_sets):
-        for position, row in enumerate(rows):
-            if row.is_header or not row.percents:
-                continue
-            if len(row.percents) > 1:
-                offsets = jitter.uniform(-0.22, 0.22, len(row.percents))
-                axes.scatter(row.percents, position + offsets, s=9, color=row.color, edgecolors=SURFACE, linewidths=0.4, zorder=3)
-                continue
-            value = row.percents[0]
-            axes.plot(value, position, row.marker, color=row.color, markersize=6 if row.marker == "o" else 5, markeredgecolor=SURFACE, markeredgewidth=1, zorder=4)
-            axes.annotate(f"{value:.0f}%", xy=(value, position), xytext=(5, 0), textcoords="offset points", ha="left", va="center", fontsize=8, color=TEXT_PRIMARY)
-        axes.axvline(50, color=BASELINE, linewidth=1, zorder=1)
-        axes.set_xlim(min(min(all_values), 50) - 3, max(all_values) + 9)
-        axes.xaxis.set_major_formatter(lambda value, _position: f"{value:.0f}%")
-        axes.set_title(panel_title, loc="left", fontsize=9, color=TEXT_PRIMARY, pad=6)
-        _style_grid(axes, "x")
-    axes_pair[0].set_yticks(range(len(labels)), labels)
-    for tick_label, row in zip(axes_pair[0].get_yticklabels(), row_sets[0]):
-        tick_label.set_color(TEXT_PRIMARY)
-        if row.is_header:
-            tick_label.set_fontweight("bold")
-    axes_pair[0].set_ylim(len(labels) - 0.4, -0.6)
-    figure.supxlabel("Share of binary questions forecast on the correct side of the cutoff", fontsize=9, color=TEXT_SECONDARY, x=0.6)
-    _add_titles(
-        figure,
-        "Percent correct (not a proper score)",
-        f"It can be gamed: always forecasting 1% scores {100 * results.at_50.always_no:.0f}% here, beating "
-        f"{100 * results.at_50.share_of_bots_below_always_no:.0f}% of regular bots",
     )
     _save(figure, path)
 

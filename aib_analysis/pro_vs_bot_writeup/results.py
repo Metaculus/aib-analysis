@@ -26,7 +26,6 @@ from aib_analysis.math.accuracy import (
     geometric_mean_probability,
     geometric_mean_probability_ci,
     paired_probability_ratio,
-    percent_correct,
     yes_rate,
 )
 from aib_analysis.math.stats import (
@@ -48,7 +47,6 @@ SIGNIFICANCE_LEVEL = 0.05
 PRO_TEAM_NAME = "Pro Team"
 BOT_TEAM_NAME = "Bot Team"
 UNIFORM_REFERENCE_BOT = "metac-uniform-probability-bot"
-ALWAYS_NO_PROBABILITY = 0.01
 BASELINE_METAC_BOT_PATTERN = re.compile(r"^metac-(?P<model>[^+\[\]]+)\+(?P<search>[^\[\]]+)$")
 VARIANCE_TEST_PATTERN = re.compile(r"\((?P<label>variance-test[^)]*)\)$")
 TOP_N = 10
@@ -316,39 +314,6 @@ class TeamAccuracy:
 
 
 @dataclass(frozen=True)
-class PercentCorrectAtCutoff:
-    bot_cutoff: float
-    team_cutoff: float
-    eligible_bots: dict[str, float]
-    top_bot: float
-    worst_bot: float
-    always_no: float
-    pro_team: float
-    bot_team: float
-    team_always_no: float
-
-    @property
-    def median(self) -> float:
-        return statistics.median(self.eligible_bots.values())
-
-    @property
-    def share_of_bots_below_always_no(self) -> float:
-        below = sum(1 for value in self.eligible_bots.values() if value < self.always_no)
-        return below / len(self.eligible_bots)
-
-
-@dataclass(frozen=True)
-class PercentCorrectResults:
-    """Plain percent correct on binary questions, kept only as an improper-score comparison."""
-
-    top_bot_name: str
-    binary_question_count: int
-    shared_binary_question_count: int
-    at_50: PercentCorrectAtCutoff
-    at_yes_rate: PercentCorrectAtCutoff
-
-
-@dataclass(frozen=True)
 class BaselineRankPoint:
     season_label: str
     rank: int
@@ -429,7 +394,6 @@ class SeasonResults:
     example_questions: list[ExampleQuestion]
     bot_field_accuracy: BotFieldAccuracy
     team_accuracy: TeamAccuracy
-    percent_correct: PercentCorrectResults
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -509,18 +473,6 @@ def questions_by_id(raw: dict[str, Any]) -> dict[int, dict[str, Any]]:
 
 def is_scored(question: dict[str, Any]) -> bool:
     return question["resolution"] is not None and question["unscored_resolution_reason"] is None
-
-
-def binary_yes_forecasts(raw: dict[str, Any]) -> dict[str, list[tuple[float, bool]]]:
-    """user name -> (P(Yes), resolved Yes) for each scored binary spot forecast."""
-    forecasts: dict[str, list[tuple[float, bool]]] = {}
-    for score in raw["scores_cache"].values():
-        forecast = score["forecast"]
-        question = forecast["question"]
-        if score["type"] != "spot_peer" or question["type"] != "binary" or not is_scored(question):
-            continue
-        forecasts.setdefault(forecast["user"]["name"], []).append((forecast["prediction"][0], question["resolution"]))
-    return forecasts
 
 
 def close_date(question: dict[str, Any]) -> date:
@@ -912,49 +864,6 @@ def compute_team_accuracy(team_raw: dict[str, Any]) -> TeamAccuracy:
     )
 
 
-def compute_percent_correct(
-    bot_forecasts: dict[str, list[tuple[float, bool]]],
-    bot_resolutions: list[bool],
-    team_forecasts: dict[str, list[tuple[float, bool]]],
-    field: FieldSummary,
-    bot_yes_rate: float,
-    team_yes_rate: float,
-) -> PercentCorrectResults:
-    eligible_names = [
-        row.name
-        for row in field.rows
-        if row.question_count >= field.eligible_min_questions
-        and row.name != UNIFORM_REFERENCE_BOT
-        and bot_forecasts.get(row.name)
-    ]
-    team_resolutions = [resolved_yes for _probability, resolved_yes in team_forecasts[PRO_TEAM_NAME]]
-    top_name = field.rows[0].name
-
-    def at_cutoff(bot_cutoff: float, team_cutoff: float) -> PercentCorrectAtCutoff:
-        eligible = {name: percent_correct(bot_forecasts[name], bot_cutoff) for name in eligible_names}
-        return PercentCorrectAtCutoff(
-            bot_cutoff=bot_cutoff,
-            team_cutoff=team_cutoff,
-            eligible_bots=eligible,
-            top_bot=percent_correct(bot_forecasts[top_name], bot_cutoff),
-            worst_bot=eligible[field.worst_eligible.name],
-            always_no=percent_correct([(ALWAYS_NO_PROBABILITY, resolved_yes) for resolved_yes in bot_resolutions], bot_cutoff),
-            pro_team=percent_correct(team_forecasts[PRO_TEAM_NAME], team_cutoff),
-            bot_team=percent_correct(team_forecasts[BOT_TEAM_NAME], team_cutoff),
-            team_always_no=percent_correct(
-                [(ALWAYS_NO_PROBABILITY, resolved_yes) for resolved_yes in team_resolutions], team_cutoff
-            ),
-        )
-
-    return PercentCorrectResults(
-        top_bot_name=top_name,
-        binary_question_count=len(bot_resolutions),
-        shared_binary_question_count=len(team_resolutions),
-        at_50=at_cutoff(0.5, 0.5),
-        at_yes_rate=at_cutoff(bot_yes_rate, team_yes_rate),
-    )
-
-
 def split_baseline_name(name: str) -> tuple[str, str, str | None]:
     """(model, search, variance-test label) for a same-prompt baseline Metac Bot name."""
     match = BASELINE_METAC_BOT_PATTERN.match(name)
@@ -1056,7 +965,6 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
     main_team_raw = load_json(team_size_files[main_size_key])
     head_to_head = compute_head_to_head(main_team_raw, config)
     team_accuracy = compute_team_accuracy(main_team_raw)
-    team_yes_forecasts = binary_yes_forecasts(main_team_raw)
     del main_team_raw
     season_trend = compute_season_trend(config, head_to_head)
 
@@ -1081,14 +989,6 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
         len(scored_bot_questions),
     )
     bot_field_accuracy = compute_bot_field_accuracy(bot_raw, field, bot_participants)
-    percent_correct_results = compute_percent_correct(
-        binary_yes_forecasts(bot_raw),
-        [question["resolution"] for question in scored_binary],
-        team_yes_forecasts,
-        field,
-        bot_field_accuracy.yes_rate,
-        team_accuracy.yes_rate,
-    )
     del bot_raw
 
     logger.info("Step 4/6: bot-only questions and Metac Bots")
@@ -1147,5 +1047,4 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
         example_questions=pick_example_questions(bot_questions, config.example_question_ids),
         bot_field_accuracy=bot_field_accuracy,
         team_accuracy=team_accuracy,
-        percent_correct=percent_correct_results,
     )
