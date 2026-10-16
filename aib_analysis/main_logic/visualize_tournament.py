@@ -22,6 +22,13 @@ from aib_analysis.main_logic.process_tournament import (
     find_question_titles_unique_to_first_tournament,
     get_leaderboard,
 )
+from aib_analysis.math.accuracy import (
+    base_rate_geometric_mean_probability,
+    binary_probability_on_outcome,
+    geometric_mean_probability,
+    geometric_mean_probability_ci,
+    yes_rate,
+)
 from aib_analysis.math.stats import (
     MeanHypothesisCalculator,
     HypothesisTest,
@@ -71,6 +78,8 @@ def display_individual_tournament(tournament: SimulatedTournament, name: str):
     with st.expander(f"{name} Spot Baseline Leaderboard"):
         leaderboard = get_leaderboard(tournament, ScoreType.SPOT_BASELINE)
         display_leaderboard(leaderboard, hidden_user_types=hidden_user_types)
+    with st.expander(f"{name} Accuracy (typical probability on the outcome)"):
+        display_accuracy(tournament, hidden_user_types)
     with st.expander(f"{name} Stats"):
         display_tournament_stats(tournament)
     with st.expander(f"{name} Forecasts"):
@@ -153,6 +162,86 @@ def _display_hypothesis_sub_section(
     st.write(f"**N > 30**: {len(observations) > 30} (N = {len(observations)})")
     st.write(f"**Interval Type**: {hypothesis_test.interval_type}")
     st.write(f"**Conclusion**: {hypothesis_test.written_conclusion}")
+
+
+def accuracy_table(
+    tournament: SimulatedTournament, hidden_user_types: set[UserType]
+) -> pd.DataFrame | None:
+    binary_forecasts = [
+        forecast
+        for forecast in tournament.spot_forecasts
+        if forecast.question.type == QuestionType.BINARY
+        and isinstance(forecast.question.resolution, bool)
+        and forecast.prediction is not None
+    ]
+    if not binary_forecasts:
+        return None
+    questions = {forecast.question.question_id: forecast.question for forecast in binary_forecasts}
+    resolutions = [question.resolution for question in questions.values()]
+    question_weights = [question.weight for question in questions.values()]
+    probabilities_by_user: dict[str, list[tuple[float, float]]] = {}
+    user_types: dict[str, str] = {}
+    for forecast in binary_forecasts:
+        if forecast.user.type in hidden_user_types:
+            continue
+        probability = binary_probability_on_outcome(
+            forecast.prediction[0], forecast.question.resolution
+        )
+        probabilities_by_user.setdefault(forecast.user.name, []).append(
+            (probability, forecast.question.weight)
+        )
+        user_types[forecast.user.name] = forecast.user.type.value
+    rows = []
+    for user_name, pairs in probabilities_by_user.items():
+        probabilities = [probability for probability, _weight in pairs]
+        interval = geometric_mean_probability_ci(probabilities)
+        rows.append(
+            {
+                "user": user_name,
+                "user_type": user_types[user_name],
+                "binary_questions": len(pairs),
+                "typical_probability_pct": 100
+                * geometric_mean_probability(
+                    probabilities, [weight for _probability, weight in pairs]
+                ),
+                "ci_lower_pct": 100 * interval[0] if interval else None,
+                "ci_upper_pct": 100 * interval[1] if interval else None,
+            }
+        )
+    rows.append(
+        {
+            "user": f"Reference: always the Yes rate ({yes_rate(resolutions):.0%})",
+            "user_type": "reference",
+            "binary_questions": len(resolutions),
+            "typical_probability_pct": 100
+            * base_rate_geometric_mean_probability(resolutions, question_weights),
+        }
+    )
+    rows.append(
+        {
+            "user": "Reference: coin flip",
+            "user_type": "reference",
+            "binary_questions": len(resolutions),
+            "typical_probability_pct": 50.0,
+        }
+    )
+    return pd.DataFrame(rows).sort_values(by="typical_probability_pct", ascending=False)
+
+
+def display_accuracy(
+    tournament: SimulatedTournament, hidden_user_types: set[UserType]
+) -> None:
+    table = accuracy_table(tournament, hidden_user_types)
+    if table is None:
+        st.write("No resolved binary questions.")
+        return
+    st.write(
+        "Typical probability on the outcome: on each resolved binary question, the probability a "
+        "forecaster gave to the outcome that happened, combined across questions with a weighted "
+        "geometric mean (the exponentiated log score). A coin flip scores 50%. Compare values only "
+        "on the same questions. The CI is a t-interval on the log probabilities."
+    )
+    st.dataframe(table, use_container_width=True, hide_index=True)
 
 
 def display_tournament_stats(tournament: SimulatedTournament) -> None:
