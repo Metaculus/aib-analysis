@@ -12,6 +12,7 @@ import math
 from datetime import date
 
 from aib_analysis.pro_vs_bot_writeup.results import (
+    PROMISING_MIN_SHARE_OF_QUESTIONS,
     SIGNIFICANCE_LEVEL,
     TOP_N,
     BotFieldAccuracy,
@@ -483,13 +484,15 @@ def field_paragraph(field: FieldSummary, chart_min_questions: int, hidden_count:
             f"question) averaged {format_score(field.uniform_reference.average_score)}."
         )
     if field.promising:
+        promising_count = len(field.promising)
         names = [f"{row.name} ({row.question_count} questions)" for row in field.promising]
         sentences.append(
-            f"{len(field.promising)} {plural(len(field.promising), 'bot')} (in green) forecast on between "
-            f"{field.promising_min_questions} and {field.eligible_min_questions - 1} questions but averaged more "
-            f"than the {ordinal(TOP_N)}-place bot ({format_score(field.tenth_place.average_score)}): "
-            f"{join_names(names)}. With more questions, some of these might prove to be strong, though lucky streaks "
-            "matter more over fewer questions."
+            f"{count_word(promising_count, capitalize=True)} {plural(promising_count, 'bot')} (in green) forecast on "
+            f"fewer than half of the questions but averaged more than the {ordinal(TOP_N)}-place bot "
+            f"({format_score(field.tenth_place.average_score)}): {join_names(names)}. With more questions, "
+            f"{'it' if promising_count == 1 else 'some of these'} might prove to be strong. Lucky streaks matter "
+            f"more over fewer questions, so we don't highlight bots with fewer than {field.promising_min_questions} "
+            f"questions ({format_whole_percent(PROMISING_MIN_SHARE_OF_QUESTIONS)} of the total)."
         )
     if hidden_count:
         sentences.append(f"({hidden_count} {plural(hidden_count, 'bot')} with fewer than {chart_min_questions} scored questions are not shown.)")

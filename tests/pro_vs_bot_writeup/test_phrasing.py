@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from datetime import date, timedelta
 
 import pytest
@@ -310,6 +311,19 @@ def _field(top_cis: list[tuple[float, float]]) -> FieldSummary:
         uniform_reference=None,
         top_10_average_ci_width=8.0,
     )
+
+
+def test_field_paragraph_names_promising_bots_with_their_own_question_counts() -> None:
+    promising = [_row(11, "late-joiner", average=22.0, questions=119), _row(12, "part-timer", average=18.0, questions=102)]
+    field = dataclasses.replace(_field([(10.0, 20.0)] * 10), promising=promising)
+    text = phrasing.field_paragraph(field, chart_min_questions=10, hidden_count=0)
+    assert "Two bots (in green) forecast on fewer than half of the questions" in text
+    assert "late-joiner (119 questions) and part-timer (102 questions)" in text
+    assert "some of these might prove to be strong" in text
+    assert "we don't highlight bots with fewer than 30 questions (10% of the total)" in text
+    single_text = phrasing.field_paragraph(dataclasses.replace(field, promising=promising[:1]), chart_min_questions=10, hidden_count=0)
+    assert "One bot (in green)" in single_text
+    assert "it might prove to be strong" in single_text
 
 
 def test_top_10_spread_takeaway() -> None:
