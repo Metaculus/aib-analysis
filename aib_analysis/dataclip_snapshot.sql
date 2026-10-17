@@ -60,8 +60,10 @@ AND p.default_project_id = 33025 -- Pro Forecasters - FutureEval 2026 Summer
 -- AND p.default_project_id = 32830 -- MiniBench Sept 15
 --AND p.default_project_id = 32630 -- Q1 Quarterly Cup
 -- AND p.default_project_id = 32726 -- Summer Metaculus Cup
--- Do not filter on u.is_bot: include stray humans on bot projects (peer GM parity) and
--- coherence bots on pro projects. Streamlit hides the out-of-scope users from
--- leaderboard charts/tables while keeping them in scoring.
+-- Pro projects: drop bot accounts (e.g. coherence bots) so they can't enter the Pro team.
+-- Only safe while every bot in the project is non-primary (outside the peer GM); dropping a
+-- primary bot would change Pro scores. Bot projects: comment this out, since stray humans
+-- count in the peer GM (Streamlit hides them from leaderboard charts/tables).
+AND NOT u.is_bot
 -- AND f.start_time < q.cp_reveal_time -- If for quarterly cup
 ORDER BY f.start_time DESC;

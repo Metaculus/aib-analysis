@@ -17,6 +17,7 @@ from aib_analysis.main_logic.process_tournament import (
     create_team_tournament,
     create_weighted_q3_spot_forecast_tourn,
     get_best_forecasters_from_tournament,
+    get_pro_team_users,
     save_tournament,
     smart_remove_questions_from_tournament,
 )
@@ -169,6 +170,7 @@ def main(
         counter_override=next_count(),
     )
 
+    pro_team = get_pro_team_users(pro_tournament)
     team_comparison_counter = next_count()
     size_10_bot_team = None
     bot_team_sizes: list[int | Literal["all"]] = [
@@ -177,7 +179,6 @@ def main(
     for bot_team_size in bot_team_sizes:
         if bot_team_size != "all" and bot_team_size > len(bot_tournament.users):
             continue
-        pro_team = pro_tournament.users
         bot_team_for_pro_comparison = get_best_forecasters_from_tournament(
             bot_tournament_wo_pro_questions, bot_team_size
         )
@@ -209,7 +210,7 @@ def main(
 
     # ------------------- Pros + bots + team aggregates -------------------
     if size_10_bot_team is not None:
-        pro_team_names = {user.name for user in pro_tournament.users}
+        pro_team_names = {user.name for user in pro_team}
         bot_team_names = {user.name for user in size_10_bot_team}
         pro_team_in_combined = [
             user for user in pro_with_bot_tourn.users if user.name in pro_team_names
