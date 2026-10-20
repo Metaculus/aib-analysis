@@ -9,6 +9,7 @@ published, add its results to the PUBLISHED_* tuples so later seasons can chart 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 
 
 @dataclass(frozen=True)
@@ -32,18 +33,34 @@ class PublishedBaselineBotRank:
 
 
 @dataclass(frozen=True)
+class BotQuestionWindow:
+    """How long bot questions stayed open from first_open_date (None: the season start) until the next window."""
+
+    first_open_date: date | None
+    open_hours: float | None
+
+
+@dataclass(frozen=True)
 class SeasonConfig:
     key: str
     label: str
     prize_pool: str | None
     bot_tournament_url: str | None
     bot_question_interval_hours: float | None
-    bot_question_open_hours: float | None
+    bot_question_windows: tuple[BotQuestionWindow, ...]
     pro_forecast_window_days: int | None
     metac_bot_code_url: str | None
     example_question_ids: dict[str, int] = field(default_factory=dict)
     expected_non_pro_members_in_pro_team: int = 0
     main_bot_team_size: int = 10
+    data_notes: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.bot_question_windows or self.bot_question_windows[0].first_open_date is not None:
+            raise ValueError(f"{self.label}: the first bot question window must start with the season (first_open_date=None)")
+        later_dates = [window.first_open_date for window in self.bot_question_windows[1:]]
+        if None in later_dates or later_dates != sorted(later_dates):
+            raise ValueError(f"{self.label}: later bot question windows need increasing first_open_date values")
 
 
 SEASON_ORDER: tuple[str, ...] = (
@@ -56,7 +73,7 @@ SEASON_ORDER: tuple[str, ...] = (
     "Summer 2026",
 )
 
-# Fall 2025 compared bots with the Metaculus community prediction instead of Pros.
+# Fall 2025 had no Pro comparison.
 SEASONS_WITHOUT_PRO_COMPARISON: tuple[str, ...] = ("Fall 2025",)
 
 PUBLISHED_PRO_VS_BOT_RESULTS: tuple[PublishedTeamResult, ...] = (
@@ -83,7 +100,7 @@ SEASONS: dict[str, SeasonConfig] = {
         prize_pool="$50,000",
         bot_tournament_url="https://www.metaculus.com/tournament/spring-aib-2026/",
         bot_question_interval_hours=2,
-        bot_question_open_hours=1.5,
+        bot_question_windows=(BotQuestionWindow(first_open_date=None, open_hours=1.5),),
         pro_forecast_window_days=3,
         metac_bot_code_url=None,
         # Bot-type accounts that forecast in the Spring Pro tournament were included in
@@ -93,12 +110,19 @@ SEASONS: dict[str, SeasonConfig] = {
     "summer_2026": SeasonConfig(
         key="summer_2026",
         label="Summer 2026",
-        prize_pool=None,
+        prize_pool="$50,000",
         bot_tournament_url=None,
         bot_question_interval_hours=None,
-        bot_question_open_hours=None,
-        pro_forecast_window_days=None,
+        bot_question_windows=(
+            BotQuestionWindow(first_open_date=None, open_hours=1.5),
+            BotQuestionWindow(first_open_date=date(2026, 6, 5), open_hours=3),
+        ),
+        pro_forecast_window_days=3,
         metac_bot_code_url=None,
+        data_notes=(
+            "On October 15, 2026, metac-agent was renamed metac-autocast. Our data predates the rename, so this post "
+            "uses the old name.",
+        ),
     ),
 }
 

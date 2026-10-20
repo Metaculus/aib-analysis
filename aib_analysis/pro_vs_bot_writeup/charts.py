@@ -202,7 +202,8 @@ def team_size_chart(team_sizes: list[TeamSizeResult], main_team_size: int, path:
     axes.xaxis.set_major_locator(FixedLocator(tick_sizes))
     axes.xaxis.set_minor_formatter(NullFormatter())
     largest = team_sizes[-1]
-    axes.set_xticklabels([f"{size}\n(all bots)" if size == largest.team_size and largest.is_all_bots else str(size) for size in tick_sizes])
+    all_label = "(all bots)" if largest.non_bot_member_count == 0 else "(all accounts)"
+    axes.set_xticklabels([f"{size}\n{all_label}" if size == largest.team_size and largest.is_all_bots else str(size) for size in tick_sizes])
     axes.set_xlim(sizes[0] * 0.85, sizes[-1] * 1.15)
     axes.set_xlabel("Bot team size (top N bots on the bot-only questions, log scale)")
     axes.set_ylabel("Bot team head-to-head score")

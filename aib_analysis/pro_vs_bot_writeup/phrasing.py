@@ -30,6 +30,7 @@ from aib_analysis.pro_vs_bot_writeup.results import (
 )
 
 FILL_ME = "[===Fill me===]"
+LATE_START_MIN_WEEKS = 2
 COUNT_WORDS = ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
 HEAD_TO_HEAD_REMINDER = (
     "(Reminder: 0 would mean bots and Pros did equally well, and a positive number would mean bots beat Pros.)"
@@ -80,10 +81,10 @@ def count_word(count: int, capitalize: bool = False) -> str:
     return word[0].upper() + word[1:] if capitalize else word
 
 
-def join_names(names: list[str]) -> str:
+def join_names(names: list[str], conjunction: str = "and") -> str:
     if len(names) <= 2:
-        return " and ".join(names)
-    return ", ".join(names[:-1]) + ", and " + names[-1]
+        return f" {conjunction} ".join(names)
+    return ", ".join(names[:-1]) + f", {conjunction} " + names[-1]
 
 
 def plural(count: int, singular: str, plural_form: str | None = None) -> str:
@@ -214,6 +215,16 @@ def season_change_clause(trend: SeasonTrend) -> str | None:
     return f"{move}, a change too small to be statistically significant ({format_p(trend.change_p_value)})."
 
 
+def month_day(day: date) -> str:
+    return f"{day:%B} {day.day}"
+
+
+def format_duration(minutes: float) -> str:
+    if minutes < 120:
+        return f"{round(minutes)} minutes"
+    return f"{format_compact(minutes / 60)} hours"
+
+
 def format_date_range(start: date, end: date) -> str:
     if start.year == end.year:
         return f"{start:%B} {start.day} and {end:%B} {end.day}, {end.year}"
@@ -254,9 +265,10 @@ def trend_paragraph(trend: SeasonTrend) -> str:
     if change_clause:
         sentences.append(change_clause)
     if trend.skipped_seasons:
+        is_single = len(trend.skipped_seasons) == 1
         sentences.append(
-            f"{join_names(list(trend.skipped_seasons))} compared bots with the Metaculus community prediction "
-            f"instead of Pros, so {'it is' if len(trend.skipped_seasons) == 1 else 'they are'} not shown."
+            f"There {'was no Pro comparison' if is_single else 'were no Pro comparisons'} in "
+            f"{join_names(list(trend.skipped_seasons))}, so {'it is' if is_single else 'they are'} not shown."
         )
     return " ".join(sentences)
 
@@ -306,7 +318,15 @@ def individuals_paragraph(individuals: IndividualResults, shown_count: int) -> s
 
 
 def _team_size_label(result: TeamSizeResult) -> str:
-    return f"all {result.team_size} bots" if result.is_all_bots else f"the top {result.team_size} {plural(result.team_size, 'bot')}"
+    bot_count = result.team_size - result.non_bot_member_count
+    humans = f"{result.non_bot_member_count} human {plural(result.non_bot_member_count, 'account')}"
+    if not result.is_all_bots:
+        if result.non_bot_member_count:
+            return f"the top {result.team_size} accounts ({bot_count} bots and {humans})"
+        return f"the top {result.team_size} {plural(result.team_size, 'bot')}"
+    if result.non_bot_member_count:
+        return f"all {bot_count} bots (plus {humans} that forecast in the bot tournament)"
+    return f"all {bot_count} bots"
 
 
 def team_size_takeaway(team_sizes: list[TeamSizeResult]) -> str:
@@ -384,9 +404,17 @@ def close_to_top_sentence(close_rows: list[LeaderboardRow], max_names: int = 3) 
     )
 
 
+def _weeks_late(metac: MetacResults, name: str) -> int:
+    return round(metac.days_after_season_start(name) / 7)
+
+
+def late_starter_count(metac: MetacResults) -> int:
+    return sum(1 for name in metac.first_scored_close_by_name if _weeks_late(metac, name) >= LATE_START_MIN_WEEKS)
+
+
 def _late_start_clause(metac: MetacResults, row: LeaderboardRow) -> str:
-    weeks_late = round(metac.days_after_season_start(row.name) / 7)
-    if weeks_late < 2:
+    weeks_late = _weeks_late(metac, row.name)
+    if weeks_late < LATE_START_MIN_WEEKS:
         return ""
     return f", starting {weeks_late} weeks into the season"
 
@@ -590,10 +618,10 @@ def peer_score_translation_paragraph(accuracy: BotFieldAccuracy) -> str:
     return (
         "Peer scores translate into this scale. A binary peer score of +X means a forecaster gave the actual outcome "
         "about e^(X/100) times the typical probability the rest of the field did (+10 ≈ 1.11×, +20 ≈ 1.22×), and the "
-        f"field's typical probability this season was {format_percent(accuracy.field_probability)}. Across all question "
-        f"types, {accuracy.top_bot.name}'s average spot peer score of {format_score(accuracy.top_bot_average_peer_score)} "
-        f"means it gave the actual outcome about {accuracy.top_bot_field_multiplier:.2f}× the probability the rest of "
-        "the field did. (Numeric and discrete peer scores are halved, so they count double in this conversion.)"
+        f"field's typical probability this season was {format_percent(accuracy.field_probability)}. On binary "
+        f"questions, {accuracy.top_bot.name}'s average spot peer score of "
+        f"{format_score(accuracy.top_bot_binary_average_peer_score)} means it gave the actual outcome about "
+        f"{math.exp(accuracy.top_bot_binary_average_peer_score / 100):.2f}× the probability the rest of the field did."
     )
 
 
@@ -614,6 +642,12 @@ def experiment_fact_lines(results: SeasonResults) -> list[str]:
     for setup, rows in groups.variance_tests.items():
         runs = ", ".join(format_score(row.average_score) for row in rows)
         lines.append(f"Repeated runs of {setup} (shows run-to-run noise): {runs}")
+    for one_shot, standard_rows in groups.no_research_pairs:
+        standard = ", ".join(f"{describe(row, row.name)} on {row.question_count}" for row in standard_rows)
+        lines.append(
+            f"No research, one shot vs the standard pipeline with the same model (question counts differ): "
+            f"{describe(one_shot, one_shot.name)} on {one_shot.question_count} vs {standard}"
+        )
     if results.metac.other_rows:
         others = ", ".join(
             f"{row.name} ({ordinal(row.rank)} of {results.metac.metac_bot_count}, {format_score(row.average_score)})"

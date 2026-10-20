@@ -132,7 +132,7 @@ def test_trend_paragraph_lists_clear_wins_and_skipped_seasons() -> None:
     text = phrasing.trend_paragraph(_trend(5.0, 12.0, 0.04))
     assert "when its 95% confidence interval is entirely on one side of zero." in text
     assert "Pros won clearly in Q2 2025 and bots won clearly in Spring 2026 and Summer 2026." in text
-    assert "Fall 2025 compared bots with the Metaculus community prediction instead of Pros, so it is not shown." in text
+    assert "There was no Pro comparison in Fall 2025, so it is not shown." in text
 
 
 def test_clear_wins_sentence_without_clear_winners() -> None:
@@ -174,16 +174,21 @@ def test_individuals_paragraph_counts_bots_above_lowest_pro() -> None:
     assert "Every Pro placed above every bot." in phrasing.individuals_paragraph(_individuals(["pro", "pro", "bot"]), 20)
 
 
-def _team_size(size: int, mean: float, ci: tuple[float, float] | None = None, is_all: bool = False) -> TeamSizeResult:
-    return TeamSizeResult(size, is_all, mean, ci or (mean - 6, mean + 6), 97)
+def _team_size(size: int, mean: float, ci: tuple[float, float] | None = None, is_all: bool = False, humans: int = 0) -> TeamSizeResult:
+    return TeamSizeResult(size, is_all, humans, mean, ci or (mean - 6, mean + 6), 97)
 
 
 def test_team_size_takeaway_peak_in_the_middle() -> None:
     sizes = [_team_size(1, -3.59), _team_size(8, 0.89), _team_size(10, -0.26), _team_size(276, -12.1, (-20.75, -3.44), True)]
     text = phrasing.team_size_takeaway(sizes)
     assert text.startswith("**Bot team aggregation peaked at 8 bots:**")
-    assert "compared with -3.59 for the top bot alone and -12.10 for a team of all 276 bots" in text
+    assert "compared with -3.59 for the top bot alone and -12.10 for a team of all 276 bots." in text
     assert "Merely increasing the size of a bot team" in text
+    sizes[-1] = _team_size(276, -12.1, (-20.75, -3.44), True, humans=2)
+    assert (
+        "-12.10 for a team of all 274 bots (plus 2 human accounts that forecast in the bot tournament)"
+        in phrasing.team_size_takeaway(sizes)
+    )
 
 
 def test_team_size_takeaway_when_top_bot_or_all_bots_win() -> None:
@@ -346,8 +351,7 @@ def test_accuracy_takeaway() -> None:
         field_probability=0.554,
         eligible_bots=eligible,
         top_bot=eligible[0],
-        top_bot_average_peer_score=17.91,
-        top_bot_field_multiplier=1.302,
+        top_bot_binary_average_peer_score=14.2,
         worst_bot=eligible[2],
     )
     text = phrasing.accuracy_takeaway(accuracy)
@@ -355,7 +359,7 @@ def test_accuracy_takeaway() -> None:
     assert "52.8% for the median bot and 41.7% for the lowest-scoring bot" in text
     assert "always forecasting this season's Yes rate (38.3%) scores 51.5%. 50% of these bots" in text
     translation = phrasing.peer_score_translation_paragraph(accuracy)
-    assert "laertes's average spot peer score of 17.91 means it gave the actual outcome about 1.30× the probability" in translation
+    assert "On binary questions, laertes's average spot peer score of 14.20 means it gave the actual outcome about 1.15× the probability" in translation
 
 
 @pytest.mark.parametrize(

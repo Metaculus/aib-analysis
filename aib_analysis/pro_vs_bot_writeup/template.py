@@ -7,14 +7,21 @@ what belongs there.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 
 from aib_analysis.pro_vs_bot_writeup import phrasing
 from aib_analysis.pro_vs_bot_writeup.phrasing import (
+    LATE_START_MIN_WEEKS,
     fill_me,
     format_ci,
+    format_compact,
+    format_date_range,
+    format_duration,
     format_score,
     format_sum,
     join_names,
+    late_starter_count,
+    month_day,
     ordinal,
     percent,
     plural,
@@ -22,6 +29,7 @@ from aib_analysis.pro_vs_bot_writeup.phrasing import (
 from aib_analysis.pro_vs_bot_writeup.results import (
     FIELD_CHART_MIN_QUESTIONS,
     TOP_N,
+    CloseTimeDifference,
     LeaderboardRow,
     SeasonResults,
     SeasonTrend,
@@ -35,6 +43,7 @@ from aib_analysis.pro_vs_bot_writeup.season_config import (
     FUTUREEVAL_URL,
     RESOURCES_URL,
     SCORING_FAQ_URL,
+    BotQuestionWindow,
     SeasonConfig,
 )
 
@@ -126,6 +135,25 @@ def _value_or_fill_me(value: str | None, reminder: str) -> str:
 
 def _number_or_fill_me(value: float | None, reminder: str) -> str:
     return phrasing.format_compact(value) if value is not None else fill_me(reminder)
+
+
+def _bot_window_text(windows: tuple[BotQuestionWindow, ...]) -> str:
+    """E.g. "1.5 hours", or "1.5 hours (through June 4) or 3 hours (from June 5 on)" when the window changed."""
+    hours = [_number_or_fill_me(window.open_hours, "hours each bot question stays open, e.g. 1.5") for window in windows]
+    if len(windows) == 1:
+        return f"{hours[0]} hours"
+    parts = []
+    for index, (window, window_hours) in enumerate(zip(windows, hours)):
+        next_start = windows[index + 1].first_open_date if index + 1 < len(windows) else None
+        last_day = month_day(next_start - timedelta(days=1)) if next_start is not None else None
+        if window.first_open_date is None:
+            span = f"through {last_day}"
+        elif last_day is None:
+            span = f"from {month_day(window.first_open_date)} on"
+        else:
+            span = f"{month_day(window.first_open_date)} to {last_day}"
+        parts.append(f"{window_hours} hours ({span})")
+    return join_names(parts, conjunction="or")
 
 
 def _image(path: str) -> str:
@@ -401,9 +429,16 @@ def _binary_resolution_sentence(yes_count: int, binary_total: int) -> str:
     )
 
 
+def _late_metac_clause(results: SeasonResults) -> str:
+    late_count = late_starter_count(results.metac)
+    if not late_count:
+        return ""
+    return f", though {late_count} of the {results.metac.metac_bot_count} started at least {LATE_START_MIN_WEEKS} weeks into it"
+
+
 def _pro_weight_sentence(pro_weighted_question_count: int) -> str:
     if pro_weighted_question_count == 0:
-        return "This doesn't apply to Pro questions, which all have a weight of 1."
+        return "Pro questions all have a weight of 1."
     return f"{pro_weighted_question_count} Pro {plural(pro_weighted_question_count, 'question')} also had a weight below 1."
 
 
@@ -411,8 +446,16 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
     overview = results.overview
     head_to_head = results.head_to_head
     metac = results.metac
-    interval = _number_or_fill_me(config.bot_question_interval_hours, "hours between question launches, e.g. 2")
-    open_hours = _number_or_fill_me(config.bot_question_open_hours, "hours each bot question stays open, e.g. 1.5")
+    window_text = _bot_window_text(config.bot_question_windows)
+    interval = config.bot_question_interval_hours
+    launch_text = (
+        f"one at a time, every {format_compact(interval)} hours"
+        if interval is not None
+        else fill_me('how bot questions launched, e.g. "one at a time, every 2 hours"')
+    )
+    closes_before_next = interval is not None and all(
+        window.open_hours is not None and window.open_hours <= interval for window in config.bot_question_windows
+    )
     pro_days = _number_or_fill_me(config.pro_forecast_window_days, "days Pros had to forecast each question, e.g. 3")
     top_model, top_search, _variance_label = split_baseline_name(metac.top_baseline.name)
     examples = [
@@ -430,12 +473,12 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
         "were not annulled and didn't have resolution issues. The scored questions were "
         f"{_type_mix(overview.bot_type_counts, with_percentages=True)}. The \"bot-only\" portion of the questions "
         f"consisted of {overview.bot_only_scored_count} scored questions, while the Pro vs. bot comparison used "
-        f"{head_to_head.question_count}. Each week, we launched a new set of questions, one at a time, every "
-        f"{interval} hours. These questions stayed open for {open_hours} hours, then closed before the next one "
-        "launched. This ensured forecasting occurred at all times of the day and night. Bots submitted their "
+        f"{head_to_head.question_count}. Each week, we launched a new set of questions {launch_text}. Each question "
+        f"stayed open for {window_text}{', so it closed before the next one launched' if closes_before_next else ''}. "
+        "This ensured forecasting occurred at all times of the day and night. Bots submitted their "
         "forecasts using our API. Questions spanned an extensive range of topics, including geopolitics, economics, "
         "elections, sports, tech, etc. Bot makers were allowed to update their bots over time (e.g., incorporate a "
-        "newer model, or iterate on prompts), but Metac Bots stayed the same over the full season. "
+        f"newer model, or iterate on prompts), but Metac Bots were not updated during the season{_late_metac_clause(results)}. "
         + _binary_resolution_sentence(overview.binary_yes_count, overview.binary_scored_count)
     )
     pro_annulled = overview.pro_annulled_count
@@ -460,8 +503,9 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
         f"out schedules). Pros had {pro_days} days to forecast each question before it closed. The Pro tournament "
         "was private and hidden throughout the tournament, which prevented bots from copying the Pros' forecasts. "
         "Pros, however, could see each other's forecasts and could communicate in the comment section of each "
-        f"question. Bots would forecast in the last {open_hours} hours of the time that the Pros got to see the "
+        f"question. Bots would forecast in the last {window_text} of the time that the Pros got to see the "
         "question, though the bot forecasts were hidden."
+        + (" Appendix C lists shared questions where the two closed at different times." if overview.close_time_differences else "")
     )
     metac_text = (
         f"**Metac Bots:** Metaculus ran {metac.metac_bot_count} in-house Metac Bots. {len(metac.baseline_rows)} of "
@@ -471,11 +515,14 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
         f"bot's name indicates which model and research provider it used. For instance, \"{metac.top_baseline.name}\" "
         f"uses {top_model} as its model and {top_search} as its research source."
     )
+    shared_weighted_count = len(overview.shared_question_weights_below_1)
+    shared_clause = f", {shared_weighted_count} of them also asked of the Pros" if shared_weighted_count else ""
     weights_text = (
-        "**Weights:** Some bot-only questions were given weights to counteract possible correlated resolutions "
+        "**Weights:** Some bot tournament questions were given weights to counteract possible correlated resolutions "
         f"between questions ({overview.weighted_question_count} of the {overview.bot_scored_count} scored bot "
-        f"questions this season). {_pro_weight_sentence(overview.pro_weighted_question_count)} The weight, when "
-        "applied, is noted in the \"Question Info\" section of the question's listing on the Metaculus website."
+        f"questions this season{shared_clause}). {_pro_weight_sentence(overview.pro_weighted_question_count)} The "
+        "Pro vs bot comparison uses the Pro questions' weights. The weight, when applied, is noted in the "
+        "\"Question Info\" section of the question's listing on the Metaculus website."
     )
     removed_count = overview.bot_scored_count - overview.bot_only_scored_count
     example_reminder = [
@@ -590,10 +637,70 @@ def _prompt_appendix() -> str:
     )
 
 
+def _close_time_note(differences: tuple[CloseTimeDifference, ...], shared_question_count: int) -> list[str]:
+    notes = []
+    for differences_one_way, direction, advantaged in (
+        ([difference for difference in differences if difference.minutes_bot_closed_after_pro > 0], "after", "bots"),
+        ([difference for difference in differences if difference.minutes_bot_closed_after_pro < 0], "before", "Pros"),
+    ):
+        if not differences_one_way:
+            continue
+        minutes = sorted({abs(difference.minutes_bot_closed_after_pro) for difference in differences_one_way})
+        gap_text = format_duration(minutes[0]) if len(minutes) == 1 else f"{format_duration(minutes[0])} to {format_duration(minutes[-1])}"
+        first_day, last_day = differences_one_way[0].bot_close.date(), differences_one_way[-1].bot_close.date()
+        dates = f"on {month_day(first_day)}, {first_day.year}" if first_day == last_day else f"between {format_date_range(first_day, last_day)}"
+        notes.append(
+            f"On {len(differences_one_way)} of the {shared_question_count} shared questions (closing {dates}), "
+            f"the bot question closed {gap_text} {direction} the Pro question, so {advantaged} had extra time to "
+            "forecast. The comparison scores both teams at the later close."
+        )
+    return notes
+
+
+def _season_disclosures(results: SeasonResults, config: SeasonConfig) -> list[str]:
+    overview = results.overview
+    disclosures = list(config.data_notes)
+    if len(config.bot_question_windows) > 1:
+        disclosures.append(
+            "The bot question window changed during the season: questions stayed open for "
+            f"{_bot_window_text(config.bot_question_windows)}."
+        )
+    disclosures.extend(_close_time_note(overview.close_time_differences, results.head_to_head.question_count))
+    shared_weights = overview.shared_question_weights_below_1
+    if shared_weights:
+        weight_range = (
+            format_compact(shared_weights[0])
+            if shared_weights[0] == shared_weights[-1]
+            else f"{format_compact(shared_weights[0])} to {format_compact(shared_weights[-1])}"
+        )
+        disclosures.append(
+            f"{len(shared_weights)} of the shared questions had weights below 1 in the bot tournament ({weight_range}), "
+            "but the Pro vs bot comparison uses the Pro questions' weights"
+            + (" of 1." if overview.pro_weighted_question_count == 0 else ".")
+        )
+    human_count = overview.human_accounts_in_bot_tournament
+    if human_count:
+        teams_with_humans = [
+            f"the {'team of all accounts' if result.is_all_bots else f'top {result.team_size}'} ({result.non_bot_member_count})"
+            for result in results.team_sizes
+            if result.non_bot_member_count
+        ]
+        disclosures.append(
+            f"{human_count} human {plural(human_count, 'account')} forecast in the bot tournament. They count in each "
+            "question's peer baseline but not in the bot leaderboards."
+            + (
+                f" The team size comparison ranks every account, so some of its teams include them: {join_names(teams_with_humans)}."
+                if teams_with_humans
+                else ""
+            )
+        )
+    return disclosures
+
+
 def _data_notes_appendix(results: SeasonResults, config: SeasonConfig) -> str:
     overview = results.overview
     head_to_head = results.head_to_head
-    detected = [
+    checks = [
         f"{overview.bot_annulled_count} bot questions and {overview.pro_annulled_count} Pro questions were annulled "
         "or unscored. Mention any with notable problems, and any Pro/bot questions that had to be force-matched "
         "(aib_analysis/data_structures/problem_questions.py).",
@@ -601,23 +708,23 @@ def _data_notes_appendix(results: SeasonResults, config: SeasonConfig) -> str:
         "whole numbers), and which questions.",
         "Bots (including Metac Bots) that missed questions because of provider outages or formatting errors.",
         "Whether these simulated scores match the official leaderboard (ranks and sums), and why if not.",
-        f"{overview.human_accounts_in_bot_tournament} human {plural(overview.human_accounts_in_bot_tournament, 'account')} "
-        "stayed in the bot tournament's peer baseline but out of bot leaderboards.",
     ]
     if overview.non_pro_accounts_in_pro_tournament or head_to_head.non_pro_member_count:
-        detected.append(
+        checks.append(
             f"The Pro tournament has {overview.non_pro_accounts_in_pro_tournament} scored non-Pro "
             f"{plural(overview.non_pro_accounts_in_pro_tournament, 'account')}, and the Pro team aggregate includes "
             f"{head_to_head.non_pro_member_count} non-Pro {plural(head_to_head.non_pro_member_count, 'member')}. "
             "Decide whether to disclose or fix this."
         )
-    return "\n\n".join(
-        [
-            "## Appendix C: Season data notes",
-            fill_me(
-                "list anything unusual about this season's data in short bullets, and delete what doesn't apply. "
-                "Things to check:"
-            ),
-            "\n".join(f"* {item}" for item in detected),
-        ]
+    disclosures = _season_disclosures(results, config)
+    blocks = ["## Appendix C: Season data notes"]
+    if disclosures:
+        blocks.append("\n".join(f"* {item}" for item in disclosures))
+    blocks.append(
+        fill_me(
+            "add anything else unusual about this season's data in short bullets, and delete what doesn't apply. "
+            "Things to check:"
+        )
     )
+    blocks.append("\n".join(f"* {item}" for item in checks))
+    return "\n\n".join(blocks)

@@ -96,12 +96,21 @@ def make_tournament(entries: list[tuple[dict[str, Any], dict[str, Any], float | 
     return {"name": "synthetic", "forecasts": forecasts, "scores_cache": scores}
 
 
-def make_team_tournament(bot_scores: list[float], bot_members: tuple[str, ...], pro_members: tuple[tuple[str, str], ...]) -> dict[str, Any]:
-    bot_team = make_user("Bot Team", "aggregate", tuple((name, "bot") for name in bot_members))
+def combined_question_notes(pro_question_id: int, bot_question_id: int) -> str:
+    """Notes in the format the simulation writes when it pairs a Pro question with its bot question."""
+    return (
+        f"Combined https://www.metaculus.com/questions/{pro_question_id}/ (QID:{pro_question_id}) and "
+        f"https://www.metaculus.com/questions/{bot_question_id}/ (QID:{bot_question_id})\nQ1 Notes: None\nQ2 Notes: None"
+    )
+
+
+def make_team_tournament(bot_scores: list[float], bot_members: tuple[tuple[str, str], ...], pro_members: tuple[tuple[str, str], ...]) -> dict[str, Any]:
+    bot_team = make_user("Bot Team", "aggregate", bot_members)
     pro_team = make_user("Pro Team", "aggregate", pro_members)
     entries: list[tuple[dict[str, Any], dict[str, Any], float | None]] = []
     for question_index, bot_score in enumerate(bot_scores, start=1):
         question = make_question(question_index, QUESTION_TYPE_CYCLE[question_index % len(QUESTION_TYPE_CYCLE)])
+        question["notes"] = combined_question_notes(question_index, question_index)
         entries.append((bot_team, question, bot_score))
         entries.append((pro_team, question, -bot_score))
     return make_tournament(entries)
@@ -156,10 +165,13 @@ def write_simulation_folder(folder: Path, bot_team_advantage: float, seed: int =
     pro_members = tuple((name, "pro") for name in PRO_NAMES)
     for team_size in TEAM_SIZES:
         member_count = len(NON_METAC_BOT_NAMES) if team_size == "all" else team_size
+        bot_members = tuple((name, "bot") for name in NON_METAC_BOT_NAMES[:member_count])
+        if team_size == "all":
+            bot_members += (("human_account", "pro"),)
         size_effect = -3.0 if team_size == "all" else 0.0
         bot_scores = [bot_team_advantage + size_effect + rng.gauss(0, 6) for _ in range(SHARED_QUESTION_COUNT)]
         files[f"7_pro_vs_bot_tournament__teams_size_{team_size}.json"] = make_team_tournament(
-            bot_scores, NON_METAC_BOT_NAMES[:member_count], pro_members
+            bot_scores, bot_members, pro_members
         )
     for file_name, content in files.items():
         (folder / file_name).write_text(json.dumps(content))

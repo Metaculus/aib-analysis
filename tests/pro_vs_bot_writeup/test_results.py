@@ -10,15 +10,18 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     LeaderboardRow,
     SeasonTrendPoint,
     anonymize_pros,
+    check_comparison_uses_pro_weights,
     compute_field,
     compute_head_to_head,
     compute_season_results,
+    find_close_time_differences,
     find_metac_experiment_groups,
     find_simulation_file,
     format_resolution,
     is_baseline_metac_bot,
     pick_example_questions,
     season_change_p_value,
+    shared_question_pairs,
     split_baseline_name,
 )
 from aib_analysis.pro_vs_bot_writeup.season_config import SeasonConfig
@@ -31,7 +34,7 @@ from tests.pro_vs_bot_writeup.conftest import (
 )
 
 PRO_MEMBERS = (("pro_user_1", "pro"), ("pro_user_2", "pro"))
-BOT_MEMBERS = ("bot-a", "bot-b", "bot-c")
+BOT_MEMBERS = (("bot-a", "bot"), ("bot-b", "bot"), ("bot-c", "bot"))
 
 
 def _row(name: str, average: float, questions: int = 100, ci: tuple[float, float] | None = None, rank: int = 1) -> LeaderboardRow:
@@ -83,6 +86,34 @@ def test_head_to_head_rejects_wrong_bot_team_size(synthetic_config: SeasonConfig
     raw = make_team_tournament(_scores(-1, 5), BOT_MEMBERS[:2], PRO_MEMBERS)
     with pytest.raises(ValueError, match="3-bot team"):
         compute_head_to_head(raw, synthetic_config)
+
+
+def test_head_to_head_rejects_non_bot_members_in_the_main_bot_team(synthetic_config: SeasonConfig) -> None:
+    raw = make_team_tournament(_scores(-1, 5), BOT_MEMBERS[:2] + (("a_human", "pro"),), PRO_MEMBERS)
+    with pytest.raises(ValueError, match="1 non-bot members"):
+        compute_head_to_head(raw, synthetic_config)
+
+
+def test_shared_question_pairs_reads_the_simulation_notes() -> None:
+    raw = make_team_tournament(_scores(-1, 5, count=3), BOT_MEMBERS, PRO_MEMBERS)
+    assert sorted(shared_question_pairs(raw)) == [(1, 1), (2, 2), (3, 3)]
+    next(iter(raw["scores_cache"].values()))["forecast"]["question"]["notes"] = "Some other note"
+    with pytest.raises(ValueError, match="Can't find the Pro and bot question ids"):
+        shared_question_pairs(raw)
+
+
+def test_find_close_time_differences() -> None:
+    pro_questions = {1: {"spot_scoring_time": "2026-06-05T12:00:00Z"}, 2: {"spot_scoring_time": "2026-06-06T12:00:00Z"}}
+    bot_questions = {11: {"spot_scoring_time": "2026-06-05T13:30:00Z"}, 12: {"spot_scoring_time": "2026-06-06T12:00:00Z"}}
+    differences = find_close_time_differences([(1, 11), (2, 12)], pro_questions, bot_questions)
+    assert [(difference.bot_question_id, difference.minutes_bot_closed_after_pro) for difference in differences] == [(11, 90.0)]
+
+
+def test_check_comparison_uses_pro_weights() -> None:
+    pro_questions = {1: {"weight": 1.0}, 2: {"weight": 1.0}}
+    check_comparison_uses_pro_weights({1: 1.0, 2: 1.0}, pro_questions)
+    with pytest.raises(ValueError, match="don't use the Pro question's weight"):
+        check_comparison_uses_pro_weights({1: 1.0, 2: 0.7}, pro_questions)
 
 
 def test_head_to_head_rejects_asymmetric_scores(synthetic_config: SeasonConfig) -> None:
@@ -141,7 +172,8 @@ def test_experiment_groups() -> None:
         _row("metac-claude+asknews", 7),
         _row("metac-claude+exa", 8),
     ]
-    groups = find_metac_experiment_groups(rows)
+    other_rows = [_row("metac-gpt-5-no-research-one-shot", -4), _row("metac-unknown-no-research-one-shot", -9), _row("metac-agent", 9)]
+    groups = find_metac_experiment_groups(rows, other_rows)
     assert list(groups.search_variants) == ["deepseek-r1"]
     assert [row.name for row in groups.search_variants["deepseek-r1"]] == [
         "metac-deepseek-r1+asknews", "metac-deepseek-r1+exa", "metac-deepseek-r1+no-research"
@@ -151,6 +183,9 @@ def test_experiment_groups() -> None:
     ]
     assert list(groups.variance_tests) == ["deepseek-r1+asknews"]
     assert len(groups.variance_tests["deepseek-r1+asknews"]) == 2
+    assert [(one_shot.name, [row.name for row in standard]) for one_shot, standard in groups.no_research_pairs] == [
+        ("metac-gpt-5-no-research-one-shot", ["metac-gpt-5+asknews", "metac-gpt-5-high+asknews"])
+    ]
 
 
 def test_anonymize_pros_by_rank_order() -> None:
@@ -228,8 +263,11 @@ def test_compute_season_results_on_synthetic_folder(pros_ahead_folder: Path, syn
     assert results.head_to_head.leader == "pros"
     assert results.individuals.excluded_account_count == 1
     assert {row.name for row in results.individuals.rows if row.user_type == "pro"} == {"Pro A", "Pro B", "Pro C"}
-    assert [result.team_size for result in results.team_sizes] == [1, 2, 3, 12]
+    assert [result.team_size for result in results.team_sizes] == [1, 2, 3, 13]
+    assert [result.non_bot_member_count for result in results.team_sizes] == [0, 0, 0, 1]
     assert results.team_sizes[-1].is_all_bots
+    assert overview.shared_question_weights_below_1 == ()
+    assert overview.close_time_differences == ()
     assert "metac-agent" in {row.name for row in results.metac.other_rows}
     assert all(is_baseline_metac_bot(row.name) for row in results.metac.baseline_rows)
     assert results.season_trend.current.season_label == "Summer 2026"

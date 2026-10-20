@@ -22,7 +22,6 @@ from scipy import stats as scipy_stats
 from aib_analysis.math.accuracy import (
     base_rate_geometric_mean_probability,
     binary_probability_on_outcome,
-    field_probability_multiplier,
     geometric_mean_probability,
     geometric_mean_probability_ci,
     paired_probability_ratio,
@@ -48,6 +47,7 @@ PRO_TEAM_NAME = "Pro Team"
 BOT_TEAM_NAME = "Bot Team"
 UNIFORM_REFERENCE_BOT = "metac-uniform-probability-bot"
 BASELINE_METAC_BOT_PATTERN = re.compile(r"^metac-(?P<model>[^+\[\]]+)\+(?P<search>[^\[\]]+)$")
+NO_RESEARCH_ONE_SHOT_SUFFIX = "-no-research-one-shot"
 VARIANCE_TEST_PATTERN = re.compile(r"\((?P<label>variance-test[^)]*)\)$")
 TOP_N = 10
 ELIGIBLE_SHARE_OF_QUESTIONS = 0.5
@@ -55,6 +55,7 @@ PROMISING_MIN_SHARE_OF_QUESTIONS = 0.1
 FIELD_CHART_MIN_QUESTIONS = 10
 QUESTION_TYPE_ORDER = ("binary", "numeric", "discrete", "multiple_choice")
 TEAM_SIZE_FILE_PATTERN = re.compile(r"^\d+_pro_vs_bot_tournament__teams_size_(?P<size>\d+|all)\.json$")
+COMBINED_QUESTION_NOTES_PATTERN = re.compile(r"^Combined \S+ \(QID:(?P<pro_id>\d+)\) and \S+ \(QID:(?P<bot_id>\d+)\)")
 
 Leader = Literal["pros", "bots"]
 Evidence = Literal["strong", "weak", "none"]
@@ -104,6 +105,15 @@ class LeaderboardRow:
 
 
 @dataclass(frozen=True)
+class CloseTimeDifference:
+    """A shared question whose bot copy closed at a different time than its Pro copy."""
+
+    bot_question_id: int
+    bot_close: datetime
+    minutes_bot_closed_after_pro: float
+
+
+@dataclass(frozen=True)
 class TournamentOverview:
     bot_count: int
     metac_bot_count: int
@@ -114,6 +124,7 @@ class TournamentOverview:
     binary_yes_count: int
     binary_scored_count: int
     weighted_question_count: int
+    shared_question_weights_below_1: tuple[float, ...]
     bot_only_scored_count: int
     pro_count: int
     non_pro_accounts_in_pro_tournament: int
@@ -122,6 +133,7 @@ class TournamentOverview:
     pro_weighted_question_count: int
     first_question_close: date
     last_question_close: date
+    close_time_differences: tuple[CloseTimeDifference, ...]
 
     @property
     def bot_annulled_count(self) -> int:
@@ -175,6 +187,7 @@ class HeadToHeadResult:
 class TeamSizeResult:
     team_size: int
     is_all_bots: bool
+    non_bot_member_count: int
     mean: float
     ci: tuple[float, float] | None
     question_count: int
@@ -284,8 +297,7 @@ class BotFieldAccuracy:
     field_probability: float
     eligible_bots: list[BotTypicalProbability]
     top_bot: BotTypicalProbability
-    top_bot_average_peer_score: float
-    top_bot_field_multiplier: float
+    top_bot_binary_average_peer_score: float
     worst_bot: BotTypicalProbability
 
     @property
@@ -369,6 +381,7 @@ class MetacExperimentGroups:
     search_variants: dict[str, list[LeaderboardRow]]
     reasoning_pairs: list[tuple[LeaderboardRow, LeaderboardRow]]
     variance_tests: dict[str, list[LeaderboardRow]]
+    no_research_pairs: list[tuple[LeaderboardRow, list[LeaderboardRow]]]
 
 
 @dataclass(frozen=True)
@@ -479,6 +492,36 @@ def close_date(question: dict[str, Any]) -> date:
     return datetime.fromisoformat(question["spot_scoring_time"]).date()
 
 
+def shared_question_pairs(team_raw: dict[str, Any]) -> list[tuple[int, int]]:
+    """(Pro question id, bot question id) for each question in a Pro vs bot team comparison."""
+    pairs = []
+    for question in questions_by_id(team_raw).values():
+        match = COMBINED_QUESTION_NOTES_PATTERN.match(question["notes"] or "")
+        if match is None:
+            raise ValueError(f"Can't find the Pro and bot question ids in the notes of question {question['question_id']}")
+        pairs.append((int(match["pro_id"]), int(match["bot_id"])))
+    return pairs
+
+
+def check_comparison_uses_pro_weights(comparison_weights: dict[int, float], pro_questions: dict[int, dict[str, Any]]) -> None:
+    """The write-up says the Pro vs bot comparison uses the Pro questions' weights; stop if the simulation didn't."""
+    mismatched = [question_id for question_id, weight in comparison_weights.items() if weight != pro_questions[question_id]["weight"]]
+    if mismatched:
+        raise ValueError(f"{len(mismatched)} Pro vs bot questions don't use the Pro question's weight, e.g. question {mismatched[0]}")
+
+
+def find_close_time_differences(
+    pairs: list[tuple[int, int]], pro_questions: dict[int, dict[str, Any]], bot_questions: dict[int, dict[str, Any]]
+) -> tuple[CloseTimeDifference, ...]:
+    differences = []
+    for pro_id, bot_id in pairs:
+        pro_close = datetime.fromisoformat(pro_questions[pro_id]["spot_scoring_time"])
+        bot_close = datetime.fromisoformat(bot_questions[bot_id]["spot_scoring_time"])
+        if bot_close != pro_close:
+            differences.append(CloseTimeDifference(bot_id, bot_close, (bot_close - pro_close).total_seconds() / 60))
+    return tuple(sorted(differences, key=lambda difference: difference.bot_close))
+
+
 def first_scored_close_by_name(raw: dict[str, Any]) -> dict[str, date]:
     first_closes: dict[str, date] = {}
     for score in raw["scores_cache"].values():
@@ -562,6 +605,9 @@ def compute_head_to_head(raw: dict[str, Any], config: SeasonConfig) -> HeadToHea
         raise ValueError(
             f"Expected a {config.main_bot_team_size}-bot team, found {len(bot_team.members)} members"
         )
+    non_bot_members = sum(1 for _name, member_type in bot_team.members if member_type != "bot")
+    if non_bot_members:
+        raise ValueError(f"The main bot team has {non_bot_members} non-bot members")
     non_pro_members = sum(1 for _name, member_type in pro_team.members if member_type != "pro")
     if non_pro_members != config.expected_non_pro_members_in_pro_team:
         raise ValueError(
@@ -649,12 +695,14 @@ def compute_team_sizes(files: dict[str, Path]) -> list[TeamSizeResult]:
         if bot_team is None:
             raise ValueError(f"No '{BOT_TEAM_NAME}' scores in {path.name}")
         team_size = len(bot_team.members)
+        non_bot_member_count = sum(1 for _name, member_type in bot_team.members if member_type != "bot")
         if size_label != "all" and int(size_label) != team_size:
             raise ValueError(f"{path.name} says size {size_label} but its bot team has {team_size} members")
         results.append(
             TeamSizeResult(
                 team_size=team_size,
                 is_all_bots=size_label == "all",
+                non_bot_member_count=non_bot_member_count,
                 mean=bot_team.average_score,
                 ci=confidence_interval(bot_team.score_values),
                 question_count=bot_team.question_count,
@@ -826,11 +874,8 @@ def compute_bot_field_accuracy(
         field_probability=geometric_mean_probability(field_probabilities, weights),
         eligible_bots=eligible_bots,
         top_bot=_typical_probability(top_row.name, outcome_probabilities[top_row.name]),
-        top_bot_average_peer_score=top_row.average_score,
-        top_bot_field_multiplier=field_probability_multiplier(
-            [question_score.score for question_score in top_scores],
-            [question_score.weight for question_score in top_scores],
-            [question_score.question_type in ("numeric", "discrete") for question_score in top_scores],
+        top_bot_binary_average_peer_score=statistics.fmean(
+            question_score.score for question_score in top_scores if question_score.question_type == "binary"
         ),
         worst_bot=next(bot for bot in eligible_bots if bot.name == field.worst_eligible.name),
     )
@@ -876,7 +921,7 @@ def split_baseline_name(name: str) -> tuple[str, str, str | None]:
     return match.group("model"), search, None
 
 
-def find_metac_experiment_groups(baseline_rows: list[LeaderboardRow]) -> MetacExperimentGroups:
+def find_metac_experiment_groups(baseline_rows: list[LeaderboardRow], other_rows: list[LeaderboardRow]) -> MetacExperimentGroups:
     parsed = [(row, *split_baseline_name(row.name)) for row in baseline_rows]
     searches_by_model: dict[str, list[LeaderboardRow]] = {}
     standard_by_model_and_search: dict[tuple[str, str], LeaderboardRow] = {}
@@ -896,10 +941,19 @@ def find_metac_experiment_groups(baseline_rows: list[LeaderboardRow]) -> MetacEx
         for (model, search), rows in runs_by_setup.items()
         if len(rows) >= 2
     }
+    no_research_pairs = []
+    for row in other_rows:
+        if not row.name.endswith(NO_RESEARCH_ONE_SHOT_SUFFIX):
+            continue
+        model = row.name.removeprefix("metac-").removesuffix(NO_RESEARCH_ONE_SHOT_SUFFIX)
+        standard = searches_by_model.get(model, []) + searches_by_model.get(f"{model}-high", [])
+        if standard:
+            no_research_pairs.append((row, standard))
     return MetacExperimentGroups(
         search_variants={model: rows for model, rows in searches_by_model.items() if len(rows) >= 3},
         reasoning_pairs=reasoning_pairs,
         variance_tests=variance_tests,
+        no_research_pairs=no_research_pairs,
     )
 
 
@@ -965,6 +1019,8 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
     main_team_raw = load_json(team_size_files[main_size_key])
     head_to_head = compute_head_to_head(main_team_raw, config)
     team_accuracy = compute_team_accuracy(main_team_raw)
+    question_pairs = shared_question_pairs(main_team_raw)
+    comparison_weights = {question_id: question["weight"] for question_id, question in questions_by_id(main_team_raw).items()}
     del main_team_raw
     season_trend = compute_season_trend(config, head_to_head)
 
@@ -974,6 +1030,7 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
     pro_names = {name for name, participant in pro_participants.items() if participant.user_type == "pro"}
     pro_questions = questions_by_id(pro_raw)
     del pro_raw
+    check_comparison_uses_pro_weights(comparison_weights, pro_questions)
 
     logger.info("Step 3/6: bot tournament leaderboard and question mix")
     bot_raw = load_json(find_simulation_file(simulations_folder, "bot_tournament.json"))
@@ -1020,6 +1077,9 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
         binary_yes_count=sum(1 for question in scored_binary if question["resolution"] is True),
         binary_scored_count=len(scored_binary),
         weighted_question_count=sum(1 for question in scored_bot_questions if question["weight"] < 1),
+        shared_question_weights_below_1=tuple(
+            sorted(bot_questions[bot_id]["weight"] for _pro_id, bot_id in question_pairs if bot_questions[bot_id]["weight"] < 1)
+        ),
         bot_only_scored_count=bot_only_scored_count,
         pro_count=len(pro_names),
         non_pro_accounts_in_pro_tournament=len(pro_participants) - len(pro_names),
@@ -1030,6 +1090,7 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
         ),
         first_question_close=min(close_date(question) for question in bot_questions.values()),
         last_question_close=max(close_date(question) for question in bot_questions.values()),
+        close_time_differences=find_close_time_differences(question_pairs, pro_questions, bot_questions),
     )
     logger.info(
         f"{overview.bot_count} bots, {overview.bot_scored_count} scored bot questions, {overview.pro_count} Pros, "
@@ -1043,7 +1104,7 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
         team_sizes=team_sizes,
         field=field,
         metac=metac,
-        experiment_groups=find_metac_experiment_groups(metac.baseline_rows),
+        experiment_groups=find_metac_experiment_groups(metac.baseline_rows, metac.other_rows),
         example_questions=pick_example_questions(bot_questions, config.example_question_ids),
         bot_field_accuracy=bot_field_accuracy,
         team_accuracy=team_accuracy,
