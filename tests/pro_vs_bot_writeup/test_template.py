@@ -88,6 +88,7 @@ def test_writeup_describes_a_mid_season_window_change(pros_ahead_folder: Path, s
     assert "Each question stayed open for 1.5 hours (through June 4) or 3 hours (from June 5 on)." in writeup
     assert "Bots would forecast in the last 1.5 hours (through June 4) or 3 hours (from June 5 on) of the time" in writeup
     assert "Metac Bots were not updated during the season" in writeup
+    assert "One of the bot makers' bots was an extra bot marked non-primary, which the official leaderboard doesn't rank" in writeup
     assert "Some bot tournament questions were given weights" in writeup
     assert "Pro questions all have a weight of 1. The Pro vs bot comparison uses the Pro questions' weights." in writeup
     appendix = _appendix_c(writeup)

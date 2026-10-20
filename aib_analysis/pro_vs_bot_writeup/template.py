@@ -33,6 +33,7 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     LeaderboardRow,
     SeasonResults,
     SeasonTrend,
+    bot_label,
     split_baseline_name,
 )
 from aib_analysis.pro_vs_bot_writeup.season_config import (
@@ -170,7 +171,17 @@ def _type_mix(counts: dict[str, int], with_percentages: bool) -> str:
     return join_names(parts)
 
 
-def _leaderboard_table(rows: list[LeaderboardRow], name_header: str) -> str:
+def _non_primary_sentence(non_primary_bots: tuple[str, ...]) -> str:
+    if not non_primary_bots:
+        return ""
+    count = len(non_primary_bots)
+    return (
+        f" {phrasing.count_word(count, capitalize=True)} of the bot makers' bots {'was an extra bot' if count == 1 else 'were extra bots'} marked "
+        "non-primary, which the official leaderboard doesn't rank; we rank every bot here, including Metac Bots."
+    )
+
+
+def _leaderboard_table(rows: list[LeaderboardRow], name_header: str, non_primary_bots: tuple[str, ...] = ()) -> str:
     lines = [
         f"| Rank | {name_header} | Sum of spot peer scores | Average spot peer score | 95% CI | Questions scored |",
         "| --- | --- | --- | --- | --- | --- |",
@@ -178,7 +189,7 @@ def _leaderboard_table(rows: list[LeaderboardRow], name_header: str) -> str:
     for row in rows:
         ci_text = format_ci(row.ci) if row.ci is not None else "n/a"
         lines.append(
-            f"| {row.rank} | {row.name} | {format_sum(row.sum_of_scores)} | {format_score(row.average_score)} | "
+            f"| {row.rank} | {bot_label(row.name, non_primary_bots)} | {format_sum(row.sum_of_scores)} | {format_score(row.average_score)} | "
             f"{ci_text} | {row.question_count} |"
         )
     return "\n".join(lines)
@@ -218,7 +229,7 @@ def _takeaways_section(results: SeasonResults, config: SeasonConfig) -> str:
         phrasing.individuals_takeaway(results.individuals),
     ]
     other_takeaways = [
-        phrasing.team_size_takeaway(results.team_sizes),
+        phrasing.team_size_takeaway(results.team_sizes, config.main_bot_team_size),
         phrasing.top_baseline_takeaway(results.metac),
         phrasing.baseline_history_takeaway(results.metac),
         phrasing.top_10_spread_takeaway(results.field),
@@ -252,7 +263,7 @@ def _introduction_section(results: SeasonResults, config: SeasonConfig) -> str:
             "FutureEval, and it focuses especially on comparing the rankings of Pros and bots. You can find our "
             f"other research on the [FutureEval resources page]({RESOURCES_URL}).",
             f"There were {overview.bot_count} bots ({overview.non_metac_bot_count} excluding the ones run by "
-            f"Metaculus) forecasting on {overview.bot_scored_count} scored questions. The non-Metaculus bot makers "
+            f"Metaculus) forecasting on {overview.bot_scored_count} scored questions.{_non_primary_sentence(overview.non_primary_bots)} The non-Metaculus bot makers "
             f"competed for a prize pool of {prize_pool}. A team of {head_to_head.pro_member_count} Metaculus Pro "
             f"forecasters served as a human benchmark on {head_to_head.question_count} of these questions against "
             f"the bots that finished in the top {len(head_to_head.bot_team_members)} of the leaderboard on the "
@@ -286,7 +297,7 @@ def _pros_vs_bots_section(results: SeasonResults, config: SeasonConfig, charts: 
             phrasing.individuals_paragraph(results.individuals, INDIVIDUAL_CHART_ROWS),
             _image(charts.individuals),
             "### How much does bot team size affect aggregation strength?",
-            phrasing.team_size_paragraph(results.team_sizes),
+            phrasing.team_size_paragraph(results.team_sizes, config.main_bot_team_size),
             _image(charts.team_size),
         ]
     )
@@ -321,11 +332,11 @@ def _top_bots_section(results: SeasonResults, config: SeasonConfig, charts: Char
             f"shows the top {TOP_BOTS_CHART_ROWS} bots ranked by the sum of their spot peer scores, and the table "
             f"gives exact numbers for the top {TOP_N}.",
             _image(charts.top_bots),
-            _leaderboard_table(field.top_10, "Bot"),
+            _leaderboard_table(field.top_10, "Bot", results.overview.non_primary_bots),
             "### The whole field",
             phrasing.field_paragraph(field, FIELD_CHART_MIN_QUESTIONS, field_hidden_count),
             _image(charts.field_rank),
-            phrasing.field_band_paragraph(),
+            phrasing.field_band_paragraph(field, FIELD_CHART_MIN_QUESTIONS),
             _image(charts.field),
             "### The winning bot",
             fill_me(
@@ -358,7 +369,7 @@ def _model_comparison_section(results: SeasonResults, charts: ChartFiles) -> str
     reminder = fill_me(
         "2-4 bullets on this season's Metac Bot experiments, each with scores and whether the difference is "
         "within the noise (e.g. \"No search provider is clearly better than another\"). Groups found among this "
-        "season's bots:"
+        "season's bots (scores here rank Metac Bots only against each other, so they differ from the bot tournament's):"
     )
     reminder_lines = "\n".join(f"* {line}" for line in phrasing.experiment_fact_lines(results))
     return "\n\n".join(
@@ -513,7 +524,8 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
         "others tested different setups. In general, the same-prompt bots do an internet search, run a ~30-line "
         "prompt (Appendix B), forecast 5 times with that prompt, and submit an aggregation of these forecasts. Each "
         f"bot's name indicates which model and research provider it used. For instance, \"{metac.top_baseline.name}\" "
-        f"uses {top_model} as its model and {top_search} as its research source."
+        f"uses {top_model} as its model and {top_search} as its research source. "
+        + phrasing.baseline_rank_method_sentence(metac)
     )
     shared_weighted_count = len(overview.shared_question_weights_below_1)
     shared_clause = f", {shared_weighted_count} of them also asked of the Pros" if shared_weighted_count else ""

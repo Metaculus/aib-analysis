@@ -329,45 +329,87 @@ def _team_size_label(result: TeamSizeResult) -> str:
     return f"all {bot_count} bots"
 
 
-def team_size_takeaway(team_sizes: list[TeamSizeResult]) -> str:
-    best = max(team_sizes, key=lambda result: result.mean)
+def _compared_with_main(result: TeamSizeResult) -> str:
+    """"better", "worse", or "unclear": whether the paired 95% CI against the main bot team excludes 0."""
+    ci = result.difference_from_main_ci
+    if ci is not None and ci[0] > 0:
+        return "better"
+    if ci is not None and ci[1] < 0:
+        return "worse"
+    return "unclear"
+
+
+def _main_team(team_sizes: list[TeamSizeResult], main_size: int) -> TeamSizeResult:
+    return next(result for result in team_sizes if result.team_size == main_size and not result.is_all_bots)
+
+
+def _larger_teams_verdict(team_sizes: list[TeamSizeResult], main_size: int) -> str | None:
+    verdicts = {_compared_with_main(result) for result in team_sizes if result.team_size > main_size}
+    return verdicts.pop() if len(verdicts) == 1 else None
+
+
+def team_size_takeaway(team_sizes: list[TeamSizeResult], main_size: int) -> str:
+    main = _main_team(team_sizes, main_size)
     single_bot = next((result for result in team_sizes if result.team_size == 1), None)
-    largest = team_sizes[-1]
-    if best.team_size == 1:
-        heading = "The top bot alone beat every larger bot team"
-    elif best.is_all_bots:
-        heading = "Aggregating every bot gave the best bot team"
+    larger = [result for result in team_sizes if result.team_size > main_size]
+    smaller = [result for result in team_sizes if result.team_size < main_size]
+    larger_verdict = _larger_teams_verdict(team_sizes, main_size)
+    if single_bot is not None and _compared_with_main(single_bot) == "better":
+        heading = f"The top bot alone did better than the top-{main_size} bot team"
+    elif larger and larger_verdict in ("worse", "better"):
+        heading = f"Bot teams of {larger[0].team_size} or more bots did {larger_verdict} than the top {main_size}"
+    elif all(_compared_with_main(result) == "unclear" for result in team_sizes):
+        heading = "Bot team size made no clear difference"
     else:
-        heading = f"Bot team aggregation peaked at {best.team_size} bots"
-    comparisons = []
-    if single_bot is not None and single_bot is not best:
-        comparisons.append(f"{format_score(single_bot.mean)} for the top bot alone")
-    if largest is not best:
-        comparisons.append(f"{format_score(largest.mean)} for a team of {_team_size_label(largest)}")
-    sentence = f"**{heading}:** A team of {_team_size_label(best)} scored {format_score(best.mean)} against Pros"
-    sentence += f", compared with {join_names(comparisons)}." if comparisons else "."
-    if largest is not best and largest.ci is not None and largest.ci[1] < best.mean:
+        heading = "Bot team size had mixed effects"
+    sentence = f"**{heading}:** The top {main_size} bots scored {format_score(main.mean)} against Pros"
+    if larger:
+        largest = larger[-1]
+        sentence += f", and a team of {_team_size_label(largest)} scored {format_score(largest.mean)}"
+    sentence += "."
+    if smaller:
+        low, high = min(result.mean for result in smaller), max(result.mean for result in smaller)
+        sentence += f" Smaller teams, down to the top bot alone, scored between {format_score(low)} and {format_score(high)}."
+    if larger and _compared_with_main(larger[-1]) == "worse":
         sentence += " Merely increasing the size of a bot team does not automatically improve the ensemble's forecasting."
     return sentence
 
 
-def team_size_paragraph(team_sizes: list[TeamSizeResult]) -> str:
+def _team_group_label(results: list[TeamSizeResult]) -> str:
+    """E.g. "the top bot alone, the top 30 and 50 bots, and all 274 bots"."""
+    parts = ["the top bot alone"] if any(result.team_size == 1 and not result.is_all_bots for result in results) else []
+    sized = [str(result.team_size) for result in results if result.team_size > 1 and not result.is_all_bots]
+    if sized:
+        parts.append(f"the top {join_names(sized)} bots")
+    parts += [_team_size_label(result) for result in results if result.is_all_bots]
+    return join_names(parts)
+
+
+def team_size_paragraph(team_sizes: list[TeamSizeResult], main_size: int) -> str:
     best = max(team_sizes, key=lambda result: result.mean)
     single_bot = next((result for result in team_sizes if result.team_size == 1), None)
-    largest = team_sizes[-1]
     best_ci = f" {format_ci(best.ci)}" if best.ci is not None else ""
     sentences = [
         "We ran a sensitivity analysis of the bot team's head-to-head score against Pros for bot teams of "
         "different sizes. The bot-only questions are used to determine which bots are included in a team of size "
         "X (i.e., the same method used to select the main bot team).",
-        f"The highest point estimate came from a team of {_team_size_label(best)} ({format_score(best.mean)}{best_ci}).",
+        f"To compare a team with the top {main_size}, we take the difference in their scores on each question; a "
+        "team did significantly better or worse when the 95% confidence interval of that difference excludes 0. "
+        "This is more precise than comparing the bands in the chart, because the teams' scores rise and fall "
+        "together from question to question.",
     ]
+    for verdict, direction in (("worse", "worse"), ("better", "better")):
+        group = [result for result in team_sizes if _compared_with_main(result) == verdict]
+        if group:
+            label = _team_group_label(group)
+            sentences.append(f"{label[0].upper()}{label[1:]} did significantly {direction} than the top {main_size}.")
+    sentences.append(f"The highest point estimate came from a team of {_team_size_label(best)} ({format_score(best.mean)}{best_ci}).")
     if single_bot is not None and single_bot is not best:
         sentences.append(f"The top bot by itself scored {format_score(single_bot.mean)}.")
-    if largest is not best:
-        largest_ci = f" {format_ci(largest.ci)}" if largest.ci is not None else ""
-        sentences.append(f"A team of {_team_size_label(largest)} scored {format_score(largest.mean)}{largest_ci}.")
-    sentences.append("Neighboring team sizes share most of their members, so small differences between them are mostly noise.")
+    sentences.append(
+        "Neighboring team sizes share most of their members, and we compared many sizes, so a single significant "
+        "difference between small teams can easily be luck."
+    )
     return " ".join(sentences)
 
 
@@ -399,8 +441,8 @@ def close_to_top_sentence(close_rows: list[LeaderboardRow], max_names: int = 3) 
     if remaining:
         names.append(f"{remaining} {plural(remaining, 'other')}")
     return (
-        f"However, {join_names(names)} scored within the top bot's 95% confidence interval, so it's hard to declare "
-        'any one setup "the best."'
+        f"However, {join_names(names)}, each forecasting on at least half of the questions, scored within the top "
+        'bot\'s 95% confidence interval, so it\'s hard to declare any one setup "the best."'
     )
 
 
@@ -460,6 +502,19 @@ def baseline_history_takeaway(metac: MetacResults) -> str:
         f"**{heading}:** The best Metac Bot using our standard single prompt placed "
         f"{join_names(placements + [current_text])}."
     )
+
+
+def baseline_rank_method_sentence(metac: MetacResults) -> str:
+    changed = [point for point in metac.baseline_history if point.differs_from_earlier_post]
+    sentence = (
+        "Each season's rank for the best same-prompt Metac Bot counts every bot, including Metac Bots, by sum of spot "
+        "peer scores on that season's current leaderboard."
+    )
+    if changed:
+        sentence += " Some differ from what earlier posts reported: " + join_names(
+            [f"{point.season_label} ({point.differs_from_earlier_post})" for point in changed]
+        ) + "."
+    return sentence
 
 
 def _separated_top_10_pairs(field: FieldSummary) -> int:
@@ -526,14 +581,22 @@ def field_paragraph(field: FieldSummary, chart_min_questions: int, hidden_count:
     return " ".join(sentences)
 
 
-def field_band_paragraph() -> str:
+def field_band_paragraph(field: FieldSummary, chart_min_questions: int) -> str:
+    counts = field.luck_band_counts(chart_min_questions)
+    lead = (
+        "Luck alone can't explain how spread out the bots are"
+        if counts.more_spread_than_luck
+        else "The spread is about what luck alone would produce"
+    )
     return (
         "The second chart plots each bot's average against how many questions it forecast. The shaded band shows "
         "how much luck alone moves an average: a bot exactly as good as the typical bot in the field (a true average "
-        "of 0) would land inside the band 95% of the time, given how much bot scores vary from question to "
+        "of 0) would land inside the band about 95% of the time, given how much bot scores vary from question to "
         "question. The band is wide on the left because an average over a few questions swings a lot, and narrow on "
         "the right because more questions even out the luck. Bots above the band did better than luck alone "
-        "explains. Lines show 95% confidence intervals for the highlighted bots."
+        f"explains. {lead}: {counts.above} of the {counts.shown} bots shown sit above the band and {counts.below} "
+        f"below it, where we'd expect only about {round(counts.expected_per_side)} on each side if every bot were "
+        "exactly as good as the typical bot. Lines show 95% confidence intervals for the highlighted bots."
     )
 
 

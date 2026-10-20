@@ -26,6 +26,7 @@ METAC_BOT_NAMES = (
     "metac-agent",
     "metac-uniform-probability-bot",
 )
+NON_PRIMARY_BOT_NAME = "bot-l"
 BOT_QUESTION_COUNT = 80
 SHARED_QUESTION_COUNT = 36
 ANNULLED_BOT_QUESTION_IDS = (79, 80)
@@ -137,6 +138,7 @@ def write_simulation_folder(folder: Path, bot_team_advantage: float, seed: int =
     pros = [make_user(name, "pro") for name in PRO_NAMES]
     bot_names = NON_METAC_BOT_NAMES + METAC_BOT_NAMES
     bots = [make_user(name, "bot") for name in bot_names]
+    next(bot for bot in bots if bot["name"] == NON_PRIMARY_BOT_NAME)["is_primary_bot"] = False
     human_in_bot_tournament = make_user("human_account", "pro")
     skills = {name: rng.uniform(-6, 12) for name in bot_names + PRO_NAMES + ("human_account",)}
     skills["metac-uniform-probability-bot"] = -12.0

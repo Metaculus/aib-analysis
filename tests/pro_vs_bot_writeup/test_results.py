@@ -10,6 +10,7 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     LeaderboardRow,
     SeasonTrendPoint,
     anonymize_pros,
+    bot_label,
     check_comparison_uses_pro_weights,
     compute_field,
     compute_head_to_head,
@@ -28,6 +29,7 @@ from aib_analysis.pro_vs_bot_writeup.season_config import SeasonConfig
 from tests.pro_vs_bot_writeup.conftest import (
     ANNULLED_BOT_QUESTION_IDS,
     BOT_QUESTION_COUNT,
+    NON_PRIMARY_BOT_NAME,
     SHARED_QUESTION_COUNT,
     make_question,
     make_team_tournament,
@@ -268,6 +270,9 @@ def test_compute_season_results_on_synthetic_folder(pros_ahead_folder: Path, syn
     assert results.team_sizes[-1].is_all_bots
     assert overview.shared_question_weights_below_1 == ()
     assert overview.close_time_differences == ()
+    assert overview.non_primary_bots == (NON_PRIMARY_BOT_NAME,)
+    assert bot_label(NON_PRIMARY_BOT_NAME, overview.non_primary_bots) == f"{NON_PRIMARY_BOT_NAME} (non-primary)"
+    assert bot_label("bot-a", overview.non_primary_bots) == "bot-a"
     assert "metac-agent" in {row.name for row in results.metac.other_rows}
     assert all(is_baseline_metac_bot(row.name) for row in results.metac.baseline_rows)
     assert results.season_trend.current.season_label == "Summer 2026"

@@ -36,6 +36,7 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     SeasonTrend,
     TeamAccuracy,
     TeamSizeResult,
+    bot_label,
     is_metac_bot,
 )
 
@@ -59,7 +60,6 @@ TITLE_BLOCK_INCHES = 0.72
 LEGEND_ROW_INCHES = 0.28
 COUNT_COLUMN_INCHES = 0.82
 LABEL_CHARACTER_WIDTH_INCHES = 0.068
-Z_95 = 1.959964
 MAX_FIELD_LABELS = 4
 
 plt.rcParams.update(
@@ -212,7 +212,7 @@ def team_size_chart(team_sizes: list[TeamSizeResult], main_team_size: int, path:
     _save(figure, path)
 
 
-def _dot_interval_rows(axes: Axes, rows: list[LeaderboardRow], colors: list[str]) -> None:
+def _dot_interval_rows(axes: Axes, rows: list[LeaderboardRow], colors: list[str], labels: list[str]) -> None:
     positions = list(range(len(rows)))
     for position, row, color in zip(positions, rows, colors):
         if row.ci is not None:
@@ -223,7 +223,7 @@ def _dot_interval_rows(axes: Axes, rows: list[LeaderboardRow], colors: list[str]
             textcoords="offset points", ha="left", va="center", fontsize=8, color=TEXT_MUTED,
         )
     axes.annotate("Questions", xy=(1, -0.6), xycoords=("axes fraction", "data"), xytext=(10, 2), textcoords="offset points", ha="left", va="bottom", fontsize=8, color=TEXT_MUTED)
-    axes.set_yticks(positions, [f"{row.rank}. {row.name}" for row in rows])
+    axes.set_yticks(positions, labels)
     axes.tick_params(axis="y", labelcolor=TEXT_PRIMARY)
     axes.set_ylim(len(rows) - 0.4, -0.6)
 
@@ -234,7 +234,7 @@ def individual_leaderboard_chart(individuals: IndividualResults, shown_count: in
     figure, axes = _new_figure(
         0.25 * len(rows) + 1.75, left_inches=_left_margin_for_labels(labels), right_inches=COUNT_COLUMN_INCHES, has_legend=True
     )
-    _dot_interval_rows(axes, rows, [PRO_COLOR if row.user_type == "pro" else BOT_COLOR for row in rows])
+    _dot_interval_rows(axes, rows, [PRO_COLOR if row.user_type == "pro" else BOT_COLOR for row in rows], labels)
     axes.set_xlabel("Average spot peer score (95% CI)")
     _style_grid(axes, "x")
     _add_titles(
@@ -246,13 +246,13 @@ def individual_leaderboard_chart(individuals: IndividualResults, shown_count: in
     _save(figure, path)
 
 
-def top_bots_chart(field: FieldSummary, shown_count: int, path: Path) -> None:
+def top_bots_chart(field: FieldSummary, shown_count: int, non_primary_bots: tuple[str, ...], path: Path) -> None:
     rows = field.rows[:shown_count]
-    labels = [f"{row.rank}. {row.name}" for row in rows]
+    labels = [f"{row.rank}. {bot_label(row.name, non_primary_bots)}" for row in rows]
     figure, axes = _new_figure(
         0.25 * len(rows) + 1.75, left_inches=_left_margin_for_labels(labels), right_inches=COUNT_COLUMN_INCHES, has_legend=True
     )
-    _dot_interval_rows(axes, rows, [DEEMPHASIS if is_metac_bot(row.name) else BOT_COLOR for row in rows])
+    _dot_interval_rows(axes, rows, [DEEMPHASIS if is_metac_bot(row.name) else BOT_COLOR for row in rows], labels)
     axes.set_xlabel("Average spot peer score (95% CI)")
     _style_grid(axes, "x")
     _add_titles(
@@ -268,7 +268,7 @@ def metac_chart(metac: MetacResults, shown_count: int, path: Path) -> None:
     rows = metac.baseline_rows[:shown_count]
     labels = [f"{row.rank}. {row.name}" for row in rows]
     figure, axes = _new_figure(0.25 * len(rows) + 1.45, left_inches=_left_margin_for_labels(labels), right_inches=COUNT_COLUMN_INCHES)
-    _dot_interval_rows(axes, rows, [BOT_COLOR] * len(rows))
+    _dot_interval_rows(axes, rows, [BOT_COLOR] * len(rows), labels)
     _zero_line(axes, horizontal=False)
     axes.set_xlabel("Average spot peer score against all Metac Bots (95% CI)")
     _style_grid(axes, "x")
@@ -410,7 +410,7 @@ def field_chart(field: FieldSummary, min_questions: int, path: Path) -> list[Lea
     hidden = [row for row in field.rows if row.question_count < min_questions]
     figure, axes = _new_figure(4.8, has_legend=True)
     question_grid = np.linspace(min_questions, max(row.question_count for row in shown) * 1.03, 200)
-    band = Z_95 * field.per_question_score_sd / np.sqrt(question_grid)
+    band = np.array([field.luck_band_half_width(question_count) for question_count in question_grid])
     axes.fill_between(question_grid, -band, band, color=BAND_FILL, linewidth=0, zorder=1)
     _zero_line(axes, horizontal=True)
     for row in shown:
@@ -437,7 +437,7 @@ def field_chart(field: FieldSummary, min_questions: int, path: Path) -> list[Lea
     _add_titles(
         figure,
         "Average score vs questions forecast",
-        "Shaded band: where 95% of bots exactly as good as the typical bot would land, by luck alone",
+        "Shaded band: where about 95% of bots exactly as good as the typical bot would land, by luck alone",
         _field_legend(),
     )
     _save(figure, path)

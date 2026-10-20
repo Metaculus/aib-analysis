@@ -25,11 +25,16 @@ class PublishedTeamResult:
 
 @dataclass(frozen=True)
 class PublishedBaselineBotRank:
-    """Where the best same-prompt Metac Bot placed in a past season's bot tournament."""
+    """Where the best same-prompt Metac Bot placed in a past season's bot tournament.
+
+    Ranks count every bot, including Metac Bots, by sum of spot peer scores on the season's
+    current official leaderboard, so they can differ from what an earlier post reported.
+    """
 
     season_label: str
     rank: int
     bot_count: int
+    differs_from_earlier_post: str | None = None
 
 
 @dataclass(frozen=True)
@@ -85,11 +90,11 @@ PUBLISHED_PRO_VS_BOT_RESULTS: tuple[PublishedTeamResult, ...] = (
 )
 
 PUBLISHED_BASELINE_BOT_RANKS: tuple[PublishedBaselineBotRank, ...] = (
-    PublishedBaselineBotRank("Q3 2024", 4, 55),
+    PublishedBaselineBotRank("Q3 2024", 4, 55, differs_from_earlier_post="the Q3 2024 post reported 3rd"),
     PublishedBaselineBotRank("Q4 2024", 6, 44),
     PublishedBaselineBotRank("Q1 2025", 1, 45),
     PublishedBaselineBotRank("Q2 2025", 2, 96),
-    PublishedBaselineBotRank("Fall 2025", 14, 134),
+    PublishedBaselineBotRank("Fall 2025", 16, 135, differs_from_earlier_post="the Spring 2026 post reported 14th of 134"),
     PublishedBaselineBotRank("Spring 2026", 18, 173),
 )
 

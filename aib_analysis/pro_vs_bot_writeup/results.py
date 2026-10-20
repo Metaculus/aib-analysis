@@ -53,6 +53,7 @@ TOP_N = 10
 ELIGIBLE_SHARE_OF_QUESTIONS = 0.5
 PROMISING_MIN_SHARE_OF_QUESTIONS = 0.1
 FIELD_CHART_MIN_QUESTIONS = 10
+LUCK_BAND_Z = scipy_stats.norm.ppf(0.975)
 QUESTION_TYPE_ORDER = ("binary", "numeric", "discrete", "multiple_choice")
 TEAM_SIZE_FILE_PATTERN = re.compile(r"^\d+_pro_vs_bot_tournament__teams_size_(?P<size>\d+|all)\.json$")
 COMBINED_QUESTION_NOTES_PATTERN = re.compile(r"^Combined \S+ \(QID:(?P<pro_id>\d+)\) and \S+ \(QID:(?P<bot_id>\d+)\)")
@@ -134,6 +135,7 @@ class TournamentOverview:
     first_question_close: date
     last_question_close: date
     close_time_differences: tuple[CloseTimeDifference, ...]
+    non_primary_bots: tuple[str, ...]
 
     @property
     def bot_annulled_count(self) -> int:
@@ -185,12 +187,15 @@ class HeadToHeadResult:
 
 @dataclass(frozen=True)
 class TeamSizeResult:
+    """difference_from_main_ci compares the team with the main bot team on questions both forecast (None for the main team)."""
+
     team_size: int
     is_all_bots: bool
     non_bot_member_count: int
     mean: float
     ci: tuple[float, float] | None
     question_count: int
+    difference_from_main_ci: tuple[float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -254,6 +259,15 @@ class IndividualResults:
 
 
 @dataclass(frozen=True)
+class LuckBandCounts:
+    shown: int
+    above: int
+    below: int
+    expected_per_side: float
+    more_spread_than_luck: bool
+
+
+@dataclass(frozen=True)
 class FieldSummary:
     rows: list[LeaderboardRow]
     scored_question_count: int
@@ -278,6 +292,27 @@ class FieldSummary:
         top_ci = self.rows[0].ci
         tenth_ci = self.tenth_place.ci
         return top_ci is not None and tenth_ci is not None and top_ci[0] > tenth_ci[1]
+
+    def luck_band_half_width(self, question_count: float) -> float:
+        """Where a bot with a true average of 0 lands about 95% of the time, treating its scores like the field's."""
+        return LUCK_BAND_Z * self.per_question_score_sd / math.sqrt(question_count)
+
+    def luck_band_counts(self, min_questions: int) -> LuckBandCounts:
+        shown = [row for row in self.rows if row.question_count >= min_questions]
+        above = sum(1 for row in shown if row.average_score > self.luck_band_half_width(row.question_count))
+        below = sum(1 for row in shown if row.average_score < -self.luck_band_half_width(row.question_count))
+        share_outside_each_side = 1 - scipy_stats.norm.cdf(LUCK_BAND_Z)
+        p_values = [
+            scipy_stats.binomtest(count, len(shown), share_outside_each_side, alternative="greater").pvalue
+            for count in (above, below)
+        ]
+        return LuckBandCounts(
+            shown=len(shown),
+            above=above,
+            below=below,
+            expected_per_side=share_outside_each_side * len(shown),
+            more_spread_than_luck=min(p_values) < SIGNIFICANCE_LEVEL,
+        )
 
 
 @dataclass(frozen=True)
@@ -331,6 +366,7 @@ class BaselineRankPoint:
     rank: int
     bot_count: int
     bot_name: str | None
+    differs_from_earlier_post: str | None = None
 
 
 @dataclass(frozen=True)
@@ -369,11 +405,16 @@ class MetacResults:
         return self.baseline_history[-1]
 
     def close_to_top(self) -> list[LeaderboardRow]:
-        """Baseline bots whose average is at or below the top bot's but inside its 95% CI."""
+        """Baseline bots on at least half the questions whose average is at or below the top bot's but inside its 95% CI."""
         top = self.top_baseline
         if top.ci is None:
             return []
-        return [row for row in self.baseline_rows[1:] if top.ci[0] <= row.average_score <= top.average_score]
+        min_questions = self.scored_question_count * ELIGIBLE_SHARE_OF_QUESTIONS
+        return [
+            row
+            for row in self.baseline_rows[1:]
+            if top.ci[0] <= row.average_score <= top.average_score and row.question_count >= min_questions
+        ]
 
 
 @dataclass(frozen=True)
@@ -490,6 +531,20 @@ def is_scored(question: dict[str, Any]) -> bool:
 
 def close_date(question: dict[str, Any]) -> date:
     return datetime.fromisoformat(question["spot_scoring_time"]).date()
+
+
+def bot_label(name: str, non_primary_bots: tuple[str, ...]) -> str:
+    return f"{name} (non-primary)" if name in non_primary_bots else name
+
+
+def find_non_primary_bots(raw: dict[str, Any]) -> tuple[str, ...]:
+    """Bots outside Metaculus that their makers didn't mark as primary; the official leaderboard doesn't rank them."""
+    names = {
+        score["forecast"]["user"]["name"]
+        for score in raw["scores_cache"].values()
+        if score["forecast"]["user"]["type"] == "bot" and score["forecast"]["user"]["is_primary_bot"] is False
+    }
+    return tuple(sorted(name for name in names if not is_metac_bot(name)))
 
 
 def shared_question_pairs(team_raw: dict[str, Any]) -> list[tuple[int, int]]:
@@ -688,24 +743,35 @@ def compute_season_trend(config: SeasonConfig, head_to_head: HeadToHeadResult) -
     return SeasonTrend(points=points, change_p_value=change_p_value, skipped_seasons=skipped_seasons)
 
 
-def compute_team_sizes(files: dict[str, Path]) -> list[TeamSizeResult]:
-    results: list[TeamSizeResult] = []
+def compute_team_sizes(
+    files: dict[str, Path], pro_questions: dict[int, dict[str, Any]], main_size_label: str
+) -> list[TeamSizeResult]:
+    teams: dict[str, Participant] = {}
     for size_label, path in files.items():
-        bot_team = spot_peer_participants(load_json(path)).get(BOT_TEAM_NAME)
+        raw = load_json(path)
+        check_comparison_uses_pro_weights(
+            {question_id: question["weight"] for question_id, question in questions_by_id(raw).items()}, pro_questions
+        )
+        bot_team = spot_peer_participants(raw).get(BOT_TEAM_NAME)
         if bot_team is None:
             raise ValueError(f"No '{BOT_TEAM_NAME}' scores in {path.name}")
-        team_size = len(bot_team.members)
-        non_bot_member_count = sum(1 for _name, member_type in bot_team.members if member_type != "bot")
-        if size_label != "all" and int(size_label) != team_size:
-            raise ValueError(f"{path.name} says size {size_label} but its bot team has {team_size} members")
+        if size_label != "all" and int(size_label) != len(bot_team.members):
+            raise ValueError(f"{path.name} says size {size_label} but its bot team has {len(bot_team.members)} members")
+        teams[size_label] = bot_team
+    main_scores = {question_score.question_id: question_score.score for question_score in teams[main_size_label].scores}
+    results: list[TeamSizeResult] = []
+    for size_label, bot_team in teams.items():
+        scores = {question_score.question_id: question_score.score for question_score in bot_team.scores}
+        differences = [scores[question_id] - main_scores[question_id] for question_id in scores.keys() & main_scores.keys()]
         results.append(
             TeamSizeResult(
-                team_size=team_size,
+                team_size=len(bot_team.members),
                 is_all_bots=size_label == "all",
-                non_bot_member_count=non_bot_member_count,
+                non_bot_member_count=sum(1 for _name, member_type in bot_team.members if member_type != "bot"),
                 mean=bot_team.average_score,
                 ci=confidence_interval(bot_team.score_values),
                 question_count=bot_team.question_count,
+                difference_from_main_ci=None if size_label == main_size_label else confidence_interval(differences),
             )
         )
     return sorted(results, key=lambda result: result.team_size)
@@ -797,7 +863,9 @@ def compute_metac(metac_raw: dict[str, Any], bot_rows: list[LeaderboardRow], sea
         raise ValueError("No same-prompt baseline Metac Bot appears in the bot tournament leaderboard")
     earlier_seasons = set(seasons_before(season_label))
     history = [
-        BaselineRankPoint(published.season_label, published.rank, published.bot_count, None)
+        BaselineRankPoint(
+            published.season_label, published.rank, published.bot_count, None, published.differs_from_earlier_post
+        )
         for published in PUBLISHED_BASELINE_BOT_RANKS
         if published.season_label in earlier_seasons
     ]
@@ -1020,7 +1088,6 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
     head_to_head = compute_head_to_head(main_team_raw, config)
     team_accuracy = compute_team_accuracy(main_team_raw)
     question_pairs = shared_question_pairs(main_team_raw)
-    comparison_weights = {question_id: question["weight"] for question_id, question in questions_by_id(main_team_raw).items()}
     del main_team_raw
     season_trend = compute_season_trend(config, head_to_head)
 
@@ -1030,7 +1097,6 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
     pro_names = {name for name, participant in pro_participants.items() if participant.user_type == "pro"}
     pro_questions = questions_by_id(pro_raw)
     del pro_raw
-    check_comparison_uses_pro_weights(comparison_weights, pro_questions)
 
     logger.info("Step 3/6: bot tournament leaderboard and question mix")
     bot_raw = load_json(find_simulation_file(simulations_folder, "bot_tournament.json"))
@@ -1046,6 +1112,7 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
         len(scored_bot_questions),
     )
     bot_field_accuracy = compute_bot_field_accuracy(bot_raw, field, bot_participants)
+    non_primary_bots = find_non_primary_bots(bot_raw)
     del bot_raw
 
     logger.info("Step 4/6: bot-only questions and Metac Bots")
@@ -1065,7 +1132,7 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
     )
 
     logger.info("Step 6/6: bot team sizes")
-    team_sizes = compute_team_sizes(team_size_files)
+    team_sizes = compute_team_sizes(team_size_files, pro_questions, main_size_key)
 
     overview = TournamentOverview(
         bot_count=len(bots),
@@ -1091,6 +1158,7 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
         first_question_close=min(close_date(question) for question in bot_questions.values()),
         last_question_close=max(close_date(question) for question in bot_questions.values()),
         close_time_differences=find_close_time_differences(question_pairs, pro_questions, bot_questions),
+        non_primary_bots=non_primary_bots,
     )
     logger.info(
         f"{overview.bot_count} bots, {overview.bot_scored_count} scored bot questions, {overview.pro_count} Pros, "

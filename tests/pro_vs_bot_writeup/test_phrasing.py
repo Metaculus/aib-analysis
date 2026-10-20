@@ -174,30 +174,73 @@ def test_individuals_paragraph_counts_bots_above_lowest_pro() -> None:
     assert "Every Pro placed above every bot." in phrasing.individuals_paragraph(_individuals(["pro", "pro", "bot"]), 20)
 
 
-def _team_size(size: int, mean: float, ci: tuple[float, float] | None = None, is_all: bool = False, humans: int = 0) -> TeamSizeResult:
-    return TeamSizeResult(size, is_all, humans, mean, ci or (mean - 6, mean + 6), 97)
+def _team_size(
+    size: int,
+    mean: float,
+    vs_main: tuple[float, float] | None = (-1.0, 1.0),
+    is_all: bool = False,
+    humans: int = 0,
+) -> TeamSizeResult:
+    return TeamSizeResult(size, is_all, humans, mean, (mean - 6, mean + 6), 97, None if size == 10 else vs_main)
 
 
-def test_team_size_takeaway_peak_in_the_middle() -> None:
-    sizes = [_team_size(1, -3.59), _team_size(8, 0.89), _team_size(10, -0.26), _team_size(276, -12.1, (-20.75, -3.44), True)]
-    text = phrasing.team_size_takeaway(sizes)
-    assert text.startswith("**Bot team aggregation peaked at 8 bots:**")
-    assert "compared with -3.59 for the top bot alone and -12.10 for a team of all 276 bots." in text
+def test_team_size_takeaway_when_larger_teams_did_worse() -> None:
+    sizes = [
+        _team_size(1, -3.59),
+        _team_size(8, 0.89, (0.35, 1.94)),
+        _team_size(10, -0.26),
+        _team_size(30, -2.48, (-4.3, -0.1)),
+        _team_size(276, -12.1, (-17.98, -5.7), is_all=True, humans=2),
+    ]
+    text = phrasing.team_size_takeaway(sizes, 10)
+    assert text.startswith("**Bot teams of 30 or more bots did worse than the top 10:**")
+    assert "a team of all 274 bots (plus 2 human accounts that forecast in the bot tournament) scored -12.10" in text
+    assert "Smaller teams, down to the top bot alone, scored between -3.59 and 0.89." in text
     assert "Merely increasing the size of a bot team" in text
-    sizes[-1] = _team_size(276, -12.1, (-20.75, -3.44), True, humans=2)
-    assert (
-        "-12.10 for a team of all 274 bots (plus 2 human accounts that forecast in the bot tournament)"
-        in phrasing.team_size_takeaway(sizes)
-    )
+    assert "peak" not in text
+    paragraph = phrasing.team_size_paragraph(sizes, 10)
+    assert "The top 8 bots did significantly better than the top 10." in paragraph
+    assert "The top 30 bots and all 274 bots (plus 2 human accounts" in paragraph
+    assert "a single significant difference between small teams can easily be luck" in paragraph
 
 
-def test_team_size_takeaway_when_top_bot_or_all_bots_win() -> None:
-    top_bot_wins = [_team_size(1, 5.0), _team_size(10, 1.0), _team_size(50, 0.0, is_all=True)]
-    assert phrasing.team_size_takeaway(top_bot_wins).startswith("**The top bot alone beat every larger bot team:**")
-    all_bots_win = [_team_size(1, -5.0), _team_size(10, 1.0), _team_size(50, 2.0, is_all=True)]
-    text = phrasing.team_size_takeaway(all_bots_win)
-    assert text.startswith("**Aggregating every bot gave the best bot team:**")
+def test_team_size_takeaway_other_headings() -> None:
+    top_bot_better = [_team_size(1, 5.0, (1.0, 9.0)), _team_size(10, 1.0), _team_size(50, 0.0, is_all=True)]
+    assert phrasing.team_size_takeaway(top_bot_better, 10).startswith("**The top bot alone did better than the top-10 bot team:**")
+    no_difference = [_team_size(1, -1.0), _team_size(10, 0.0), _team_size(50, 0.5, is_all=True)]
+    text = phrasing.team_size_takeaway(no_difference, 10)
+    assert text.startswith("**Bot team size made no clear difference:**")
     assert "Merely increasing" not in text
+    mixed = [_team_size(1, -1.0), _team_size(10, 0.0), _team_size(30, 3.0, (0.5, 5.5)), _team_size(50, -0.5, is_all=True)]
+    assert phrasing.team_size_takeaway(mixed, 10).startswith("**Bot team size had mixed effects:**")
+
+
+def test_field_band_paragraph_counts_bots_outside_the_band() -> None:
+    field = _field([(10.0, 20.0)] * 10)
+    rows = [_row(rank, f"bot-{rank}", average=average, questions=100) for rank, average in enumerate([30.0] * 6 + [0.0] * 30 + [-30.0] * 4, start=1)]
+    text = phrasing.field_band_paragraph(dataclasses.replace(field, rows=rows), chart_min_questions=10)
+    assert "about 95% of the time" in text
+    assert "Luck alone can't explain how spread out the bots are: 6 of the 40 bots shown sit above the band and 4 below it, where we'd expect only about 1 on each side" in text
+    calm = [_row(rank, f"bot-{rank}", average=0.0, questions=100) for rank in range(1, 41)]
+    assert "The spread is about what luck alone would produce" in phrasing.field_band_paragraph(dataclasses.replace(field, rows=calm), 10)
+
+
+def test_close_to_top_skips_bots_with_few_questions() -> None:
+    history = [BaselineRankPoint("Summer 2026", 24, 282, "metac-model-a+asknews")]
+    metac = _metac(history, close=True)
+    few_questions = _row(3, "metac-model-d+asknews", average=9.5, questions=14)
+    metac = dataclasses.replace(metac, baseline_rows=metac.baseline_rows + [few_questions])
+    assert [row.name for row in metac.close_to_top()] == ["metac-model-b+asknews"]
+
+
+def test_baseline_rank_method_sentence_lists_changed_ranks() -> None:
+    history = [
+        BaselineRankPoint("Fall 2025", 16, 135, None, "the Spring 2026 post reported 14th of 134"),
+        BaselineRankPoint("Summer 2026", 24, 282, "metac-model-a+asknews"),
+    ]
+    text = phrasing.baseline_rank_method_sentence(_metac(history, close=False))
+    assert "counts every bot, including Metac Bots" in text
+    assert "Some differ from what earlier posts reported: Fall 2025 (the Spring 2026 post reported 14th of 134)." in text
 
 
 def _metac(history: list[BaselineRankPoint], close: bool, late_starter_average: float | None = None) -> MetacResults:
@@ -230,7 +273,7 @@ def test_top_baseline_takeaway_mentions_close_competitors() -> None:
     history = [BaselineRankPoint("Summer 2026", 24, 282, "metac-model-a+asknews")]
     text = phrasing.top_baseline_takeaway(_metac(history, close=True))
     assert "24th of 282 overall" in text
-    assert "However, metac-model-b+asknews scored within the top bot's 95% confidence interval" in text
+    assert "However, metac-model-b+asknews, each forecasting on at least half of the questions, scored within the top bot's 95% confidence interval" in text
     assert "scored within" not in phrasing.top_baseline_takeaway(_metac(history, close=False))
 
 
