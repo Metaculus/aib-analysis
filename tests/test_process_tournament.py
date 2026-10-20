@@ -6,8 +6,9 @@ from aib_analysis.data_structures.custom_types import (
     ForecastType,
     QuestionType,
     ScoreType,
+    UserType,
 )
-from aib_analysis.data_structures.data_models import Question
+from aib_analysis.data_structures.data_models import Question, User
 from aib_analysis.data_structures.simulated_tournament import (
     SimulatedTournament,
 )
@@ -17,6 +18,7 @@ from aib_analysis.main_logic.process_tournament import (
     create_team_tournament,
     get_best_forecasters_from_tournament,
     get_leaderboard,
+    get_pro_team_users,
     smart_remove_questions_from_tournament,
 )
 from tests.mock_data_maker import (
@@ -293,6 +295,45 @@ class TestCreateTeam:
         assert (
             team2_user.aggregated_users[0].name == "user3"
         )  # Only user in tournament2
+
+    def test_bot_accounts_in_pro_tournament_do_not_enter_pro_team(self) -> None:
+        question = make_question_binary()
+        coherence_bot = User(
+            name="coherence_bot", type=UserType.BOT, aggregated_users=[], is_primary_bot=False
+        )
+        pro_tournament = SimulatedTournament(
+            forecasts=[
+                make_forecast(question, make_user("pro_1"), [0.8]),
+                make_forecast(question, make_user("pro_2"), [0.6]),
+                make_forecast(question, coherence_bot, [0.1]),
+            ]
+        )
+        bot = make_user("bot", UserType.BOT)
+        bot_tournament = SimulatedTournament(forecasts=[make_forecast(question, bot, [0.5])])
+
+        team_tournament = create_team_tournament(
+            pro_tournament,
+            bot_tournament,
+            get_pro_team_users(pro_tournament),
+            [bot],
+            "Pro Team",
+            "Bot Team",
+            use_tourn_1_weights=True,
+        )
+
+        pro_team_forecast = next(
+            forecast for forecast in team_tournament.forecasts if forecast.user.name == "Pro Team"
+        )
+        assert sorted(user.name for user in pro_team_forecast.user.aggregated_users) == ["pro_1", "pro_2"]
+        assert pro_team_forecast.prediction[0] == pytest.approx(0.7)
+
+    def test_pro_team_without_pros_raises(self) -> None:
+        question = make_question_binary()
+        bot_only_tournament = SimulatedTournament(
+            forecasts=[make_forecast(question, make_user("bot", UserType.BOT), [0.5])]
+        )
+        with pytest.raises(ValueError, match="No Pro users"):
+            get_pro_team_users(bot_only_tournament)
 
     @pytest.mark.skip(reason="Need more diverse mock tournaments in order to not have hash conflicts")
     def test_create_team_tournament_all_users(self) -> None:

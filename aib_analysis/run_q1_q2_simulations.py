@@ -16,6 +16,7 @@ from aib_analysis.main_logic.process_tournament import (
     create_team_tournament,
     create_weighted_q3_spot_forecast_tourn,
     get_best_forecasters_from_tournament,
+    get_pro_team_users,
     save_tournament,
     smart_remove_questions_from_tournament,
 )
@@ -137,12 +138,12 @@ def main(
         counter_override=next_count(),
     )
 
+    pro_team = get_pro_team_users(pro_tournament)
     team_comparison_counter = next_count()
     size_10_bot_team = None
     for bot_team_size in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 30, 50, 100]:
         if bot_team_size > len(bot_tournament.users):
             continue
-        pro_team = pro_tournament.users
         bot_team_for_pro_comparison = get_best_forecasters_from_tournament(
             bot_tournament_wo_pro_questions, bot_team_size
         )
