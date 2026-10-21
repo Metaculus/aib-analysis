@@ -21,6 +21,7 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     IndividualResults,
     LeaderboardRow,
     MetacResults,
+    RunnerUpComparison,
     SeasonResults,
     SeasonTrend,
     SeasonTrendPoint,
@@ -414,9 +415,8 @@ def top_baseline_takeaway(metac: MetacResults) -> str:
         f"{top.name} finished first among these, and {ordinal(standing.rank)} of {standing.bot_count} overall in "
         "the bot tournament."
     )
-    close_rows = metac.close_to_top()
-    if close_rows:
-        sentence += f" {close_to_top_sentence(close_rows)}"
+    if metac.runner_up_comparison is not None:
+        sentence += f" {runner_up_sentence(metac.runner_up_comparison)}"
     higher_average_rows = metac.higher_average_on_fewer_questions()
     if higher_average_rows:
         standout = higher_average_rows[0]
@@ -427,14 +427,28 @@ def top_baseline_takeaway(metac: MetacResults) -> str:
     return sentence
 
 
-def close_to_top_sentence(close_rows: list[LeaderboardRow], max_names: int = 3) -> str:
-    names = [row.name for row in close_rows[:max_names]]
-    remaining = len(close_rows) - len(names)
-    if remaining:
-        names.append(f"{remaining} {plural(remaining, 'other')}")
+def runner_up_sentence(comparison: RunnerUpComparison) -> str:
+    runner_up = comparison.runner_up.name
+    ci = comparison.difference_ci
+    on_shared = f"on the {comparison.shared_question_count} questions both forecast"
+    if ci is not None:
+        on_shared += f" (95% CI: {format_ci(ci)})"
+    gap = comparison.mean_difference
+    if ci is not None and ci[0] > 0:
+        return f"It scored {format_score(gap)} points higher than the runner-up, {runner_up}, {on_shared}, a statistically significant lead."
+    if ci is not None and ci[1] < 0:
+        return (
+            f"However, the runner-up, {runner_up}, scored {format_score(-gap)} points higher than it {on_shared}, a "
+            "statistically significant difference, even though it ranks lower by sum."
+        )
+    if gap >= 0:
+        return (
+            f"However, it scored only {format_score(gap)} points higher than the runner-up, {runner_up}, {on_shared}, "
+            'so it\'s hard to declare any one setup "the best."'
+        )
     return (
-        f"However, {join_names(names)} scored within the top bot's 95% confidence interval, so it's hard to declare "
-        'any one setup "the best."'
+        f"However, the runner-up, {runner_up}, scored {format_score(-gap)} points higher than it {on_shared}, so "
+        'it\'s hard to declare any one setup "the best."'
     )
 
 
@@ -707,11 +721,8 @@ def metac_comparison_sentence(metac: MetacResults) -> str:
         f"{top.name} ranked first by sum of spot peer scores, with an average of {format_score(top.average_score)}"
     )
     sentence += f" (95% CI: {format_ci(top.ci)})." if top.ci is not None else "."
-    close_rows = metac.close_to_top()
-    if close_rows:
-        sentence += f" {close_to_top_sentence(close_rows)}"
-    elif not metac.higher_average_on_fewer_questions():
-        sentence += " Every other same-prompt bot's average falls below the top bot's 95% confidence interval."
+    if metac.runner_up_comparison is not None:
+        sentence += f" {runner_up_sentence(metac.runner_up_comparison)}"
     higher_average_sentence = higher_average_on_fewer_questions_sentence(metac)
     if higher_average_sentence:
         sentence += f" {higher_average_sentence}"

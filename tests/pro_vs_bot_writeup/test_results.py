@@ -274,6 +274,9 @@ def test_compute_season_results_on_synthetic_folder(pros_ahead_folder: Path, syn
     assert bot_label("bot-a", overview.non_primary_bots) == "bot-a"
     assert "metac-agent" in {row.name for row in results.metac.other_rows}
     assert all(is_baseline_metac_bot(row.name) for row in results.metac.baseline_rows)
+    runner_up = results.metac.runner_up_comparison
+    assert runner_up is not None and runner_up.runner_up == results.metac.baseline_rows[1]
+    assert runner_up.shared_question_count == BOT_QUESTION_COUNT - len(ANNULLED_BOT_QUESTION_IDS)
     assert results.season_trend.current.season_label == "Summer 2026"
     assert results.example_questions[0].title == "Short?"
 

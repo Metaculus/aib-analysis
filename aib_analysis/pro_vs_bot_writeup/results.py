@@ -369,6 +369,16 @@ class BaselineRankPoint:
 
 
 @dataclass(frozen=True)
+class RunnerUpComparison:
+    """The top same-prompt Metac Bot's score minus the runner-up's, on the questions both forecast."""
+
+    runner_up: LeaderboardRow
+    shared_question_count: int
+    mean_difference: float
+    difference_ci: tuple[float, float] | None
+
+
+@dataclass(frozen=True)
 class MetacResults:
     baseline_rows: list[LeaderboardRow]
     other_rows: list[LeaderboardRow]
@@ -378,6 +388,7 @@ class MetacResults:
     baseline_history: list[BaselineRankPoint]
     first_question_close: date
     first_scored_close_by_name: dict[str, date]
+    runner_up_comparison: RunnerUpComparison | None
 
     @property
     def top_baseline(self) -> LeaderboardRow:
@@ -403,12 +414,6 @@ class MetacResults:
     def current_standing(self) -> BaselineRankPoint:
         return self.baseline_history[-1]
 
-    def close_to_top(self) -> list[LeaderboardRow]:
-        """Baseline bots whose average is at or below the top bot's but inside its 95% CI."""
-        top = self.top_baseline
-        if top.ci is None:
-            return []
-        return [row for row in self.baseline_rows[1:] if top.ci[0] <= row.average_score <= top.average_score]
 
 
 @dataclass(frozen=True)
@@ -849,6 +854,25 @@ def compute_field(bot_rows: list[LeaderboardRow], all_scores: list[float], score
     )
 
 
+def compare_with_runner_up(
+    baseline_rows: list[LeaderboardRow], participants: dict[str, Participant]
+) -> RunnerUpComparison | None:
+    if len(baseline_rows) < 2:
+        return None
+    top_scores = {score.question_id: score.score for score in participants[baseline_rows[0].name].scores}
+    runner_up_scores = {score.question_id: score.score for score in participants[baseline_rows[1].name].scores}
+    shared = sorted(top_scores.keys() & runner_up_scores.keys())
+    if not shared:
+        raise ValueError(f"{baseline_rows[0].name} and {baseline_rows[1].name} share no scored questions")
+    differences = [top_scores[question_id] - runner_up_scores[question_id] for question_id in shared]
+    return RunnerUpComparison(
+        runner_up=baseline_rows[1],
+        shared_question_count=len(shared),
+        mean_difference=statistics.fmean(differences),
+        difference_ci=confidence_interval(differences),
+    )
+
+
 def compute_metac(metac_raw: dict[str, Any], bot_rows: list[LeaderboardRow], season_label: str) -> MetacResults:
     metac_participants = spot_peer_participants(metac_raw)
     scored_question_count = sum(1 for question in questions_by_id(metac_raw).values() if is_scored(question))
@@ -887,6 +911,7 @@ def compute_metac(metac_raw: dict[str, Any], bot_rows: list[LeaderboardRow], sea
         baseline_history=history,
         first_question_close=min(close_date(question) for question in questions_by_id(metac_raw).values()),
         first_scored_close_by_name=first_scored_close_by_name(metac_raw),
+        runner_up_comparison=compare_with_runner_up(baseline_rows, metac_participants),
     )
 
 

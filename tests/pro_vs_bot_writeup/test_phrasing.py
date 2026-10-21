@@ -15,6 +15,7 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     IndividualResults,
     LeaderboardRow,
     MetacResults,
+    RunnerUpComparison,
     SeasonTrend,
     SeasonTrendPoint,
     TeamAccuracy,
@@ -219,7 +220,12 @@ def test_field_band_paragraph_counts_bots_outside_the_band() -> None:
     assert "The spread is about what luck alone would produce" in phrasing.field_band_paragraph(dataclasses.replace(field, rows=calm), 10)
 
 
-def _metac(history: list[BaselineRankPoint], close: bool, late_starter_average: float | None = None) -> MetacResults:
+def _metac(
+    history: list[BaselineRankPoint],
+    close: bool,
+    late_starter_average: float | None = None,
+    runner_up_gap: tuple[float, tuple[float, float] | None] = (0.71, (-3.14, 4.56)),
+) -> MetacResults:
     top_ci = (5.0, 15.0)
     second_average = 9.0 if close else 2.0
     rows = [
@@ -242,15 +248,34 @@ def _metac(history: list[BaselineRankPoint], close: bool, late_starter_average: 
             "metac-model-b+asknews": season_start,
             "metac-model-c+asknews": season_start + timedelta(days=23),
         },
+        runner_up_comparison=RunnerUpComparison(rows[1], 309, runner_up_gap[0], runner_up_gap[1]),
     )
 
 
-def test_top_baseline_takeaway_mentions_close_competitors() -> None:
+def test_top_baseline_takeaway_compares_with_the_runner_up() -> None:
     history = [BaselineRankPoint("Summer 2026", 24, 282, "metac-model-a+asknews")]
     text = phrasing.top_baseline_takeaway(_metac(history, close=True))
     assert "24th of 282 overall" in text
-    assert "However, metac-model-b+asknews scored within the top bot's 95% confidence interval" in text
-    assert "scored within" not in phrasing.top_baseline_takeaway(_metac(history, close=False))
+    assert (
+        "However, it scored only 0.71 points higher than the runner-up, metac-model-b+asknews, on the 309 questions "
+        'both forecast (95% CI: [-3.14, 4.56]), so it\'s hard to declare any one setup "the best."' in text
+    )
+
+
+@pytest.mark.parametrize(
+    ("gap", "expected"),
+    [
+        ((5.2, (1.1, 9.3)), "It scored 5.20 points higher than the runner-up, metac-model-b+asknews, on the 309 questions both forecast (95% CI: [1.10, 9.30]), a statistically significant lead."),
+        ((-4.0, (-7.0, -1.0)), "However, the runner-up, metac-model-b+asknews, scored 4.00 points higher than it on the 309 questions both forecast (95% CI: [-7.00, -1.00]), a statistically significant difference"),
+        ((-0.5, (-4.0, 3.0)), "However, the runner-up, metac-model-b+asknews, scored 0.50 points higher than it on the 309 questions both forecast (95% CI: [-4.00, 3.00]), so it's hard"),
+        ((0.3, None), "However, it scored only 0.30 points higher than the runner-up, metac-model-b+asknews, on the 309 questions both forecast, so it's hard"),
+    ],
+)
+def test_runner_up_sentence_branches(gap: tuple[float, tuple[float, float] | None], expected: str) -> None:
+    history = [BaselineRankPoint("Summer 2026", 24, 282, "metac-model-a+asknews")]
+    metac = _metac(history, close=True, runner_up_gap=gap)
+    assert expected in phrasing.runner_up_sentence(metac.runner_up_comparison)
+    assert expected in phrasing.metac_comparison_sentence(metac)
 
 
 def test_higher_average_bots_that_started_late_are_called_out() -> None:
