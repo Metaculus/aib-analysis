@@ -19,6 +19,7 @@ from aib_analysis.main_logic.process_tournament import (
     get_best_forecasters_from_tournament,
     get_leaderboard,
     get_pro_team_users,
+    remove_human_accounts,
     smart_remove_questions_from_tournament,
 )
 from tests.mock_data_maker import (
@@ -295,6 +296,21 @@ class TestCreateTeam:
         assert (
             team2_user.aggregated_users[0].name == "user3"
         )  # Only user in tournament2
+
+    def test_remove_human_accounts_keeps_only_bots_and_rescores(self) -> None:
+        question = make_question_binary()
+        bot_tournament = SimulatedTournament(
+            forecasts=[
+                make_forecast(question, make_user("bot_1", UserType.BOT), [0.8]),
+                make_forecast(question, make_user("bot_2", UserType.BOT), [0.6]),
+                make_forecast(question, make_user("stray_human"), [0.1]),
+            ]
+        )
+        bots_only = remove_human_accounts(bot_tournament)
+        assert sorted(user.name for user in bots_only.users) == ["bot_1", "bot_2"]
+        with_human = {score.forecast.user.name: score.score for score in bot_tournament.scores if score.type == ScoreType.SPOT_PEER}
+        without_human = {score.forecast.user.name: score.score for score in bots_only.scores if score.type == ScoreType.SPOT_PEER}
+        assert without_human["bot_1"] != pytest.approx(with_human["bot_1"])
 
     def test_bot_accounts_in_pro_tournament_do_not_enter_pro_team(self) -> None:
         question = make_question_binary()

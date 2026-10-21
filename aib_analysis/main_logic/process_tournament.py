@@ -338,6 +338,22 @@ def get_best_forecasters_from_tournament(
     return users
 
 
+def remove_human_accounts(bot_tournament: SimulatedTournament) -> SimulatedTournament:
+    """The bot tournament rescored without human accounts.
+
+    Humans who forecast in a bot tournament count in the official peer baseline, so the first bot
+    leaderboard keeps them to match the live one. Every step after it uses this copy, so humans never
+    reach a team, an aggregate, or a later leaderboard.
+    """
+    human_names = {user.name for user in bot_tournament.users if user.type != UserType.BOT}
+    if human_names:
+        logger.info(f"Removing {len(human_names)} human accounts from the bot tournament after its leaderboard")
+    return SimulatedTournament(
+        name=bot_tournament.name,
+        forecasts=[forecast for forecast in bot_tournament.forecasts if forecast.user.type == UserType.BOT],
+    )
+
+
 def get_pro_team_users(pro_tournament: SimulatedTournament) -> list[User]:
     """The Pros in a Pro tournament. Bot accounts there (e.g. coherence bots) keep their scores but never join the Pro team."""
     pros = [user for user in pro_tournament.users if user.type == UserType.PRO]
