@@ -18,6 +18,7 @@ from aib_analysis.main_logic.process_tournament import (
     create_weighted_q3_spot_forecast_tourn,
     get_best_forecasters_from_tournament,
     get_pro_team_users,
+    remove_human_accounts,
     save_tournament,
     smart_remove_questions_from_tournament,
 )
@@ -94,6 +95,7 @@ def main(
         folder=output_folder,
         counter_override=next_count(),
     )
+    bot_tournament = remove_human_accounts(bot_tournament)
 
     comparison_bot_users = get_comparison_bot_users(bot_tournament)
     skip_comparison_team_outputs = False
