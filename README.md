@@ -21,10 +21,10 @@ to install all required dependencies.
 
 ## Input data
 
-Forecast CSVs live under `local/private_input_data/` (gitignored). For Spring 2026 the simulation script expects:
+Forecast CSVs live under `local/private_input_data/` (gitignored). For Summer 2026 the simulation script expects:
 
-- `local/private_input_data/pro_forecasts_2026_spring.csv`
-- `local/private_input_data/bot_forecasts_2026_spring.csv`
+- `local/private_input_data/pro_forecasts_2026_summer.csv`
+- `local/private_input_data/bot_forecasts_2026_summer.csv`
 
 You can:
 
@@ -33,13 +33,13 @@ You can:
 
 ## Running the analysis
 
-For the current (Spring 2026) tournament:
+For the current (Summer 2026) tournament:
 
 ```
-poetry run python aib_analysis/run_spring_simulations.py
+poetry run python aib_analysis/run_summer_simulations.py
 ```
 
-That writes JSON artifacts to `local/spring_2026_simulations_teams_comparison/`.
+That writes JSON artifacts to `local/summer_2026_simulations/`.
 
 Check `logs/latest_info.log` for warnings (annulled questions, weight mismatches, unmatched questions, missing control bots, etc.).
 
@@ -51,7 +51,15 @@ For older seasons (Q1–Q4), use `aib_analysis/run_q1_q2_simulations.py` and edi
 poetry run streamlit run aib_analysis/front_end.py
 ```
 
-In the UI, set the tournaments folder to the simulation output path (e.g. `local/spring_2026_simulations_teams_comparison`). Restart Streamlit or use **Clear cache** in the ⋮ menu after changing underlying JSON or loading/scoring code.
+In the UI, set the tournaments folder to the simulation output path (e.g. `local/summer_2026_simulations`). Restart Streamlit or use **Clear cache** in the ⋮ menu after changing underlying JSON or loading/scoring code.
+
+To get a markdown results summary (leaderboards, Pro vs bot head-to-head, per-type and team-size breakdowns, charts) from the same JSON outputs:
+
+```
+poetry run python aib_analysis/utils/summarize_season_results.py --simulations-folder local/summer_2026_simulations --season-name "Summer 2026"
+```
+
+That writes `results_summary.md`, CSV leaderboards, and PNG charts to `local/summer_2026_simulations/results_summary/`.
 
 ## Pros vs bots write-up
 

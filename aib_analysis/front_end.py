@@ -95,7 +95,7 @@ def main(tournaments_folder: str | None = None):
                 team_comparison_tourns.append(tournament)
             display_individual_tournament(tournament, tournament_name)
 
-            if file == "7_pro_vs_bot_tournament__teams.json":
+            if file.endswith("pro_vs_bot_tournament__teams_size_10.json"):
                 comparison_tournament = grab_tournament_data(
                     tournaments_folder, "1_pro_tournament.json"
                 )

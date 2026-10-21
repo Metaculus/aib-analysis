@@ -9,7 +9,7 @@ import typeguard
 from pydantic import BaseModel
 from scipy.stats import binom
 
-from aib_analysis.data_structures.custom_types import QuestionType
+from aib_analysis.data_structures.custom_types import QuestionType, UserType
 from aib_analysis.data_structures.data_models import (
     Forecast,
     Leaderboard,
@@ -336,6 +336,19 @@ def get_best_forecasters_from_tournament(
     top_entries = entries[:num_users]
     users = [entry.user for entry in top_entries]
     return users
+
+
+def get_pro_team_users(pro_tournament: SimulatedTournament) -> list[User]:
+    """The Pros in a Pro tournament. Bot accounts there (e.g. coherence bots) keep their scores but never join the Pro team."""
+    pros = [user for user in pro_tournament.users if user.type == UserType.PRO]
+    left_out_names = [user.name for user in pro_tournament.users if user.type != UserType.PRO]
+    if left_out_names:
+        logger.warning(
+            f"Leaving {len(left_out_names)} non-Pro accounts out of the Pro team aggregate: {left_out_names}"
+        )
+    if not pros:
+        raise ValueError(f"No Pro users in tournament {pro_tournament.name}")
+    return pros
 
 
 def create_team_tournament(
