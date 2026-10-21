@@ -318,15 +318,7 @@ def individuals_paragraph(individuals: IndividualResults, shown_count: int) -> s
 
 
 def _team_size_label(result: TeamSizeResult) -> str:
-    bot_count = result.team_size - result.non_bot_member_count
-    humans = f"{result.non_bot_member_count} human {plural(result.non_bot_member_count, 'account')}"
-    if not result.is_all_bots:
-        if result.non_bot_member_count:
-            return f"the top {result.team_size} accounts ({bot_count} bots and {humans})"
-        return f"the top {result.team_size} {plural(result.team_size, 'bot')}"
-    if result.non_bot_member_count:
-        return f"all {bot_count} bots (plus {humans} that forecast in the bot tournament)"
-    return f"all {bot_count} bots"
+    return f"all {result.team_size} bots" if result.is_all_bots else f"the top {result.team_size} {plural(result.team_size, 'bot')}"
 
 
 def _compared_with_main(result: TeamSizeResult) -> str:
@@ -441,8 +433,8 @@ def close_to_top_sentence(close_rows: list[LeaderboardRow], max_names: int = 3) 
     if remaining:
         names.append(f"{remaining} {plural(remaining, 'other')}")
     return (
-        f"However, {join_names(names)}, each forecasting on at least half of the questions, scored within the top "
-        'bot\'s 95% confidence interval, so it\'s hard to declare any one setup "the best."'
+        f"However, {join_names(names)} scored within the top bot's 95% confidence interval, so it's hard to declare "
+        'any one setup "the best."'
     )
 
 
@@ -502,19 +494,6 @@ def baseline_history_takeaway(metac: MetacResults) -> str:
         f"**{heading}:** The best Metac Bot using our standard single prompt placed "
         f"{join_names(placements + [current_text])}."
     )
-
-
-def baseline_rank_method_sentence(metac: MetacResults) -> str:
-    changed = [point for point in metac.baseline_history if point.differs_from_earlier_post]
-    sentence = (
-        "Each season's rank for the best same-prompt Metac Bot counts every bot, including Metac Bots, by sum of spot "
-        "peer scores on that season's current leaderboard."
-    )
-    if changed:
-        sentence += " Some differ from what earlier posts reported: " + join_names(
-            [f"{point.season_label} ({point.differs_from_earlier_post})" for point in changed]
-        ) + "."
-    return sentence
 
 
 def _separated_top_10_pairs(field: FieldSummary) -> int:
@@ -681,10 +660,11 @@ def peer_score_translation_paragraph(accuracy: BotFieldAccuracy) -> str:
     return (
         "Peer scores translate into this scale. A binary peer score of +X means a forecaster gave the actual outcome "
         "about e^(X/100) times the typical probability the rest of the field did (+10 ≈ 1.11×, +20 ≈ 1.22×), and the "
-        f"field's typical probability this season was {format_percent(accuracy.field_probability)}. On binary "
-        f"questions, {accuracy.top_bot.name}'s average spot peer score of "
-        f"{format_score(accuracy.top_bot_binary_average_peer_score)} means it gave the actual outcome about "
-        f"{math.exp(accuracy.top_bot_binary_average_peer_score / 100):.2f}× the probability the rest of the field did."
+        f"field's typical probability this season was {format_percent(accuracy.field_probability)}. Numeric and "
+        "discrete peer scores are halved, so there +X means about e^(2X/100) times the field's probability density at "
+        f"the outcome. Counting every question type this way, {accuracy.top_bot.name}'s average spot peer score of "
+        f"{format_score(accuracy.top_bot_average_peer_score)} means it gave the actual outcome about "
+        f"{accuracy.top_bot_field_multiplier:.2f}× the probability (or probability density) the rest of the field did."
     )
 
 
@@ -708,7 +688,8 @@ def experiment_fact_lines(results: SeasonResults) -> list[str]:
     for one_shot, standard_rows in groups.no_research_pairs:
         standard = ", ".join(f"{describe(row, row.name)} on {row.question_count}" for row in standard_rows)
         lines.append(
-            f"No research, one shot vs the standard pipeline with the same model (question counts differ): "
+            "No research, one shot vs the standard pipeline with the same model (if you write about this, say these "
+            "bots forecast on fewer, different questions, so the gaps aren't on matched questions): "
             f"{describe(one_shot, one_shot.name)} on {one_shot.question_count} vs {standard}"
         )
     if results.metac.other_rows:

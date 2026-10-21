@@ -14,6 +14,8 @@ import statistics
 
 from scipy import stats
 
+CONTINUOUS_PEER_SCORE_DIVISOR = 2
+
 
 def binary_probability_on_outcome(probability_yes: float, resolved_yes: bool) -> float:
     return probability_yes if resolved_yes else 1 - probability_yes
@@ -69,3 +71,18 @@ def base_rate_geometric_mean_probability(resolutions: list[bool], weights: list[
     return geometric_mean_probability(
         [binary_probability_on_outcome(observed_yes_rate, resolved_yes) for resolved_yes in resolutions], weights
     )
+
+
+def field_probability_multiplier(peer_scores: list[float], weights: list[float], is_continuous: list[bool]) -> float:
+    """How many times the field's probability a forecaster put on the outcome, from its spot peer scores.
+
+    Spot peer scores are 100 * weight * ln(p / field p), halved for numeric and discrete questions,
+    so this undoes the halving and averages the log ratios with the question weights.
+    """
+    if not peer_scores or not (len(peer_scores) == len(weights) == len(is_continuous)):
+        raise ValueError("Need matching, non-empty peer scores, weights, and question kinds")
+    log_ratio_total = sum(
+        peer_score * (CONTINUOUS_PEER_SCORE_DIVISOR if continuous else 1) / 100
+        for peer_score, continuous in zip(peer_scores, is_continuous)
+    )
+    return math.exp(log_ratio_total / sum(weights))

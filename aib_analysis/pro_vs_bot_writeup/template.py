@@ -524,8 +524,7 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
         "others tested different setups. In general, the same-prompt bots do an internet search, run a ~30-line "
         "prompt (Appendix B), forecast 5 times with that prompt, and submit an aggregation of these forecasts. Each "
         f"bot's name indicates which model and research provider it used. For instance, \"{metac.top_baseline.name}\" "
-        f"uses {top_model} as its model and {top_search} as its research source. "
-        + phrasing.baseline_rank_method_sentence(metac)
+        f"uses {top_model} as its model and {top_search} as its research source."
     )
     shared_weighted_count = len(overview.shared_question_weights_below_1)
     shared_clause = f", {shared_weighted_count} of them also asked of the Pros" if shared_weighted_count else ""
@@ -689,22 +688,6 @@ def _season_disclosures(results: SeasonResults, config: SeasonConfig) -> list[st
             f"{len(shared_weights)} of the shared questions had weights below 1 in the bot tournament ({weight_range}), "
             "but the Pro vs bot comparison uses the Pro questions' weights"
             + (" of 1." if overview.pro_weighted_question_count == 0 else ".")
-        )
-    human_count = overview.human_accounts_in_bot_tournament
-    if human_count:
-        teams_with_humans = [
-            f"the {'team of all accounts' if result.is_all_bots else f'top {result.team_size}'} ({result.non_bot_member_count})"
-            for result in results.team_sizes
-            if result.non_bot_member_count
-        ]
-        disclosures.append(
-            f"{human_count} human {plural(human_count, 'account')} forecast in the bot tournament. They count in each "
-            "question's peer baseline but not in the bot leaderboards."
-            + (
-                f" The team size comparison ranks every account, so some of its teams include them: {join_names(teams_with_humans)}."
-                if teams_with_humans
-                else ""
-            )
         )
     return disclosures
 

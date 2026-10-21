@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import replace
 from pathlib import Path
@@ -259,14 +260,12 @@ def test_compute_season_results_on_synthetic_folder(pros_ahead_folder: Path, syn
     assert overview.bot_question_count == BOT_QUESTION_COUNT
     assert overview.bot_scored_count == BOT_QUESTION_COUNT - len(ANNULLED_BOT_QUESTION_IDS)
     assert overview.bot_only_scored_count == BOT_QUESTION_COUNT - SHARED_QUESTION_COUNT - len(ANNULLED_BOT_QUESTION_IDS)
-    assert overview.human_accounts_in_bot_tournament == 1
     assert overview.pro_count == 3
     assert overview.pro_annulled_count == 1
     assert results.head_to_head.leader == "pros"
-    assert results.individuals.excluded_account_count == 1
+    assert results.individuals.excluded_account_count == 0
     assert {row.name for row in results.individuals.rows if row.user_type == "pro"} == {"Pro A", "Pro B", "Pro C"}
-    assert [result.team_size for result in results.team_sizes] == [1, 2, 3, 13]
-    assert [result.non_bot_member_count for result in results.team_sizes] == [0, 0, 0, 1]
+    assert [result.team_size for result in results.team_sizes] == [1, 2, 3, 12]
     assert results.team_sizes[-1].is_all_bots
     assert overview.shared_question_weights_below_1 == ()
     assert overview.close_time_differences == ()
@@ -298,3 +297,13 @@ def test_accuracy_results_on_synthetic_folder(pros_ahead_folder: Path, synthetic
 def test_compute_season_results_requires_main_team_file(pros_ahead_folder: Path, synthetic_config: SeasonConfig) -> None:
     with pytest.raises(FileNotFoundError, match="main bot team size 7"):
         compute_season_results(pros_ahead_folder, replace(synthetic_config, main_bot_team_size=7))
+
+
+def test_team_sizes_reject_human_accounts_unless_the_season_allows_them(
+    pros_ahead_folder: Path, synthetic_config: SeasonConfig
+) -> None:
+    team_file = pros_ahead_folder / "7_pro_vs_bot_tournament__teams_size_all.json"
+    team_file.write_text(json.dumps(make_team_tournament(_scores(-1, 5, count=SHARED_QUESTION_COUNT), BOT_MEMBERS + (("a_human", "pro"),), PRO_MEMBERS)))
+    with pytest.raises(ValueError, match="1 human accounts"):
+        compute_season_results(pros_ahead_folder, synthetic_config)
+    compute_season_results(pros_ahead_folder, replace(synthetic_config, human_accounts_in_bot_teams_allowed=True))

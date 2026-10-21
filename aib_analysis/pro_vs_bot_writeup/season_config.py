@@ -25,16 +25,11 @@ class PublishedTeamResult:
 
 @dataclass(frozen=True)
 class PublishedBaselineBotRank:
-    """Where the best same-prompt Metac Bot placed in a past season's bot tournament.
-
-    Ranks count every bot, including Metac Bots, by sum of spot peer scores on the season's
-    current official leaderboard, so they can differ from what an earlier post reported.
-    """
+    """Where the best same-prompt Metac Bot placed in a past season's bot tournament."""
 
     season_label: str
     rank: int
     bot_count: int
-    differs_from_earlier_post: str | None = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +54,7 @@ class SeasonConfig:
     expected_non_pro_members_in_pro_team: int = 0
     main_bot_team_size: int = 10
     data_notes: tuple[str, ...] = ()
+    human_accounts_in_bot_teams_allowed: bool = False
 
     def __post_init__(self) -> None:
         if not self.bot_question_windows or self.bot_question_windows[0].first_open_date is not None:
@@ -90,11 +86,11 @@ PUBLISHED_PRO_VS_BOT_RESULTS: tuple[PublishedTeamResult, ...] = (
 )
 
 PUBLISHED_BASELINE_BOT_RANKS: tuple[PublishedBaselineBotRank, ...] = (
-    PublishedBaselineBotRank("Q3 2024", 4, 55, differs_from_earlier_post="the Q3 2024 post reported 3rd"),
+    PublishedBaselineBotRank("Q3 2024", 4, 55),
     PublishedBaselineBotRank("Q4 2024", 6, 44),
     PublishedBaselineBotRank("Q1 2025", 1, 45),
     PublishedBaselineBotRank("Q2 2025", 2, 96),
-    PublishedBaselineBotRank("Fall 2025", 16, 135, differs_from_earlier_post="the Spring 2026 post reported 14th of 134"),
+    PublishedBaselineBotRank("Fall 2025", 14, 134),
     PublishedBaselineBotRank("Spring 2026", 18, 173),
 )
 
@@ -111,6 +107,9 @@ SEASONS: dict[str, SeasonConfig] = {
         # Bot-type accounts that forecast in the Spring Pro tournament were included in
         # the Pro Team aggregate. Kept as-is so this season reproduces the published post.
         expected_non_pro_members_in_pro_team=20,
+        # Spring's simulations predate removing human accounts after the bot leaderboard, so
+        # its largest team-size teams include a few. Kept so this season reproduces the published post.
+        human_accounts_in_bot_teams_allowed=True,
     ),
     "summer_2026": SeasonConfig(
         key="summer_2026",
@@ -125,8 +124,7 @@ SEASONS: dict[str, SeasonConfig] = {
         pro_forecast_window_days=3,
         metac_bot_code_url=None,
         data_notes=(
-            "On October 15, 2026, metac-agent was renamed metac-autocast. Our data predates the rename, so this post "
-            "uses the old name.",
+            "metac-autocast was named metac-agent until October 15, 2026, so earlier posts and pages may use that name.",
         ),
     ),
 }

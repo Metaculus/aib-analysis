@@ -5,6 +5,7 @@ import pytest
 from aib_analysis.math.accuracy import (
     base_rate_geometric_mean_probability,
     binary_probability_on_outcome,
+    field_probability_multiplier,
     geometric_mean_probability,
     geometric_mean_probability_ci,
     paired_probability_ratio,
@@ -53,3 +54,11 @@ def test_base_rate_forecaster() -> None:
     expected = math.exp((math.log(0.25) + 3 * math.log(0.75)) / 4)
     assert base_rate_geometric_mean_probability(resolutions) == pytest.approx(expected)
     assert base_rate_geometric_mean_probability(resolutions) > 0.5
+
+
+def test_field_probability_multiplier_undoes_numeric_halving() -> None:
+    binary_peer = 100 * math.log(1.2)
+    numeric_peer = 100 * math.log(1.2) / 2
+    assert field_probability_multiplier([binary_peer, numeric_peer], [1.0, 1.0], [False, True]) == pytest.approx(1.2)
+    weighted_peer = 0.5 * 100 * math.log(1.5)
+    assert field_probability_multiplier([weighted_peer], [0.5], [False]) == pytest.approx(1.5)

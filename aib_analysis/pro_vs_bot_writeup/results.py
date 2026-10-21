@@ -22,6 +22,7 @@ from scipy import stats as scipy_stats
 from aib_analysis.math.accuracy import (
     base_rate_geometric_mean_probability,
     binary_probability_on_outcome,
+    field_probability_multiplier,
     geometric_mean_probability,
     geometric_mean_probability_ci,
     paired_probability_ratio,
@@ -118,7 +119,6 @@ class CloseTimeDifference:
 class TournamentOverview:
     bot_count: int
     metac_bot_count: int
-    human_accounts_in_bot_tournament: int
     bot_question_count: int
     bot_scored_count: int
     bot_type_counts: dict[str, int]
@@ -191,7 +191,6 @@ class TeamSizeResult:
 
     team_size: int
     is_all_bots: bool
-    non_bot_member_count: int
     mean: float
     ci: tuple[float, float] | None
     question_count: int
@@ -332,7 +331,8 @@ class BotFieldAccuracy:
     field_probability: float
     eligible_bots: list[BotTypicalProbability]
     top_bot: BotTypicalProbability
-    top_bot_binary_average_peer_score: float
+    top_bot_average_peer_score: float
+    top_bot_field_multiplier: float
     worst_bot: BotTypicalProbability
 
     @property
@@ -366,7 +366,6 @@ class BaselineRankPoint:
     rank: int
     bot_count: int
     bot_name: str | None
-    differs_from_earlier_post: str | None = None
 
 
 @dataclass(frozen=True)
@@ -405,16 +404,11 @@ class MetacResults:
         return self.baseline_history[-1]
 
     def close_to_top(self) -> list[LeaderboardRow]:
-        """Baseline bots on at least half the questions whose average is at or below the top bot's but inside its 95% CI."""
+        """Baseline bots whose average is at or below the top bot's but inside its 95% CI."""
         top = self.top_baseline
         if top.ci is None:
             return []
-        min_questions = self.scored_question_count * ELIGIBLE_SHARE_OF_QUESTIONS
-        return [
-            row
-            for row in self.baseline_rows[1:]
-            if top.ci[0] <= row.average_score <= top.average_score and row.question_count >= min_questions
-        ]
+        return [row for row in self.baseline_rows[1:] if top.ci[0] <= row.average_score <= top.average_score]
 
 
 @dataclass(frozen=True)
@@ -744,7 +738,7 @@ def compute_season_trend(config: SeasonConfig, head_to_head: HeadToHeadResult) -
 
 
 def compute_team_sizes(
-    files: dict[str, Path], pro_questions: dict[int, dict[str, Any]], main_size_label: str
+    files: dict[str, Path], pro_questions: dict[int, dict[str, Any]], main_size_label: str, humans_allowed: bool
 ) -> list[TeamSizeResult]:
     teams: dict[str, Participant] = {}
     for size_label, path in files.items():
@@ -757,6 +751,12 @@ def compute_team_sizes(
             raise ValueError(f"No '{BOT_TEAM_NAME}' scores in {path.name}")
         if size_label != "all" and int(size_label) != len(bot_team.members):
             raise ValueError(f"{path.name} says size {size_label} but its bot team has {len(bot_team.members)} members")
+        human_count = sum(1 for _name, member_type in bot_team.members if member_type != "bot")
+        if human_count and not humans_allowed:
+            raise ValueError(
+                f"{path.name}: the bot team has {human_count} human accounts. Rerun the simulations, which remove "
+                "humans after the bot leaderboard, or set human_accounts_in_bot_teams_allowed for this season."
+            )
         teams[size_label] = bot_team
     main_scores = {question_score.question_id: question_score.score for question_score in teams[main_size_label].scores}
     results: list[TeamSizeResult] = []
@@ -767,7 +767,6 @@ def compute_team_sizes(
             TeamSizeResult(
                 team_size=len(bot_team.members),
                 is_all_bots=size_label == "all",
-                non_bot_member_count=sum(1 for _name, member_type in bot_team.members if member_type != "bot"),
                 mean=bot_team.average_score,
                 ci=confidence_interval(bot_team.score_values),
                 question_count=bot_team.question_count,
@@ -863,9 +862,7 @@ def compute_metac(metac_raw: dict[str, Any], bot_rows: list[LeaderboardRow], sea
         raise ValueError("No same-prompt baseline Metac Bot appears in the bot tournament leaderboard")
     earlier_seasons = set(seasons_before(season_label))
     history = [
-        BaselineRankPoint(
-            published.season_label, published.rank, published.bot_count, None, published.differs_from_earlier_post
-        )
+        BaselineRankPoint(published.season_label, published.rank, published.bot_count, None)
         for published in PUBLISHED_BASELINE_BOT_RANKS
         if published.season_label in earlier_seasons
     ]
@@ -942,8 +939,11 @@ def compute_bot_field_accuracy(
         field_probability=geometric_mean_probability(field_probabilities, weights),
         eligible_bots=eligible_bots,
         top_bot=_typical_probability(top_row.name, outcome_probabilities[top_row.name]),
-        top_bot_binary_average_peer_score=statistics.fmean(
-            question_score.score for question_score in top_scores if question_score.question_type == "binary"
+        top_bot_average_peer_score=top_row.average_score,
+        top_bot_field_multiplier=field_probability_multiplier(
+            [question_score.score for question_score in top_scores],
+            [question_score.weight for question_score in top_scores],
+            [question_score.question_type in ("numeric", "discrete") for question_score in top_scores],
         ),
         worst_bot=next(bot for bot in eligible_bots if bot.name == field.worst_eligible.name),
     )
@@ -1132,12 +1132,11 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
     )
 
     logger.info("Step 6/6: bot team sizes")
-    team_sizes = compute_team_sizes(team_size_files, pro_questions, main_size_key)
+    team_sizes = compute_team_sizes(team_size_files, pro_questions, main_size_key, config.human_accounts_in_bot_teams_allowed)
 
     overview = TournamentOverview(
         bot_count=len(bots),
         metac_bot_count=sum(1 for participant in bots if is_metac_bot(participant.name)),
-        human_accounts_in_bot_tournament=len(bot_participants) - len(bots),
         bot_question_count=len(bot_questions),
         bot_scored_count=len(scored_bot_questions),
         bot_type_counts=dict(Counter(question["type"] for question in scored_bot_questions)),

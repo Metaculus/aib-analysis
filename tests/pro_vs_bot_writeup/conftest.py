@@ -160,16 +160,12 @@ def write_simulation_folder(folder: Path, bot_team_advantage: float, seed: int =
         "4_metac_bot_tournament.json": make_tournament(
             entries_for([bot for bot in bots if bot["name"].startswith("metac-")], bot_questions)
         ),
-        "6_pro_with_bot_tourn__no_teams.json": make_tournament(
-            entries_for(pros + bots + [human_in_bot_tournament], shared_questions)
-        ),
+        "6_pro_with_bot_tourn__no_teams.json": make_tournament(entries_for(pros + bots, shared_questions)),
     }
     pro_members = tuple((name, "pro") for name in PRO_NAMES)
     for team_size in TEAM_SIZES:
         member_count = len(NON_METAC_BOT_NAMES) if team_size == "all" else team_size
         bot_members = tuple((name, "bot") for name in NON_METAC_BOT_NAMES[:member_count])
-        if team_size == "all":
-            bot_members += (("human_account", "pro"),)
         size_effect = -3.0 if team_size == "all" else 0.0
         bot_scores = [bot_team_advantage + size_effect + rng.gauss(0, 6) for _ in range(SHARED_QUESTION_COUNT)]
         files[f"7_pro_vs_bot_tournament__teams_size_{team_size}.json"] = make_team_tournament(
