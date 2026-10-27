@@ -400,9 +400,10 @@ def test_accuracy_takeaway() -> None:
         worst_bot=eligible[2],
     )
     text = phrasing.accuracy_takeaway(accuracy)
-    assert text.startswith("**On binary questions, the top bot gave the actual outcome a typical probability of 63.5%:**")
-    assert "52.8% for the median bot and 41.7% for the lowest-scoring bot" in text
-    assert "always forecasting this season's Yes rate (38.3%) scores 51.5%. 50% of these bots" in text
+    assert text.startswith("**The top bot gave the actual outcome a typical probability of 63.5%, vs 52.8% for the median bot:**")
+    assert "The lowest-scoring bot gave a typical probability of 41.7%." in text
+    assert "always forecasting 38.3% (the share of binary questions that resolved Yes) scores 51.5%. 50% of bots did worse than that." in text
+    assert text.endswith("These figures pertain to only binary questions among the 4 bots that forecast on at least half of the questions.")
     translation = phrasing.peer_score_translation_paragraph(accuracy)
     assert "there +X means about e^(2X/100) times the field's probability density" in translation
     assert "laertes's average spot peer score of 17.91 means it gave the actual outcome about 1.30× the probability (or probability density)" in translation
