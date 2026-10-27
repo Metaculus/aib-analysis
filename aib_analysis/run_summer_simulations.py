@@ -424,6 +424,9 @@ COMMERCIAL_BOT_NAMES: set[str] = {
     "futuresearch",
     "lightningrod",
     "Upskillbot",
+    "oraclebot",
+    "GreyIrisAgent",
+    "red_is_dead",
 }
 
 # Top 10 bots from the official Spring 2026 bot leaderboard (used as a fixed team in
