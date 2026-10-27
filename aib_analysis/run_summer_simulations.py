@@ -7,6 +7,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 top_level_dir = os.path.abspath(os.path.join(current_dir, "../"))
 sys.path.append(top_level_dir)
 
+from aib_analysis.data_structures.commercial_bots import COMMERCIAL_BOT_NAMES
 from aib_analysis.data_structures.data_models import Forecast, User, UserType
 from aib_analysis.data_structures.simulated_tournament import (
     SimulatedTournament,
@@ -413,18 +414,6 @@ def grab_tournament_data(
 ) -> SimulatedTournament:
     return load_tournament(path, user_type, tournament_name)
 
-
-# Commercial bots excluded from the Non-Commercial Bot Team aggregate.
-COMMERCIAL_BOT_NAMES: set[str] = {
-    "Preseen-Atlas",
-    "Preseen-Chestnut",
-    "preseen",  # Summer 2026 account of the same company as the two Preseen bots above
-    "manticAI",
-    "cassi",
-    "futuresearch",
-    "lightningrod",
-    "Upskillbot",
-}
 
 # Top 10 bots from the official Spring 2026 bot leaderboard (used as a fixed team in
 # Summer comparisons). Bots that did not compete in Summer are skipped with a warning.

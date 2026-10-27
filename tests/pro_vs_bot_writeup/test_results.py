@@ -13,6 +13,7 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     anonymize_pros,
     bot_label,
     check_comparison_uses_pro_weights,
+    compute_bot_groups,
     compute_field,
     compute_head_to_head,
     compute_season_results,
@@ -200,6 +201,27 @@ def test_anonymize_pros_by_rank_order() -> None:
     anonymized, aliases = anonymize_pros(rows)
     assert [row.name for row in anonymized] == ["Pro A", "some-bot", "Pro B"]
     assert aliases == {"zeta_pro": "Pro A", "alpha_pro": "Pro B"}
+
+
+def test_compute_bot_groups_splits_hobbyist_commercial_and_metac_bots() -> None:
+    rows = [
+        _row("hobby-1", 18, questions=100, rank=1),
+        _row("company-1", 17, questions=100, rank=2),
+        _row("metac-gpt-5+asknews", 12, questions=100, rank=3),
+        _row("hobby-2", 5, questions=20, rank=4),
+        _row("hobby-3", 1, questions=100, rank=5),
+    ]
+    field = compute_field(rows, [1.0, -1.0], scored_question_count=100)
+    groups = compute_bot_groups(field, ("hobby-1", "company-1", "hobby-3"), frozenset({"company-1", "not-competing"}))
+    assert [row.name for row in groups.hobbyist.rows] == ["hobby-1", "hobby-2", "hobby-3"]
+    assert [row.name for row in groups.hobbyist.eligible_rows] == ["hobby-1", "hobby-3"]
+    assert groups.hobbyist.median_eligible_average == pytest.approx(9.5)
+    assert groups.commercial is not None and groups.commercial.best.name == "company-1"
+    assert groups.metac is not None and groups.metac.best.name == "metac-gpt-5+asknews"
+    assert groups.hobbyists_on_main_team == 2
+    assert groups.hobbyist.count_in_top(2, field.rows) == 1
+    with pytest.raises(ValueError, match="missing from the bot tournament leaderboard"):
+        compute_bot_groups(field, ("someone-else",), frozenset())
 
 
 def test_compute_field_groups_bots() -> None:

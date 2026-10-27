@@ -16,6 +16,7 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     SIGNIFICANCE_LEVEL,
     TOP_N,
     BotFieldAccuracy,
+    BotGroups,
     FieldSummary,
     HeadToHeadResult,
     IndividualResults,
@@ -516,6 +517,50 @@ def _separated_top_10_pairs(field: FieldSummary) -> int:
         1
         for higher, lower in itertools.combinations(rows_with_ci, 2)
         if higher.ci[0] > lower.ci[1] or lower.ci[0] > higher.ci[1]
+    )
+
+
+def hobbyist_takeaway(groups: BotGroups, field: FieldSummary, bot_team_size: int) -> str:
+    hobbyist = groups.hobbyist
+    in_top = hobbyist.count_in_top(TOP_N, field.rows)
+    best = hobbyist.best
+    if in_top == 0:
+        heading = f"No hobbyist bot made the top {TOP_N}"
+    else:
+        heading = f"Hobbyist bots took {in_top} of the top {TOP_N} spots" + (", including first place" if best.rank == 1 else "")
+    if best.rank == 1:
+        sentences = [f"{best.name} topped the leaderboard with an average spot peer score of {format_score(best.average_score)}"]
+    else:
+        sentences = [
+            f"The best hobbyist bot, {best.name}, placed {ordinal(best.rank)} with an average spot peer score of "
+            f"{format_score(best.average_score)}"
+        ]
+    commercial = groups.commercial
+    if commercial is not None:
+        sentences[0] += (
+            f"; the best commercial bot, {commercial.best.name}, placed {ordinal(commercial.best.rank)} with "
+            f"{format_score(commercial.best.average_score)}"
+        )
+    sentences[0] += "."
+    sentences.append(
+        f"Hobbyist bots made up {groups.hobbyists_on_main_team} of the {bot_team_size} bots on the team that faced the Pros."
+    )
+    if commercial is not None and commercial.eligible_rows and hobbyist.eligible_rows:
+        sentences.append(
+            "Among bots that forecast on at least half of the questions, the median commercial bot averaged "
+            f"{format_score(commercial.median_eligible_average)} ({len(commercial.eligible_rows)} "
+            f"{plural(len(commercial.eligible_rows), 'bot')}) and the median hobbyist bot "
+            f"{format_score(hobbyist.median_eligible_average)} ({len(hobbyist.eligible_rows)} "
+            f"{plural(len(hobbyist.eligible_rows), 'bot')})."
+        )
+    return f"**{heading}:** " + " ".join(sentences)
+
+
+def bot_groups_paragraph(field: FieldSummary) -> str:
+    return (
+        "We split the bots into hobbyist bots, commercial bots (run by companies that build forecasting products), "
+        "and Metac Bots (run by Metaculus). Averages are spot peer scores over the "
+        f"{field.scored_question_count} scored questions, and ranks are by sum of scores, as on the leaderboard."
     )
 
 

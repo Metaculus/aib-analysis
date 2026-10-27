@@ -29,7 +29,9 @@ from aib_analysis.pro_vs_bot_writeup.phrasing import (
 from aib_analysis.pro_vs_bot_writeup.results import (
     FIELD_CHART_MIN_QUESTIONS,
     TOP_N,
+    BotGroups,
     CloseTimeDifference,
+    FieldSummary,
     LeaderboardRow,
     SeasonResults,
     SeasonTrend,
@@ -181,6 +183,23 @@ def _non_primary_sentence(non_primary_bots: tuple[str, ...]) -> str:
     )
 
 
+def _bot_groups_table(groups: BotGroups, field: FieldSummary) -> str:
+    lines = [
+        f"| Group | Bots | On at least half the questions | Best bot (rank, average) | Median average* | In top {TOP_N} | "
+        f"In top {TOP_BOTS_CHART_ROWS} |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for group in groups.all:
+        median = group.median_eligible_average
+        lines.append(
+            f"| {group.label} | {len(group.rows)} | {len(group.eligible_rows)} | {group.best.name} "
+            f"({ordinal(group.best.rank)}, {format_score(group.best.average_score)}) | "
+            f"{'n/a' if median is None else format_score(median)} | {group.count_in_top(TOP_N, field.rows)} | "
+            f"{group.count_in_top(TOP_BOTS_CHART_ROWS, field.rows)} |"
+        )
+    return "\n".join(lines) + "\n\n\\*Among bots that forecast on at least half of the questions."
+
+
 def _leaderboard_table(rows: list[LeaderboardRow], name_header: str, non_primary_bots: tuple[str, ...] = ()) -> str:
     lines = [
         f"| Rank | {name_header} | Sum of spot peer scores | Average spot peer score | 95% CI | Questions scored |",
@@ -233,12 +252,13 @@ def _takeaways_section(results: SeasonResults, config: SeasonConfig) -> str:
         phrasing.top_baseline_takeaway(results.metac),
         phrasing.baseline_history_takeaway(results.metac),
         phrasing.top_10_spread_takeaway(results.field),
+        phrasing.hobbyist_takeaway(results.bot_groups, results.field, config.main_bot_team_size),
         phrasing.accuracy_takeaway(results.bot_field_accuracy),
         fill_me(
             "add 1-3 takeaways that don't repeat every season, each as a bold one-sentence finding followed by the "
             "numbers. Candidates: results of this season's Metac Bot experiments (search providers, reasoning "
-            "effort, agentic Metac Bots; see the LLM section), who the top bot makers were (students and hobbyists "
-            "vs companies, from the bot maker survey), and notable rule or question-mix changes"
+            "effort, agentic Metac Bots; see the LLM section), who the top bot makers were (e.g. students or "
+            "researchers, from the bot maker survey), and notable rule or question-mix changes"
         ),
     ]
     return "\n".join(
@@ -333,6 +353,9 @@ def _top_bots_section(results: SeasonResults, config: SeasonConfig, charts: Char
             f"gives exact numbers for the top {TOP_N}.",
             _image(charts.top_bots),
             _leaderboard_table(field.top_10, "Bot", results.overview.non_primary_bots),
+            "### Hobbyist and commercial bots",
+            phrasing.bot_groups_paragraph(field),
+            _bot_groups_table(results.bot_groups, field),
             "### The whole field",
             phrasing.field_paragraph(field, FIELD_CHART_MIN_QUESTIONS, field_hidden_count),
             _image(charts.field_rank),

@@ -49,6 +49,11 @@ def test_writeup_sections_charts_and_fill_mes(pros_ahead_folder: Path, synthetic
     assert "with questions closing between May 2 and May 2, 2026" in writeup
     assert "linkpost" not in writeup
     assert "**Pro forecasters" in writeup
+    bot_groups_section = writeup[writeup.index("### Hobbyist and commercial bots") : writeup.index("### The whole field")]
+    assert "| Group | Bots | On at least half the questions |" in bot_groups_section
+    assert "| Hobbyist | 12 |" in bot_groups_section
+    assert "| Metac Bots | 8 |" in bot_groups_section
+    assert "**Hobbyist bots took" in writeup
     assert re.search(r"\bNone\b(?! of)|\bnan\b", writeup) is None
     assert "—" not in writeup
     for real_pro_name in PRO_NAMES:
