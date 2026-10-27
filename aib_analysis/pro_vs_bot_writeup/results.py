@@ -19,7 +19,6 @@ from typing import Any, Literal
 
 from scipy import stats as scipy_stats
 
-from aib_analysis.data_structures.commercial_bots import COMMERCIAL_BOT_NAMES
 from aib_analysis.math.accuracy import (
     base_rate_geometric_mean_probability,
     binary_probability_on_outcome,
@@ -436,39 +435,6 @@ class ExampleQuestion:
 
 
 @dataclass(frozen=True)
-class BotGroupSummary:
-    """One group of bots (hobbyist, commercial, or Metac Bots) on the bot tournament leaderboard."""
-
-    label: str
-    rows: list[LeaderboardRow]
-    eligible_rows: list[LeaderboardRow]
-
-    @property
-    def best(self) -> LeaderboardRow:
-        return self.rows[0]
-
-    @property
-    def median_eligible_average(self) -> float | None:
-        return statistics.median(row.average_score for row in self.eligible_rows) if self.eligible_rows else None
-
-    def count_in_top(self, top_n: int, field_rows: list[LeaderboardRow]) -> int:
-        names = {row.name for row in self.rows}
-        return sum(1 for row in field_rows[:top_n] if row.name in names)
-
-
-@dataclass(frozen=True)
-class BotGroups:
-    hobbyist: BotGroupSummary
-    commercial: BotGroupSummary | None
-    metac: BotGroupSummary | None
-    hobbyists_on_main_team: int
-
-    @property
-    def all(self) -> list[BotGroupSummary]:
-        return [group for group in (self.hobbyist, self.commercial, self.metac) if group is not None]
-
-
-@dataclass(frozen=True)
 class SeasonResults:
     overview: TournamentOverview
     head_to_head: HeadToHeadResult
@@ -481,7 +447,6 @@ class SeasonResults:
     example_questions: list[ExampleQuestion]
     bot_field_accuracy: BotFieldAccuracy
     team_accuracy: TeamAccuracy
-    bot_groups: BotGroups
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -847,32 +812,6 @@ def compute_individuals(
     rows, aliases = anonymize_pros(build_leaderboard(included))
     return IndividualResults(
         rows=rows, pro_aliases=aliases, excluded_account_count=excluded_count, question_count=question_count
-    )
-
-
-def compute_bot_groups(
-    field: FieldSummary, bot_team_members: tuple[str, ...], commercial_names: frozenset[str]
-) -> BotGroups:
-    def group(label: str, rows: list[LeaderboardRow]) -> BotGroupSummary | None:
-        if not rows:
-            return None
-        eligible = [row for row in rows if row.question_count >= field.eligible_min_questions]
-        return BotGroupSummary(label=label, rows=rows, eligible_rows=eligible)
-
-    is_hobbyist = {row.name: not is_metac_bot(row.name) and row.name not in commercial_names for row in field.rows}
-    missing_members = [name for name in bot_team_members if name not in is_hobbyist]
-    if missing_members:
-        raise ValueError(f"Bot team members missing from the bot tournament leaderboard: {missing_members}")
-    commercial_competing = sorted(row.name for row in field.rows if row.name in commercial_names)
-    logger.info(f"{len(commercial_competing)} commercial bots competed: {commercial_competing}")
-    hobbyist = group("Hobbyist", [row for row in field.rows if is_hobbyist[row.name]])
-    if hobbyist is None:
-        raise ValueError("No hobbyist bots in the bot tournament")
-    return BotGroups(
-        hobbyist=hobbyist,
-        commercial=group("Commercial", [row for row in field.rows if row.name in commercial_names]),
-        metac=group("Metac Bots", [row for row in field.rows if is_metac_bot(row.name)]),
-        hobbyists_on_main_team=sum(1 for name in bot_team_members if is_hobbyist[name]),
     )
 
 
@@ -1261,5 +1200,4 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
         example_questions=pick_example_questions(bot_questions, config.example_question_ids),
         bot_field_accuracy=bot_field_accuracy,
         team_accuracy=team_accuracy,
-        bot_groups=compute_bot_groups(field, head_to_head.bot_team_members, COMMERCIAL_BOT_NAMES),
     )

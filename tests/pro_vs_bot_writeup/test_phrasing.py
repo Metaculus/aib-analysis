@@ -9,8 +9,6 @@ from aib_analysis.pro_vs_bot_writeup import phrasing
 from aib_analysis.pro_vs_bot_writeup.results import (
     BaselineRankPoint,
     BotFieldAccuracy,
-    BotGroups,
-    BotGroupSummary,
     BotTypicalProbability,
     FieldSummary,
     HeadToHeadResult,
@@ -344,41 +342,6 @@ def test_field_paragraph_names_promising_bots_with_their_own_question_counts() -
     single_text = phrasing.field_paragraph(dataclasses.replace(field, promising=promising[:1]), chart_min_questions=10, hidden_count=0)
     assert "One bot (in green)" in single_text
     assert "it might prove to be strong" in single_text
-
-
-def _bot_groups(hobbyist_ranks: list[int], commercial_ranks: list[int], hobbyists_on_team: int = 8) -> tuple[BotGroups, FieldSummary]:
-    names_by_rank = {rank: f"hobby-{rank}" for rank in hobbyist_ranks} | {rank: f"company-{rank}" for rank in commercial_ranks}
-    rows = [_row(rank, names_by_rank[rank], average=20.0 - rank, questions=300) for rank in sorted(names_by_rank)]
-    field = dataclasses.replace(_field([(10.0, 20.0)] * 10), rows=rows)
-    hobbyist = [row for row in rows if row.name.startswith("hobby")]
-    commercial = [row for row in rows if row.name.startswith("company")]
-    groups = BotGroups(
-        hobbyist=BotGroupSummary("Hobbyist", hobbyist, hobbyist),
-        commercial=BotGroupSummary("Commercial", commercial, commercial) if commercial else None,
-        metac=None,
-        hobbyists_on_main_team=hobbyists_on_team,
-    )
-    return groups, field
-
-
-def test_hobbyist_takeaway_when_a_hobbyist_wins() -> None:
-    groups, field = _bot_groups(hobbyist_ranks=[1, 4, 5, 6, 7, 8, 9, 10, 11], commercial_ranks=[2, 3])
-    text = phrasing.hobbyist_takeaway(groups, field, bot_team_size=10)
-    assert text.startswith("**Hobbyist bots took 8 of the top 10 spots, including first place:**")
-    assert "hobby-1 topped the leaderboard with an average spot peer score of 19.00; the best commercial bot, company-2, placed 2nd with 18.00." in text
-    assert "Hobbyist bots made up 8 of the 10 bots on the team that faced the Pros." in text
-    assert "the median commercial bot averaged 17.50 (2 bots) and the median hobbyist bot 13.00 (9 bots)." in text
-
-
-def test_hobbyist_takeaway_other_cases() -> None:
-    groups, field = _bot_groups(hobbyist_ranks=[3, 12], commercial_ranks=list(range(1, 3)) + list(range(4, 12)), hobbyists_on_team=1)
-    text = phrasing.hobbyist_takeaway(groups, field, bot_team_size=10)
-    assert text.startswith("**Hobbyist bots took 1 of the top 10 spots:** The best hobbyist bot, hobby-3, placed 3rd")
-    groups, field = _bot_groups(hobbyist_ranks=[11], commercial_ranks=list(range(1, 11)), hobbyists_on_team=0)
-    assert phrasing.hobbyist_takeaway(groups, field, bot_team_size=10).startswith("**No hobbyist bot made the top 10:**")
-    groups, field = _bot_groups(hobbyist_ranks=[1, 2], commercial_ranks=[])
-    text = phrasing.hobbyist_takeaway(groups, field, bot_team_size=10)
-    assert "commercial" not in text
 
 
 def test_top_10_spread_takeaway() -> None:
