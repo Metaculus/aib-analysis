@@ -603,14 +603,14 @@ def format_percent(probability: float) -> str:
 
 def accuracy_takeaway(accuracy: BotFieldAccuracy) -> str:
     return (
-        "**On binary questions, the top bot gave the actual outcome a typical probability of "
-        f"{format_percent(accuracy.top_bot.typical_probability)}:** That compares with "
-        f"{format_percent(accuracy.median_probability)} for the median bot and "
-        f"{format_percent(accuracy.worst_bot.typical_probability)} for the lowest-scoring bot, among the "
-        f"{len(accuracy.eligible_bots)} bots that forecast on at least half of the questions. A coin flip scores 50%, "
-        f"and always forecasting this season's Yes rate ({format_percent(accuracy.yes_rate)}) scores "
-        f"{format_percent(accuracy.base_rate_probability)}. {round(100 * accuracy.share_below_base_rate)}% of these "
-        "bots did worse than always forecasting the Yes rate."
+        "**The top bot gave the actual outcome a typical probability of "
+        f"{format_percent(accuracy.top_bot.typical_probability)}, vs {format_percent(accuracy.median_probability)} "
+        "for the median bot:** The lowest-scoring bot gave a typical probability of "
+        f"{format_percent(accuracy.worst_bot.typical_probability)}. For reference, a coin flip scores 50%, and always "
+        f"forecasting {format_percent(accuracy.yes_rate)} (the share of binary questions that resolved Yes) scores "
+        f"{format_percent(accuracy.base_rate_probability)}. {round(100 * accuracy.share_below_base_rate)}% of bots did "
+        "worse than that. These figures pertain to only binary questions among the "
+        f"{len(accuracy.eligible_bots)} bots that forecast on at least half of the questions."
     )
 
 
