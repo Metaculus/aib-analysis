@@ -30,10 +30,13 @@ from aib_analysis.pro_vs_bot_writeup.season_config import SeasonConfig
 from tests.pro_vs_bot_writeup.conftest import (
     ANNULLED_BOT_QUESTION_IDS,
     BOT_QUESTION_COUNT,
+    MAIN_TEAM_SIZE,
+    NON_METAC_BOT_NAMES,
     NON_PRIMARY_BOT_NAME,
     SHARED_QUESTION_COUNT,
     make_question,
     make_team_tournament,
+    vs_main_file_name,
 )
 
 PRO_MEMBERS = (("pro_user_1", "pro"), ("pro_user_2", "pro"))
@@ -302,6 +305,44 @@ def test_compute_season_results_requires_main_team_file(pros_ahead_folder: Path,
         compute_season_results(pros_ahead_folder, replace(synthetic_config, main_bot_team_size=7))
 
 
+def test_team_sizes_read_head_to_head_scores_against_the_main_team(pros_ahead_folder: Path, synthetic_config: SeasonConfig) -> None:
+    results = compute_season_results(pros_ahead_folder, synthetic_config)
+    by_size = {result.team_size: result for result in results.team_sizes}
+    assert by_size[MAIN_TEAM_SIZE].head_to_head_vs_main_mean is None
+    for size_label, team_size in ((1, 1), (2, 2), ("all", len(NON_METAC_BOT_NAMES))):
+        raw = json.loads((pros_ahead_folder / vs_main_file_name(size_label)).read_text())
+        bot_team_scores = [
+            score["score"]
+            for score in raw["scores_cache"].values()
+            if score["type"] == "spot_peer" and score["forecast"]["user"]["name"] == "Bot Team"
+        ]
+        assert by_size[team_size].head_to_head_vs_main_mean == pytest.approx(sum(bot_team_scores) / len(bot_team_scores))
+        assert by_size[team_size].head_to_head_vs_main_ci is not None
+
+
+def test_team_sizes_require_vs_main_files_unless_the_season_predates_them(
+    pros_ahead_folder: Path, synthetic_config: SeasonConfig
+) -> None:
+    (pros_ahead_folder / vs_main_file_name(2)).unlink()
+    with pytest.raises(FileNotFoundError, match="team size 2"):
+        compute_season_results(pros_ahead_folder, synthetic_config)
+    results = compute_season_results(pros_ahead_folder, replace(synthetic_config, has_bot_team_vs_main_simulations=False))
+    assert all(result.head_to_head_vs_main_mean is None for result in results.team_sizes)
+
+
+def test_vs_main_files_must_use_the_main_bot_team(pros_ahead_folder: Path, synthetic_config: SeasonConfig) -> None:
+    wrong_main_team = (("bot-a", "bot"), ("bot-b", "bot"), ("bot-z", "bot"))
+    (pros_ahead_folder / vs_main_file_name(1)).write_text(
+        json.dumps(
+            make_team_tournament(
+                _scores(0, 2, count=SHARED_QUESTION_COUNT), (("bot-a", "bot"),), wrong_main_team, f"Top {MAIN_TEAM_SIZE} Bot Team"
+            )
+        )
+    )
+    with pytest.raises(ValueError, match="members differ from the main bot team"):
+        compute_season_results(pros_ahead_folder, synthetic_config)
+
+
 def test_team_sizes_reject_human_accounts_unless_the_season_allows_them(
     pros_ahead_folder: Path, synthetic_config: SeasonConfig
 ) -> None:
@@ -309,4 +350,7 @@ def test_team_sizes_reject_human_accounts_unless_the_season_allows_them(
     team_file.write_text(json.dumps(make_team_tournament(_scores(-1, 5, count=SHARED_QUESTION_COUNT), BOT_MEMBERS + (("a_human", "pro"),), PRO_MEMBERS)))
     with pytest.raises(ValueError, match="1 human accounts"):
         compute_season_results(pros_ahead_folder, synthetic_config)
-    compute_season_results(pros_ahead_folder, replace(synthetic_config, human_accounts_in_bot_teams_allowed=True))
+    compute_season_results(
+        pros_ahead_folder,
+        replace(synthetic_config, human_accounts_in_bot_teams_allowed=True, has_bot_team_vs_main_simulations=False),
+    )

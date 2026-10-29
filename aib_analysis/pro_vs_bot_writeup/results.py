@@ -57,6 +57,9 @@ FIELD_CHART_MIN_QUESTIONS = 10
 LUCK_BAND_Z = scipy_stats.norm.ppf(0.975)
 QUESTION_TYPE_ORDER = ("binary", "numeric", "discrete", "multiple_choice")
 TEAM_SIZE_FILE_PATTERN = re.compile(r"^\d+_pro_vs_bot_tournament__teams_size_(?P<size>\d+|all)\.json$")
+BOT_TEAM_VS_MAIN_FILE_PATTERN = re.compile(
+    r"^\d+_bot_team_vs_top_(?P<main>\d+)_bot_team__teams_size_(?P<size>\d+|all)\.json$"
+)
 COMBINED_QUESTION_NOTES_PATTERN = re.compile(r"^Combined \S+ \(QID:(?P<pro_id>\d+)\) and \S+ \(QID:(?P<bot_id>\d+)\)")
 
 Leader = Literal["pros", "bots"]
@@ -187,14 +190,15 @@ class HeadToHeadResult:
 
 @dataclass(frozen=True)
 class TeamSizeResult:
-    """difference_from_main_ci compares the team with the main bot team on questions both forecast (None for the main team)."""
+    """head_to_head_vs_main_* score the team head-to-head against the main bot team (None for the main team)."""
 
     team_size: int
     is_all_bots: bool
     mean: float
     ci: tuple[float, float] | None
     question_count: int
-    difference_from_main_ci: tuple[float, float] | None = None
+    head_to_head_vs_main_mean: float | None = None
+    head_to_head_vs_main_ci: tuple[float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -481,6 +485,19 @@ def find_team_size_files(folder: Path) -> dict[str, Path]:
     return files
 
 
+def find_bot_team_vs_main_files(folder: Path, main_size: int) -> dict[str, Path]:
+    files: dict[str, Path] = {}
+    for path in sorted(folder.iterdir()):
+        match = BOT_TEAM_VS_MAIN_FILE_PATTERN.match(path.name)
+        if match and int(match.group("main")) == main_size and match.group("size") not in files:
+            files[match.group("size")] = path
+    return files
+
+
+def main_bot_team_name(main_size: int) -> str:
+    return f"Top {main_size} Bot Team"
+
+
 def spot_peer_participants(raw: dict[str, Any]) -> dict[str, Participant]:
     participants: dict[str, Participant] = {}
     for score in raw["scores_cache"].values():
@@ -742,9 +759,42 @@ def compute_season_trend(config: SeasonConfig, head_to_head: HeadToHeadResult) -
     return SeasonTrend(points=points, change_p_value=change_p_value, skipped_seasons=skipped_seasons)
 
 
+def head_to_head_vs_main_team(
+    path: Path | None, size_label: str, bot_team: Participant, main_team: Participant, pro_questions: dict[int, dict[str, Any]]
+) -> Participant:
+    """The team's scores in its head-to-head tournament against the main bot team, checked against the Pro comparison's teams."""
+    if path is None:
+        raise FileNotFoundError(
+            f"No bot team vs top {len(main_team.members)} bot team file for team size {size_label}. Rerun the simulations."
+        )
+    raw = load_json(path)
+    check_comparison_uses_pro_weights(
+        {question_id: question["weight"] for question_id, question in questions_by_id(raw).items()}, pro_questions
+    )
+    participants = spot_peer_participants(raw)
+    main_name = main_bot_team_name(len(main_team.members))
+    team, opponent = participants.get(BOT_TEAM_NAME), participants.get(main_name)
+    if team is None or opponent is None:
+        raise ValueError(f"{path.name} needs '{BOT_TEAM_NAME}' and '{main_name}' scores")
+    if {name for name, _member_type in opponent.members} != {name for name, _member_type in main_team.members}:
+        raise ValueError(f"{path.name}: '{main_name}' members differ from the main bot team in the Pro comparison")
+    team_names = {name for name, _member_type in team.members}
+    expected_names = {name for name, _member_type in bot_team.members}
+    if not team_names <= expected_names or (size_label != "all" and team_names != expected_names):
+        raise ValueError(f"{path.name}: '{BOT_TEAM_NAME}' members differ from the size {size_label} team in the Pro comparison")
+    if {score.question_id for score in team.scores} != {score.question_id for score in bot_team.scores}:
+        raise ValueError(f"{path.name}: scored questions differ from the size {size_label} team's Pro comparison")
+    return team
+
+
 def compute_team_sizes(
-    files: dict[str, Path], pro_questions: dict[int, dict[str, Any]], main_size_label: str, humans_allowed: bool
+    files: dict[str, Path],
+    vs_main_files: dict[str, Path] | None,
+    pro_questions: dict[int, dict[str, Any]],
+    main_size_label: str,
+    humans_allowed: bool,
 ) -> list[TeamSizeResult]:
+    """vs_main_files is None for seasons whose simulations predate the bot team vs main bot team files."""
     teams: dict[str, Participant] = {}
     for size_label, path in files.items():
         raw = load_json(path)
@@ -763,11 +813,13 @@ def compute_team_sizes(
                 "humans after the bot leaderboard, or set human_accounts_in_bot_teams_allowed for this season."
             )
         teams[size_label] = bot_team
-    main_scores = {question_score.question_id: question_score.score for question_score in teams[main_size_label].scores}
     results: list[TeamSizeResult] = []
     for size_label, bot_team in teams.items():
-        scores = {question_score.question_id: question_score.score for question_score in bot_team.scores}
-        differences = [scores[question_id] - main_scores[question_id] for question_id in scores.keys() & main_scores.keys()]
+        vs_main = None
+        if vs_main_files is not None and size_label != main_size_label:
+            vs_main = head_to_head_vs_main_team(
+                vs_main_files.get(size_label), size_label, bot_team, teams[main_size_label], pro_questions
+            )
         results.append(
             TeamSizeResult(
                 team_size=len(bot_team.members),
@@ -775,10 +827,24 @@ def compute_team_sizes(
                 mean=bot_team.average_score,
                 ci=confidence_interval(bot_team.score_values),
                 question_count=bot_team.question_count,
-                difference_from_main_ci=None if size_label == main_size_label else confidence_interval(differences),
+                head_to_head_vs_main_mean=None if vs_main is None else vs_main.average_score,
+                head_to_head_vs_main_ci=None if vs_main is None else confidence_interval(vs_main.score_values),
             )
         )
     return sorted(results, key=lambda result: result.team_size)
+
+
+def require_head_to_head_vs_main(team_sizes: list[TeamSizeResult], main_size: int) -> None:
+    missing = [
+        result.team_size
+        for result in team_sizes
+        if (result.team_size != main_size or result.is_all_bots) and result.head_to_head_vs_main_mean is None
+    ]
+    if missing:
+        raise ValueError(
+            f"Team sizes {missing} have no head-to-head scores against the top-{main_size} bot team. Rerun the "
+            "simulations to create the bot team vs top bot team files."
+        )
 
 
 def anonymize_pros(rows: list[LeaderboardRow]) -> tuple[list[LeaderboardRow], dict[str, str]]:
@@ -1157,7 +1223,17 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
     )
 
     logger.info("Step 6/6: bot team sizes")
-    team_sizes = compute_team_sizes(team_size_files, pro_questions, main_size_key, config.human_accounts_in_bot_teams_allowed)
+    vs_main_files = None
+    if config.has_bot_team_vs_main_simulations:
+        vs_main_files = find_bot_team_vs_main_files(simulations_folder, config.main_bot_team_size)
+    else:
+        logger.warning(
+            f"{config.label} has no bot team vs top {main_size_key} bot team simulations, so its team-size "
+            "section can't be rendered"
+        )
+    team_sizes = compute_team_sizes(
+        team_size_files, vs_main_files, pro_questions, main_size_key, config.human_accounts_in_bot_teams_allowed
+    )
 
     overview = TournamentOverview(
         bot_count=len(bots),

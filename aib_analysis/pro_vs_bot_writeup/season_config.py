@@ -55,6 +55,7 @@ class SeasonConfig:
     main_bot_team_size: int = 10
     data_notes: tuple[str, ...] = ()
     human_accounts_in_bot_teams_allowed: bool = False
+    has_bot_team_vs_main_simulations: bool = True
 
     def __post_init__(self) -> None:
         if not self.bot_question_windows or self.bot_question_windows[0].first_open_date is not None:
@@ -110,6 +111,9 @@ SEASONS: dict[str, SeasonConfig] = {
         # Spring's simulations predate removing human accounts after the bot leaderboard, so
         # its largest team-size teams include a few. Kept so this season reproduces the published post.
         human_accounts_in_bot_teams_allowed=True,
+        # Spring's simulations predate the bot team vs top-10 bot team files, so its results still compute
+        # but its team-size section can't be rendered.
+        has_bot_team_vs_main_simulations=False,
     ),
     "summer_2026": SeasonConfig(
         key="summer_2026",
