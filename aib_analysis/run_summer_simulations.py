@@ -175,6 +175,7 @@ def main(
     pro_team = get_pro_team_users(pro_tournament)
     team_comparison_counter = next_count()
     size_10_bot_team = None
+    bot_teams_by_size: dict[int | Literal["all"], list[User]] = {}
     bot_team_sizes: list[int | Literal["all"]] = [
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 30, 50, 100, "all",
     ]
@@ -184,6 +185,7 @@ def main(
         bot_team_for_pro_comparison = get_best_forecasters_from_tournament(
             bot_tournament_wo_pro_questions, bot_team_size
         )
+        bot_teams_by_size[bot_team_size] = bot_team_for_pro_comparison
         pro_v_bot_tournament__teams = create_team_tournament(
             tournament_1=pro_tournament,
             tournament_2=bot_tournament,
@@ -308,6 +310,35 @@ def main(
             folder=output_folder,
             counter_override=next_count(),
         )
+
+    # ------------------- Bot teams vs the top 10 bot team -------------------
+    if size_10_bot_team is not None:
+        users_on_pro_questions = {user.name for user in pro_with_bot_tourn.users}
+        bot_team_vs_top_10_counter = next_count()
+        for bot_team_size, bot_team in bot_teams_by_size.items():
+            if bot_team_size == 10:
+                continue
+            # Bots with no forecasts on the Pro questions add nothing to the aggregate here,
+            # and create_aggregated_user_at_spot_time rejects users missing from the tournament.
+            bot_team_on_pro_questions = [
+                user for user in bot_team if user.name in users_on_pro_questions
+            ]
+            bot_team_vs_top_10__teams = create_team_tournament(
+                tournament_1=pro_with_bot_tourn,
+                tournament_2=pro_with_bot_tourn,
+                team_1=bot_team_on_pro_questions,
+                team_2=size_10_bot_team,
+                aggregate_name_1="Bot Team",
+                aggregate_name_2="Top 10 Bot Team",
+                use_tourn_1_weights=use_pro_weights,
+            )
+            save_tournament(
+                bot_team_vs_top_10__teams,
+                f"bot_team_vs_top_10_bot_team__teams_size_{bot_team_size}.json",
+                divide_into_types=False,
+                folder=output_folder,
+                counter_override=bot_team_vs_top_10_counter,
+            )
 
     # ------------------- Control/comparison Bots -------------------
     if not skip_comparison_team_outputs and size_10_bot_team is not None:
