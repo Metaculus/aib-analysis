@@ -104,6 +104,7 @@ The last thing you write is your final answer as: "Probability: ZZ%", 0-100"""
 class ChartFiles:
     season_trend: str
     team_size: str
+    team_size_vs_main: str
     individuals: str
     accuracy: str
     top_bots: str
@@ -299,6 +300,8 @@ def _pros_vs_bots_section(results: SeasonResults, config: SeasonConfig, charts: 
             "### How much does bot team size affect aggregation strength?",
             phrasing.team_size_paragraph(results.team_sizes, config.main_bot_team_size),
             _image(charts.team_size),
+            phrasing.team_size_vs_main_paragraph(results.team_sizes, config.main_bot_team_size),
+            _image(charts.team_size_vs_main),
         ]
     )
 

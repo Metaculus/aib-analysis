@@ -27,6 +27,7 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     SeasonTrendPoint,
     TeamAccuracy,
     TeamSizeResult,
+    require_head_to_head_vs_main,
     split_baseline_name,
 )
 
@@ -323,8 +324,8 @@ def _team_size_label(result: TeamSizeResult) -> str:
 
 
 def _compared_with_main(result: TeamSizeResult) -> str:
-    """"better", "worse", or "unclear": whether the paired 95% CI against the main bot team excludes 0."""
-    ci = result.difference_from_main_ci
+    """"better", "worse", or "unclear": whether the 95% CI of the head-to-head score against the main bot team excludes 0."""
+    ci = result.head_to_head_vs_main_ci
     if ci is not None and ci[0] > 0:
         return "better"
     if ci is not None and ci[1] < 0:
@@ -342,6 +343,7 @@ def _larger_teams_verdict(team_sizes: list[TeamSizeResult], main_size: int) -> s
 
 
 def team_size_takeaway(team_sizes: list[TeamSizeResult], main_size: int) -> str:
+    require_head_to_head_vs_main(team_sizes, main_size)
     main = _main_team(team_sizes, main_size)
     single_bot = next((result for result in team_sizes if result.team_size == 1), None)
     larger = [result for result in team_sizes if result.team_size > main_size]
@@ -386,19 +388,35 @@ def team_size_paragraph(team_sizes: list[TeamSizeResult], main_size: int) -> str
         "We ran a sensitivity analysis of the bot team's head-to-head score against Pros for bot teams of "
         "different sizes. The bot-only questions are used to determine which bots are included in a team of size "
         "X (i.e., the same method used to select the main bot team).",
-        f"To compare a team with the top {main_size}, we take the difference in their scores on each question; a "
-        "team did significantly better or worse when the 95% confidence interval of that difference excludes 0. "
-        "This is more precise than comparing the bands in the chart, because the teams' scores rise and fall "
-        "together from question to question.",
+        "The chart below shows each team's average head-to-head score against the Pro team, with a 95% confidence band.",
+        f"The highest point estimate came from a team of {_team_size_label(best)} ({format_score(best.mean)}{best_ci}).",
     ]
-    for verdict, direction in (("worse", "worse"), ("better", "better")):
-        group = [result for result in team_sizes if _compared_with_main(result) == verdict]
-        if group:
-            label = _team_group_label(group)
-            sentences.append(f"{label[0].upper()}{label[1:]} did significantly {direction} than the top {main_size}.")
-    sentences.append(f"The highest point estimate came from a team of {_team_size_label(best)} ({format_score(best.mean)}{best_ci}).")
     if single_bot is not None and single_bot is not best:
         sentences.append(f"The top bot by itself scored {format_score(single_bot.mean)}.")
+    return " ".join(sentences)
+
+
+def team_size_vs_main_paragraph(team_sizes: list[TeamSizeResult], main_size: int) -> str:
+    require_head_to_head_vs_main(team_sizes, main_size)
+    sentences = [
+        "Comparing the bands in that chart can't show whether two bot teams differ from each other, because "
+        "neighboring teams share most of their members, so a question that goes well for one team usually goes "
+        "well for the others.",
+        f"To compare each team with the top {main_size} directly, we also scored each team head-to-head against "
+        f"the top-{main_size} team on the same questions, the same way we score bots against Pros.",
+        f"The chart below shows each team's average head-to-head score against the top-{main_size} team, with 95% "
+        f"confidence intervals. A team did significantly better or worse than the top {main_size} when its "
+        "interval excludes 0.",
+    ]
+    verdict_groups = {
+        verdict: [result for result in team_sizes if _compared_with_main(result) == verdict] for verdict in ("worse", "better")
+    }
+    for verdict, group in verdict_groups.items():
+        if group:
+            label = _team_group_label(group)
+            sentences.append(f"{label[0].upper()}{label[1:]} did significantly {verdict} than the top {main_size}.")
+    if not any(verdict_groups.values()):
+        sentences.append(f"No team did significantly better or worse than the top {main_size}.")
     sentences.append(
         "Neighboring team sizes share most of their members, and we compared many sizes, so a single significant "
         "difference between small teams can easily be luck."
@@ -603,14 +621,14 @@ def format_percent(probability: float) -> str:
 
 def accuracy_takeaway(accuracy: BotFieldAccuracy) -> str:
     return (
-        "**On binary questions, the top bot gave the actual outcome a typical probability of "
-        f"{format_percent(accuracy.top_bot.typical_probability)}:** That compares with "
-        f"{format_percent(accuracy.median_probability)} for the median bot and "
-        f"{format_percent(accuracy.worst_bot.typical_probability)} for the lowest-scoring bot, among the "
-        f"{len(accuracy.eligible_bots)} bots that forecast on at least half of the questions. A coin flip scores 50%, "
-        f"and always forecasting this season's Yes rate ({format_percent(accuracy.yes_rate)}) scores "
-        f"{format_percent(accuracy.base_rate_probability)}. {round(100 * accuracy.share_below_base_rate)}% of these "
-        "bots did worse than always forecasting the Yes rate."
+        "**The top bot gave the actual outcome a typical probability of "
+        f"{format_percent(accuracy.top_bot.typical_probability)}, vs {format_percent(accuracy.median_probability)} "
+        "for the median bot:** The lowest-scoring bot gave a typical probability of "
+        f"{format_percent(accuracy.worst_bot.typical_probability)}. For reference, a coin flip scores 50%, and always "
+        f"forecasting {format_percent(accuracy.yes_rate)} (the share of binary questions that resolved Yes) scores "
+        f"{format_percent(accuracy.base_rate_probability)}. {round(100 * accuracy.share_below_base_rate)}% of bots did "
+        "worse than that. These figures pertain to only binary questions among the "
+        f"{len(accuracy.eligible_bots)} bots that forecast on at least half of the questions."
     )
 
 

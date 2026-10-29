@@ -176,7 +176,9 @@ def test_individuals_paragraph_counts_bots_above_lowest_pro() -> None:
 
 
 def _team_size(size: int, mean: float, vs_main: tuple[float, float] | None = (-1.0, 1.0), is_all: bool = False) -> TeamSizeResult:
-    return TeamSizeResult(size, is_all, mean, (mean - 6, mean + 6), 97, None if size == 10 else vs_main)
+    if size == 10 or vs_main is None:
+        return TeamSizeResult(size, is_all, mean, (mean - 6, mean + 6), 97)
+    return TeamSizeResult(size, is_all, mean, (mean - 6, mean + 6), 97, sum(vs_main) / 2, vs_main)
 
 
 def test_team_size_takeaway_when_larger_teams_did_worse() -> None:
@@ -193,7 +195,13 @@ def test_team_size_takeaway_when_larger_teams_did_worse() -> None:
     assert "Smaller teams, down to the top bot alone, scored between -3.59 and 0.89." in text
     assert "Merely increasing the size of a bot team" in text
     assert "peak" not in text
-    paragraph = phrasing.team_size_paragraph(sizes, 10)
+    pro_chart_paragraph = phrasing.team_size_paragraph(sizes, 10)
+    assert "The chart below shows each team's average head-to-head score against the Pro team" in pro_chart_paragraph
+    assert "The highest point estimate came from a team of the top 8 bots (0.89 [-5.11, 6.89])." in pro_chart_paragraph
+    assert "significantly" not in pro_chart_paragraph
+    paragraph = phrasing.team_size_vs_main_paragraph(sizes, 10)
+    assert "we also scored each team head-to-head against the top-10 team on the same questions" in paragraph
+    assert "The chart below shows each team's average head-to-head score against the top-10 team" in paragraph
     assert "The top 8 bots did significantly better than the top 10." in paragraph
     assert "The top 30 bots and all 274 bots did significantly worse than the top 10." in paragraph
     assert "a single significant difference between small teams can easily be luck" in paragraph
@@ -208,6 +216,15 @@ def test_team_size_takeaway_other_headings() -> None:
     assert "Merely increasing" not in text
     mixed = [_team_size(1, -1.0), _team_size(10, 0.0), _team_size(30, 3.0, (0.5, 5.5)), _team_size(50, -0.5, is_all=True)]
     assert phrasing.team_size_takeaway(mixed, 10).startswith("**Bot team size had mixed effects:**")
+    assert "No team did significantly better or worse than the top 10." in phrasing.team_size_vs_main_paragraph(no_difference, 10)
+
+
+def test_team_size_text_requires_head_to_head_scores_against_the_main_team() -> None:
+    missing = [_team_size(1, -1.0, None), _team_size(10, 0.0), _team_size(50, 0.5, is_all=True)]
+    with pytest.raises(ValueError, match=r"Team sizes \[1\] have no head-to-head scores against the top-10 bot team"):
+        phrasing.team_size_takeaway(missing, 10)
+    with pytest.raises(ValueError, match="Rerun the simulations"):
+        phrasing.team_size_vs_main_paragraph(missing, 10)
 
 
 def test_field_band_paragraph_counts_bots_outside_the_band() -> None:
@@ -400,9 +417,10 @@ def test_accuracy_takeaway() -> None:
         worst_bot=eligible[2],
     )
     text = phrasing.accuracy_takeaway(accuracy)
-    assert text.startswith("**On binary questions, the top bot gave the actual outcome a typical probability of 63.5%:**")
-    assert "52.8% for the median bot and 41.7% for the lowest-scoring bot" in text
-    assert "always forecasting this season's Yes rate (38.3%) scores 51.5%. 50% of these bots" in text
+    assert text.startswith("**The top bot gave the actual outcome a typical probability of 63.5%, vs 52.8% for the median bot:**")
+    assert "The lowest-scoring bot gave a typical probability of 41.7%." in text
+    assert "always forecasting 38.3% (the share of binary questions that resolved Yes) scores 51.5%. 50% of bots did worse than that." in text
+    assert text.endswith("These figures pertain to only binary questions among the 4 bots that forecast on at least half of the questions.")
     translation = phrasing.peer_score_translation_paragraph(accuracy)
     assert "there +X means about e^(2X/100) times the field's probability density" in translation
     assert "laertes's average spot peer score of 17.91 means it gave the actual outcome about 1.30× the probability (or probability density)" in translation

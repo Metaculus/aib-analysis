@@ -48,6 +48,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CHART_FILES = ChartFiles(
     season_trend="charts/season_trend.png",
     team_size="charts/team_size.png",
+    team_size_vs_main="charts/team_size_vs_main.png",
     individuals="charts/individual_leaderboard.png",
     accuracy="charts/accuracy.png",
     top_bots="charts/top_bots.png",
@@ -66,6 +67,7 @@ def write_charts(results: SeasonResults, config: SeasonConfig, output_folder: Pa
         stale_chart.unlink()
     charts.season_trend_chart(results.season_trend, output_folder / CHART_FILES.season_trend)
     charts.team_size_chart(results.team_sizes, config.main_bot_team_size, output_folder / CHART_FILES.team_size)
+    charts.team_size_vs_main_chart(results.team_sizes, config.main_bot_team_size, output_folder / CHART_FILES.team_size_vs_main)
     charts.individual_leaderboard_chart(results.individuals, INDIVIDUAL_CHART_ROWS, output_folder / CHART_FILES.individuals)
     charts.accuracy_chart(results.bot_field_accuracy, results.team_accuracy, output_folder / CHART_FILES.accuracy)
     charts.top_bots_chart(results.field, TOP_BOTS_CHART_ROWS, results.overview.non_primary_bots, output_folder / CHART_FILES.top_bots)
@@ -102,8 +104,14 @@ def write_data_files(results: SeasonResults, output_folder: Path) -> None:
     write_leaderboard_csv(results.metac.baseline_rows, data_folder / "metac_same_prompt_leaderboard.csv")
     with open(data_folder / "team_sizes.csv", "w", newline="") as file_handle:
         writer = csv.writer(file_handle)
-        writer.writerow(["team_size", "is_all_bots", "mean", "ci_lower", "ci_upper", "questions"])
+        writer.writerow(
+            [
+                "team_size", "is_all_bots", "mean", "ci_lower", "ci_upper", "questions",
+                "vs_main_bot_team_mean", "vs_main_bot_team_ci_lower", "vs_main_bot_team_ci_upper",
+            ]
+        )
         for team_size in results.team_sizes:
+            vs_main_ci = team_size.head_to_head_vs_main_ci
             writer.writerow(
                 [
                     team_size.team_size,
@@ -112,6 +120,9 @@ def write_data_files(results: SeasonResults, output_folder: Path) -> None:
                     "" if team_size.ci is None else f"{team_size.ci[0]:.4f}",
                     "" if team_size.ci is None else f"{team_size.ci[1]:.4f}",
                     team_size.question_count,
+                    "" if team_size.head_to_head_vs_main_mean is None else f"{team_size.head_to_head_vs_main_mean:.4f}",
+                    "" if vs_main_ci is None else f"{vs_main_ci[0]:.4f}",
+                    "" if vs_main_ci is None else f"{vs_main_ci[1]:.4f}",
                 ]
             )
     with open(output_folder / "pro_name_key.csv", "w", newline="") as file_handle:

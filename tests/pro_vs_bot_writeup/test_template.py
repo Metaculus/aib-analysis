@@ -49,6 +49,13 @@ def test_writeup_sections_charts_and_fill_mes(pros_ahead_folder: Path, synthetic
     assert "with questions closing between May 2 and May 2, 2026" in writeup
     assert "linkpost" not in writeup
     assert "**Pro forecasters" in writeup
+    team_size_positions = [
+        writeup.index("average head-to-head score against the Pro team"),
+        writeup.index("](charts/team_size.png)"),
+        writeup.index("average head-to-head score against the top-3 team"),
+        writeup.index("](charts/team_size_vs_main.png)"),
+    ]
+    assert team_size_positions == sorted(team_size_positions)
     assert re.search(r"\bNone\b(?! of)|\bnan\b", writeup) is None
     assert "—" not in writeup
     for real_pro_name in PRO_NAMES:

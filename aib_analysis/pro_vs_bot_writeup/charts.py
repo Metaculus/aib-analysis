@@ -38,6 +38,7 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     TeamSizeResult,
     bot_label,
     is_metac_bot,
+    require_head_to_head_vs_main,
 )
 
 logger = logging.getLogger(__name__)
@@ -196,19 +197,58 @@ def team_size_chart(team_sizes: list[TeamSizeResult], main_team_size: int, path:
         )
     _zero_line(axes, horizontal=True)
     axes.annotate("Bots and Pros equal", xy=(1, 0), xycoords=("axes fraction", "data"), xytext=(-2, 3), textcoords="offset points", ha="right", va="bottom", fontsize=8, color=TEXT_MUTED)
-    axes.set_xscale("log")
-    present_sizes = set(sizes.astype(int))
-    tick_sizes = sorted({size for size in (1, 2, 3, 5, 10, 30, 50, 100) if size in present_sizes} | {int(sizes[-1])})
-    axes.xaxis.set_major_locator(FixedLocator(tick_sizes))
-    axes.xaxis.set_minor_formatter(NullFormatter())
+    _team_size_x_axis(axes, team_sizes, {})
+    axes.set_ylabel("Head-to-head score vs the Pro team")
+    _style_grid(axes, "y")
+    _add_titles(figure, "Bot team vs Pro team, by team size", "Average head-to-head score against the Pro team, with 95% confidence band")
+    _save(figure, path)
+
+
+def team_size_vs_main_chart(team_sizes: list[TeamSizeResult], main_team_size: int, path: Path) -> None:
+    require_head_to_head_vs_main(team_sizes, main_team_size)
+    figure, axes = _new_figure(3.9, bottom_inches=0.75, has_legend=True)
+    for result in team_sizes:
+        if result.head_to_head_vs_main_mean is None:
+            continue
+        ci = result.head_to_head_vs_main_ci
+        excludes_zero = ci is not None and (ci[0] > 0 or ci[1] < 0)
+        if ci is not None:
+            axes.plot([result.team_size, result.team_size], ci, color=BOT_COLOR, linewidth=2, alpha=0.55, solid_capstyle="round", zorder=2)
+        axes.plot(
+            result.team_size, result.head_to_head_vs_main_mean, "o", markersize=7, zorder=3,
+            color=BOT_COLOR if excludes_zero else SURFACE, markeredgecolor=BOT_COLOR, markeredgewidth=1.5,
+        )
+    _zero_line(axes, horizontal=True)
+    axes.annotate(f"Equal to the top {main_team_size}", xy=(1, 0), xycoords=("axes fraction", "data"), xytext=(-2, 3), textcoords="offset points", ha="right", va="bottom", fontsize=8, color=TEXT_MUTED)
+    _team_size_x_axis(axes, team_sizes, {main_team_size: f"{main_team_size}\n(reference)"})
+    axes.set_ylabel(f"Head-to-head score vs the top {main_team_size}")
+    _style_grid(axes, "y")
+    legend_handles = [
+        _dot(BOT_COLOR, "95% CI excludes 0"),
+        Line2D([], [], marker="o", linestyle="none", color=SURFACE, markeredgecolor=BOT_COLOR, markeredgewidth=1.5, markersize=6.5, label="95% CI includes 0"),
+    ]
+    _add_titles(
+        figure,
+        f"Bot team vs top-{main_team_size} bot team, by team size",
+        f"Average head-to-head score against the top-{main_team_size} bot team, with 95% confidence intervals",
+        legend_handles,
+    )
+    _save(figure, path)
+
+
+def _team_size_x_axis(axes: Axes, team_sizes: list[TeamSizeResult], extra_tick_labels: dict[int, str]) -> None:
+    sizes = [result.team_size for result in team_sizes]
     largest = team_sizes[-1]
-    axes.set_xticklabels([f"{size}\n(all bots)" if size == largest.team_size and largest.is_all_bots else str(size) for size in tick_sizes])
+    tick_labels = {size: str(size) for size in (1, 2, 3, 5, 10, 30, 50, 100) if size in sizes}
+    tick_labels[largest.team_size] = f"{largest.team_size}\n(all bots)" if largest.is_all_bots else str(largest.team_size)
+    tick_labels.update(extra_tick_labels)
+    ticks = sorted(tick_labels)
+    axes.set_xscale("log")
+    axes.xaxis.set_major_locator(FixedLocator(ticks))
+    axes.xaxis.set_minor_formatter(NullFormatter())
+    axes.set_xticklabels([tick_labels[tick] for tick in ticks])
     axes.set_xlim(sizes[0] * 0.85, sizes[-1] * 1.15)
     axes.set_xlabel("Bot team size (top N bots on the bot-only questions, log scale)")
-    axes.set_ylabel("Bot team head-to-head score")
-    _style_grid(axes, "y")
-    _add_titles(figure, "Bot team score by team size", "Average head-to-head score against the Pro team, with 95% confidence band")
-    _save(figure, path)
 
 
 def _dot_interval_rows(axes: Axes, rows: list[LeaderboardRow], colors: list[str], labels: list[str]) -> None:
