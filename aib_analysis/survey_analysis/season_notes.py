@@ -24,6 +24,19 @@ SEASON_START_DATE = date(2026, 5, 18)
 SPOTLIGHT_OPENAI_MODEL = "GPT-5.6 Sol"
 SPOTLIGHT_OPUS_MODEL = "Claude Opus 5"
 
+# Definition changes made after the responses were downloaded, stated in the
+# report for transparency. Empty when nothing changed after the download.
+PRECOMMIT_LATE_DEFINITION_NOTE = (
+    "One definition was settled after the responses were downloaded but before anyone looked at a "
+    "hypothesis result: the research-source count also counts sources named in write-ins (see "
+    "Methodology)."
+)
+FRONTIER_LATE_DEFINITION_CAVEAT = (
+    "The Summer release-date cutoff and the rule that a flagship line still counts below a pricier "
+    "tier were set after an earlier draft of these results had been seen. The frontier results are "
+    "exploratory either way."
+)
+
 # Human-authored headline findings shown at the top of the report. Filled in
 # once per season after reading the generated charts; the report renders each
 # entry as a bullet verbatim.

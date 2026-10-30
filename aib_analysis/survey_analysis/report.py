@@ -380,10 +380,8 @@ def _precommitted_section(
         f"{family_size} hypotheses drawn from the Fall 2025 and Spring 2026 surveys. We chose the "
         "strongest past findings that measure different things, so each test adds independent "
         "information. Each is tested on the same bots and with the same correlation as the "
-        "exploratory list below, but only in the direction we committed to (a one-sided test). One "
-        "definition was settled after the responses were downloaded but before anyone looked at a "
-        "hypothesis result: the research-source count also counts sources named in write-ins (see "
-        "Methodology)."
+        "exploratory list below, but only in the direction we committed to (a one-sided test)."
+        + (f" {season_notes.PRECOMMIT_LATE_DEFINITION_NOTE}" if season_notes.PRECOMMIT_LATE_DEFINITION_NOTE else "")
     )
     lines.append("")
     lines.append(
@@ -689,11 +687,8 @@ def _caveats_section(features, corr_pool, counts, leaderboard_size) -> str:
             "Metaculus/Manifold search tools without ticking the strategy, so they count as not "
             "checking."
         )
-    lines.append(
-        "- Frontier definition: The Summer release-date cutoff and the rule that a flagship line "
-        "still counts below a pricier tier were set after an earlier draft of these results had been "
-        "seen. The frontier results are exploratory either way."
-    )
+    if season_notes.FRONTIER_LATE_DEFINITION_CAVEAT:
+        lines.append(f"- Frontier definition: {season_notes.FRONTIER_LATE_DEFINITION_CAVEAT}")
     return "\n".join(lines)
 
 

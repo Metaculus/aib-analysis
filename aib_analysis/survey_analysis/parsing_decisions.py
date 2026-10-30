@@ -110,7 +110,8 @@ def generate_parsing_decisions() -> str:
     lines.append("| Source | Pattern |")
     lines.append("| --- | --- |")
     for name, pattern in config.RESEARCH_WRITE_IN_SOURCES.items():
-        lines.append(f"| {name} | `{pattern.replace('|', '&#124;')}` |")
+        escaped_pattern = pattern.replace("|", "\\|")
+        lines.append(f"| {name} | `{escaped_pattern}` |")
     lines.append("")
 
     lines.append("## Single-select parsing")
