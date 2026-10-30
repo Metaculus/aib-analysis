@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from aib_analysis.survey_analysis import config, manual_adjustments, parsing
+from aib_analysis.survey_analysis import config, manual_adjustments, parsing, season_notes
 from aib_analysis.survey_analysis.config import ModelInfo
 from aib_analysis.survey_analysis.loading import Respondent, normalize_name
 from aib_analysis.survey_analysis.manual_adjustments import AnswerAdjustment
@@ -25,13 +25,16 @@ _MODEL_BY_DISPLAY: dict[str, ModelInfo] = {
     model.display: model for model in config.MODEL_REGISTRY
 }
 
-# Claude Opus 4.6 is the Opus release closest in time to GPT-5.4, so it is the
-# like-for-like Opus comparison used in the final-model charts.
-_OPUS_4_6: ModelInfo | None = next(
-    (m for m in config.MODEL_REGISTRY if m.display == "Claude Opus 4.6"), None
-)
-if _OPUS_4_6 is None:  # pragma: no cover - guards a registry rename
-    raise ValueError("Expected 'Claude Opus 4.6' in MODEL_REGISTRY for the Opus comparison")
+
+def _registry_model(display: str) -> ModelInfo:
+    model = _MODEL_BY_DISPLAY.get(display)
+    if model is None:
+        raise ValueError(f"season_notes names {display!r}, which is not a MODEL_REGISTRY display name")
+    return model
+
+
+_SPOTLIGHT_OPENAI_MODEL = _registry_model(season_notes.SPOTLIGHT_OPENAI_MODEL)
+_SPOTLIGHT_OPUS_MODEL = _registry_model(season_notes.SPOTLIGHT_OPUS_MODEL)
 
 
 @dataclass
@@ -80,10 +83,14 @@ class VariableSpec:
 NUMERIC_VARIABLE_SPECS: list[VariableSpec] = [
     VariableSpec("frontier", "Frontier final model", "binary"),
     VariableSpec("frontier_support", "Frontier supporting-role model", "binary"),
-    VariableSpec("gpt_5_4", "Used GPT-5.4 for its final model", "binary"),
+    VariableSpec(
+        "spotlight_openai_model", f"Used {_SPOTLIGHT_OPENAI_MODEL.display} for its final model", "binary"
+    ),
     VariableSpec("gpt_5x_high", "Used a flagship GPT-5.x for its final model", "binary"),
     VariableSpec("opus", "Used a Claude Opus model for its final model", "binary"),
-    VariableSpec("opus_4_6", f"Used {_OPUS_4_6.display} for its final model", "binary"),
+    VariableSpec(
+        "spotlight_opus_model", f"Used {_SPOTLIGHT_OPUS_MODEL.display} for its final model", "binary"
+    ),
     VariableSpec("final_model_release", "Final model release date (flagship models only)", "continuous"),
     VariableSpec("n_research_sources", "Number of research sources", "count"),
     VariableSpec("team_size", "Team size", "ordinal"),
@@ -92,6 +99,7 @@ NUMERIC_VARIABLE_SPECS: list[VariableSpec] = [
     VariableSpec("llm_calls_mid", "LLM calls per question (midpoint)", "ordinal"),
     VariableSpec("cost_mid", "Cost per question (midpoint)", "ordinal"),
     VariableSpec("research_vs_reasoning_ord", "Research vs reasoning (0=research..4=reasoning)", "ordinal"),
+    VariableSpec("questions_missed", "Questions missed after the bot's first forecast", "count"),
 ]
 
 
@@ -289,25 +297,36 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         for feature in config.BOOLEAN_FEATURES:
             answered = bool(cells[feature.column_slug].raw.strip())
             variables[feature.key] = (1.0 if booleans[feature.key] else 0.0) if answered else None
-        final_answered = bool(answers.get("final_model", "").strip())
-        support_answered = bool(answers.get("support_model", "").strip())
+        # Text that names no recognizable model (e.g. "our own system") says
+        # nothing about which model was used, so it is coded unknown, not "no".
+        final_answered = bool(final_models)
+        support_answered = bool(support_models)
         variables["frontier"] = (1.0 if frontier else 0.0) if final_answered else None
         variables["frontier_support"] = (
             (1.0 if frontier_support else 0.0) if support_answered else None
         )
-        variables["gpt_5_4"] = (
-            (1.0 if _uses_gpt_5_4(final_models) else 0.0) if final_answered else None
+        variables["spotlight_openai_model"] = (
+            (1.0 if _uses_model(final_models, _SPOTLIGHT_OPENAI_MODEL) else 0.0)
+            if final_answered
+            else None
         )
         variables["gpt_5x_high"] = (
             (1.0 if _uses_high_power_gpt_5x(final_models) else 0.0) if final_answered else None
         )
         variables["opus"] = (1.0 if _uses_opus(final_models) else 0.0) if final_answered else None
-        variables["opus_4_6"] = (
-            (1.0 if _uses_opus_4_6(final_models) else 0.0) if final_answered else None
+        variables["spotlight_opus_model"] = (
+            (1.0 if _uses_model(final_models, _SPOTLIGHT_OPUS_MODEL) else 0.0)
+            if final_answered
+            else None
         )
         variables["final_model_release"] = _high_power_release_ordinal(final_models)
+        research_write_in_sources = parsing.match_write_in_sources(
+            cells["research"].other, config.RESEARCH_WRITE_IN_SOURCES
+        )
         variables["n_research_sources"] = (
-            float(len(cells["research"].matched)) if answers.get("research") else None
+            float(len(cells["research"].matched) + len(research_write_in_sources))
+            if answers.get("research")
+            else None
         )
         variables["team_size"] = cells["team_size"].numeric
         variables["iterations_mid"] = cells["iterations"].numeric
@@ -317,6 +336,9 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         variables["research_vs_reasoning_ord"] = _ordinal_index(
             _canon(cells["research_vs_reasoning"]),
             config.ORDINAL_ORDER["research_vs_reasoning"],
+        )
+        variables["questions_missed"] = (
+            float(respondent.questions_missed) if respondent.questions_missed is not None else None
         )
 
         features.append(
@@ -348,13 +370,13 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
     return features
 
 
-def _uses_gpt_5_4(models: list[ModelInfo]) -> bool:
-    """True if the exact GPT-5.4 flagship (not GPT-5.4 mini) is present."""
-    return any(model.display == "GPT-5.4" for model in models)
+def _uses_model(models: list[ModelInfo], target: ModelInfo) -> bool:
+    """True if exactly this registry model is present (a mini variant does not count)."""
+    return any(model.display == target.display for model in models)
 
 
 def _uses_high_power_gpt_5x(models: list[ModelInfo]) -> bool:
-    """True if any full-size GPT-5 series model is present (GPT-5, 5.1, 5.2, 5.4, 5.5).
+    """True if any full-size GPT-5 series model is present (GPT-5 through GPT-5.6 Sol).
 
     The mini/nano variants normalize to keys starting 'gpt5' too, but carry
     high_power=False and so are excluded.
@@ -367,11 +389,6 @@ def _uses_high_power_gpt_5x(models: list[ModelInfo]) -> bool:
 def _uses_opus(models: list[ModelInfo]) -> bool:
     """True if any Claude Opus model is present."""
     return any("opus" in model.display.lower() for model in models)
-
-
-def _uses_opus_4_6(models: list[ModelInfo]) -> bool:
-    """True if Claude Opus 4.6 (the Opus closest in time to GPT-5.4) is present."""
-    return any(model.display == _OPUS_4_6.display for model in models)
 
 
 def _high_power_release_ordinal(models: list[ModelInfo]) -> float | None:

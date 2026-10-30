@@ -128,9 +128,16 @@ def test_team_size_zero_is_kept_as_is():
     assert parsing.parse_team_size("0") == (0, None)
 
 
-def test_count_research_sources_ignores_write_ins():
-    raw = "Exa, Tavily, my homemade tool"
-    assert parsing.count_research_sources(raw, config.RESEARCH_SOURCE_OPTIONS) == 2
+def test_write_in_sources_ignore_unlisted_and_non_source_text():
+    write_ins = ["my homemade tool", "no research at all this season"]
+    assert parsing.match_write_in_sources(write_ins, config.RESEARCH_WRITE_IN_SOURCES) == []
+
+
+def test_openrouter_fusion_is_not_counted_as_openrouter_web_search():
+    write_ins = ["OpenRouter Fusion research mode"]
+    assert parsing.match_write_in_sources(write_ins, config.RESEARCH_WRITE_IN_SOURCES) == [
+        "OpenRouter Fusion research"
+    ]
 
 
 # --------------------------------------------------------------------------- #

@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import os
 
-from aib_analysis.survey_analysis import config
+from aib_analysis.survey_analysis import config, precommitted, season_notes
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +65,14 @@ def generate_parsing_decisions() -> str:
     lines.append("")
     lines.append(
         f"A bot is frontier if its final-prediction model is a flagship model and "
-        f"{config.FRONTIER_RELEASE_CUTOFF_LABEL}. Flagship excludes mini, nano, flash, fast, haiku, "
-        "free-tier, and other small variants. Release dates were looked up online in August 2026; "
-        "`after cutoff` is computed from the date against the 2025-11-01 cutoff. A couple of dates are "
-        "marked approximate in the note column. Fix any date below and rerun."
+        f"{config.FRONTIER_RELEASE_CUTOFF_LABEL}. The season start comes from `SEASON_START_DATE` "
+        f"({season_notes.SEASON_START_DATE.isoformat()}) in season_notes.py, and the offset reproduces "
+        "Spring 2026's cutoff (a 2026-01-05 start gave 2025-11-01). Flagship means a vendor's flagship line, which still counts when the "
+        "vendor adds a pricier tier above it (Claude Opus under Claude Fable, GPT-6 Sol under GPT-6 "
+        "Astra). Mid tiers (Sonnet, Terra, Luna) and mini, nano, flash, fast, haiku, free-tier, and "
+        "other small variants are not flagship. Release dates were looked up online in August 2026, "
+        "and for the Summer 2026 additions in October 2026; `after cutoff` is computed from the date. "
+        "A couple of dates are marked approximate in the note column. Fix any date below and rerun."
     )
     lines.append("")
     lines.extend(_model_registry_table())
@@ -86,8 +90,8 @@ def generate_parsing_decisions() -> str:
         "Multi-select cells are not split on commas, because option text contains commas. Instead "
         "each known option is matched as a substring (longest first) and removed; whatever is left is "
         "recorded as an 'Other' write-in. Write-ins are aggregated into an 'Other (write-in)' bar in "
-        "the distribution charts, but they do not feed the habit features or the correlations. Option "
-        "vocabularies:"
+        "the distribution charts, but they do not feed the habit features or the correlations, except "
+        "for the research write-in sources listed after the vocabularies. Option vocabularies:"
     )
     lines.append("")
     for slug, vocab in config.MULTISELECT_VOCAB.items():
@@ -96,6 +100,18 @@ def generate_parsing_decisions() -> str:
         for option in vocab:
             lines.append(f"- {option}")
         lines.append("")
+    lines.append(
+        "**Research write-in sources.** Each of these that a respondent's research write-ins mention "
+        "(case-insensitive regex) adds one to their number of research sources, on top of the ticked "
+        "options. The list is extended each season from the new write-ins, before any scores are "
+        "looked at."
+    )
+    lines.append("")
+    lines.append("| Source | Pattern |")
+    lines.append("| --- | --- |")
+    for name, pattern in config.RESEARCH_WRITE_IN_SOURCES.items():
+        lines.append(f"| {name} | `{pattern.replace('|', '&#124;')}` |")
+    lines.append("")
 
     lines.append("## Single-select parsing")
     lines.append("")
@@ -113,7 +129,12 @@ def generate_parsing_decisions() -> str:
     lines.append("")
     lines.append(
         "Bucketed answers are converted to a single number for correlation. Mixed-unit hours are "
-        "mapped to approximate total hours."
+        "mapped to approximate total hours. Form options with no place on the scale are charted but "
+        "get no number, so they stay out of the correlation: "
+        + "; ".join(
+            f"{slug}: {', '.join(options)}" for slug, options in config.UNORDERED_OPTIONS.items()
+        )
+        + "."
     )
     lines.append("")
     lines.extend(_midpoint_table("Iterations", config.ITERATIONS_MIDPOINT))
@@ -154,6 +175,19 @@ def generate_parsing_decisions() -> str:
     lines.append(
         "- Winner and top-10 groups are defined on total (summed) score, matching the official "
         "leaderboard and prizes; only the performance metric for correlations uses the average."
+    )
+    lines.append(
+        "- Questions missed is the one feature not taken from the survey: the number of scored "
+        "questions whose spot-scoring time came after the bot's first forecast, minus the number the "
+        "bot forecast. The tournament data has no question open time, so a question counts as open to "
+        "a bot if it had not been scored yet when the bot first forecast. Early stops and mid-season "
+        "outages count the same; questions that closed before a late start do not count."
+    )
+    lines.append(
+        "- Precommitted hypotheses (`precommitted.py`) use the same correlations, but each p-value is "
+        "one-sided in the committed direction, and the family is corrected with Holm's method. A "
+        f"hypothesis is supported when its Holm-adjusted p is below {precommitted.FAMILY_ALPHA}. A "
+        "hypothesis that cannot be tested enters the correction with p = 1."
     )
     lines.append(
         "- Yes/no and plain-number traits vs peer score: Pearson's r. (For a yes/no trait coded 0/1 "

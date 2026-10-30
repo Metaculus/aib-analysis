@@ -269,7 +269,7 @@ def generate_review_report(features: list[RespondentFeatures]) -> str:
         "`data/respondent_audit.csv` link each bot name to its exact peer score and its individual "
         "survey answers. Because peer scores are public on the leaderboard, that combination "
         "de-anonymizes respondents. It exists so you can spot-check the parsing; the publishable "
-        "output is `spring_survey_analysis.md`, which reports only aggregates."
+        f"output is `{os.path.basename(config.REPORT_MD)}`, which reports only aggregates."
     )
     lines.append("")
     lines.append(
@@ -303,7 +303,7 @@ def _csv_safe(value: str) -> str:
 def write_respondent_audit_csv(features: list[RespondentFeatures]) -> None:
     os.makedirs(config.DATA_DIR, exist_ok=True)
     all_slugs = list(config.COLUMNS)  # raw for every survey field (full dump)
-    charted_slugs = [spec.slug for spec in config.QUESTION_SPECS]
+    charted_slugs = [spec.slug for spec in config.QUESTION_SPECS if spec.slug in config.COLUMNS]
     with open(RESPONDENT_AUDIT_CSV, "w", newline="") as handle:
         writer = csv.writer(handle)
         header = [

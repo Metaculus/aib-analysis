@@ -48,21 +48,30 @@ def test_split_bot_list_on_commas_and_semicolons():
     assert _split_bot_list("") == []
 
 
-def test_to_int_and_to_float_tolerate_junk():
+def test_to_int_and_to_float_parse_numbers_and_blanks():
     assert _to_int("3") == 3
     assert _to_int("3.0") == 3
     assert _to_int("") == 0
-    assert _to_int("n/a") == 0
+    assert _to_int(None) == 0
     assert _to_float("2.5") == 2.5
+    assert _to_float("3,374.02") == pytest.approx(3374.02)
     assert _to_float("") == 0.0
-    assert _to_float("junk") == 0.0
+
+
+@pytest.mark.parametrize("junk", ["junk", "n/a", "$5"])
+def test_to_float_raises_on_junk_instead_of_reading_zero(junk):
+    # A prize read as 0 would silently turn a winner into a non-winner.
+    with pytest.raises(ValueError, match="Expected a number"):
+        _to_float(junk)
 
 
 # --------------------------------------------------------------------------- #
 # Leaderboard match: exact, alnum, none (never loose substring)
 # --------------------------------------------------------------------------- #
 def _row(name: str) -> LeaderboardRow:
-    return LeaderboardRow(rank=1, bot_name=name, sum_spot_peer=1.0, question_count=100)
+    return LeaderboardRow(
+        rank=1, bot_name=name, sum_spot_peer=1.0, question_count=100, questions_open_after_start=120
+    )
 
 
 def test_leaderboard_exact_match():
@@ -97,6 +106,7 @@ def _owner(bots: list[str], **kw) -> PrizeOwner:
         winner_count=kw.get("winner_count", 1),
         aib_prize=kw.get("aib_prize", 100.0),
         total_prize=kw.get("total_prize", 100.0),
+        in_futureeval=True,
     )
 
 
@@ -205,8 +215,11 @@ def test_no_prize_match_defaults_to_non_winner():
 # --------------------------------------------------------------------------- #
 # Survey loading: blank bot names must never be dropped silently
 # --------------------------------------------------------------------------- #
-def _write_survey_csv(path, rows: list[list[str]]) -> None:
-    header = [config.COLUMNS["timestamp"], config.COLUMNS["bot_name"]]
+def _write_survey_csv(path, rows: list[list[str]], header: list[str] | None = None) -> None:
+    # Timestamp and bot name first, so each test row can give just those two cells.
+    header = header or [config.COLUMNS["timestamp"], config.COLUMNS["bot_name"]] + [
+        text for slug, text in config.COLUMNS.items() if slug not in ("timestamp", "bot_name")
+    ]
     with open(path, "w", newline="") as handle:
         writer = csv.writer(handle)
         writer.writerow(header)
@@ -226,4 +239,22 @@ def test_load_survey_raises_on_answers_without_bot_name(tmp_path, monkeypatch):
     _write_survey_csv(path, [["1/1/26", "bot-a"], ["1/2/26", ""]])
     monkeypatch.setattr(config, "SURVEY_CSV", str(path))
     with pytest.raises(ValueError, match="no bot name"):
+        load_survey()
+
+
+def test_load_survey_raises_on_a_column_missing_from_the_export(tmp_path, monkeypatch):
+    path = tmp_path / "survey.csv"
+    header = [text for slug, text in config.COLUMNS.items() if slug != "hours"]
+    _write_survey_csv(path, [["1/1/26", "bot-a"]], header=header)
+    monkeypatch.setattr(config, "SURVEY_CSV", str(path))
+    with pytest.raises(ValueError, match="Missing from the CSV"):
+        load_survey()
+
+
+def test_load_survey_raises_on_a_question_the_config_does_not_know(tmp_path, monkeypatch):
+    path = tmp_path / "survey.csv"
+    header = list(config.COLUMNS.values()) + ["A brand new question?"]
+    _write_survey_csv(path, [["1/1/26", "bot-a"]], header=header)
+    monkeypatch.setattr(config, "SURVEY_CSV", str(path))
+    with pytest.raises(ValueError, match="A brand new question"):
         load_survey()

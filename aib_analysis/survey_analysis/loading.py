@@ -16,7 +16,7 @@ import logging
 import re
 from dataclasses import dataclass
 
-from aib_analysis.survey_analysis import config, manual_adjustments, season_notes
+from aib_analysis.survey_analysis import config, manual_adjustments
 from aib_analysis.survey_analysis.leaderboard import (
     LeaderboardRow,
     get_leaderboard_rows,
@@ -48,6 +48,7 @@ class PrizeOwner:
     winner_count: int
     aib_prize: float
     total_prize: float
+    in_futureeval: bool
 
     @property
     def won_any(self) -> bool:
@@ -62,6 +63,7 @@ class Respondent:
     rank: int | None = None
     sum_spot_peer: float | None = None
     question_count: int | None = None
+    questions_missed: int | None = None
     is_winner: bool = False
     # Prize amounts are owner-level totals from the prize sheet (an owner with
     # several bots reports one combined figure); only is_winner is bot-level.
@@ -102,6 +104,7 @@ def load_survey() -> list[dict[str, str]]:
         header = [cell.strip() for cell in next(reader)]
         raw_rows = [row for row in reader]
 
+    _check_survey_header(header)
     header_to_slug = {name: slug for slug, name in config.COLUMNS.items()}
     index_to_slug: dict[int, str] = {}
     for index, name in enumerate(header):
@@ -132,6 +135,22 @@ def load_survey() -> list[dict[str, str]]:
     return records
 
 
+def _check_survey_header(header: list[str]) -> None:
+    """Fail on any column the config and the export disagree about.
+
+    A question added to or reworded on the form would otherwise be dropped (or
+    read as blank for everyone) without a trace.
+    """
+    expected = set(config.COLUMNS.values())
+    missing = sorted(expected - set(header))
+    unexpected = sorted(name for name in set(header) - expected if name)
+    if missing or unexpected:
+        raise ValueError(
+            f"Survey CSV header does not match config.COLUMNS. Missing from the CSV: {missing}. "
+            f"Not in config.COLUMNS: {unexpected}."
+        )
+
+
 def load_prize_owners() -> list[PrizeOwner]:
     with open(config.PRIZE_STATS_CSV, newline="") as handle:
         reader = csv.DictReader(handle)
@@ -151,24 +170,33 @@ def load_prize_owners() -> list[PrizeOwner]:
                     winner_count=_to_int(row.get("winner_count")),
                     aib_prize=_to_float(row.get("aib_prize")),
                     total_prize=_to_float(row.get("total_prize")),
+                    in_futureeval=_to_bool(row["in_aib"]),
                 )
             )
     logger.info("Loaded %d prize-stats owner rows", len(owners))
     return owners
 
 
-def _to_int(value: str | None) -> int:
-    try:
-        return int(float((value or "").strip()))
-    except ValueError:
-        return 0
-
-
 def _to_float(value: str | None) -> float:
-    try:
-        return float((value or "").strip())
-    except ValueError:
+    """Blank is 0; anything else must be a number (thousands separators allowed)."""
+    text = (value or "").strip().replace(",", "")
+    if not text:
         return 0.0
+    try:
+        return float(text)
+    except ValueError:
+        raise ValueError(f"Expected a number in the prize sheet, got {value!r}") from None
+
+
+def _to_int(value: str | None) -> int:
+    return int(_to_float(value))
+
+
+def _to_bool(value: str) -> bool:
+    text = value.strip().upper()
+    if text not in ("TRUE", "FALSE"):
+        raise ValueError(f"Expected TRUE or FALSE in the prize sheet, got {value!r}")
+    return text == "TRUE"
 
 
 def _match_leaderboard(
@@ -259,6 +287,7 @@ def build_respondents(refresh: bool = False) -> list[Respondent]:
         normalize_name(override.bot_name): override
         for override in manual_adjustments.load_winner_overrides()
     }
+    aliases = manual_adjustments.load_bot_name_aliases()
 
     by_norm = {normalize_name(row.bot_name): row for row in leaderboard_rows}
     by_alnum = {_alnum_key(row.bot_name): row for row in leaderboard_rows}
@@ -275,7 +304,7 @@ def build_respondents(refresh: bool = False) -> list[Respondent]:
         # A reviewed alias lets a survey name join to its tournament entry when
         # the automatic matcher cannot safely bridge the two; the respondent's
         # displayed name stays exactly what they typed.
-        match_name = season_notes.BOT_NAME_ALIASES.get(bot_name, bot_name)
+        match_name = aliases.get(bot_name, bot_name)
 
         lb_row, lb_kind = _match_leaderboard(match_name, by_norm, by_alnum)
         respondent.leaderboard_match_kind = lb_kind
@@ -284,6 +313,7 @@ def build_respondents(refresh: bool = False) -> list[Respondent]:
             respondent.rank = lb_row.rank
             respondent.sum_spot_peer = lb_row.sum_spot_peer
             respondent.question_count = lb_row.question_count
+            respondent.questions_missed = lb_row.questions_missed
             respondent.is_top_10 = normalize_name(lb_row.bot_name) in top_10_names
 
         owner, prize_kind = _match_prize(match_name, owners)
@@ -308,6 +338,9 @@ def build_respondents(refresh: bool = False) -> list[Respondent]:
                 "Winner override for %r matched no survey respondent; stale entry?",
                 override.bot_name,
             )
+    survey_names = {record["bot_name"] for record in survey_records}
+    for survey_name in sorted(set(aliases) - survey_names):
+        logger.warning("Bot name alias for %r matched no survey respondent; stale entry?", survey_name)
     _log_join_summary(respondents)
     return respondents
 

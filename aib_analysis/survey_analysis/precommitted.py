@@ -6,6 +6,12 @@ Each is tested one-sided in its committed direction and the family is corrected
 with Holm's method, so these few tests avoid most of the multiple-comparison
 penalty the exploratory feature list pays. Do not edit a hypothesis after seeing
 Summer results; new ideas belong in the exploratory list.
+
+The picks were confirmed on 2026-10-30, after the responses were downloaded but
+before anyone looked at a hypothesis result. At the same time, the research-source
+count was defined to also count write-ins naming a source in
+config.RESEARCH_WRITE_IN_SOURCES, and checking similar questions/markets was kept
+to the strategy checkbox alone.
 """
 
 from __future__ import annotations
@@ -56,17 +62,17 @@ PRECOMMITTED_HYPOTHESES: list[PrecommittedHypothesis] = [
     ),
 ]
 
-# Considered and set aside. They stay in the exploratory list; while results are
-# blinded they are withheld too, so any of them can still replace a hypothesis above.
+# Considered and set aside. They stay in the exploratory list. --blind withholds
+# them too, so the picks can be reviewed before any of them is seen.
 ALTERNATIVE_HYPOTHESES: list[PrecommittedHypothesis] = [
     PrecommittedHypothesis(
         key="questions_missed",
-        statement="Bots that miss fewer of the season's questions score higher.",
+        statement="Bots that miss fewer questions after their first forecast score higher.",
         predicted_sign=-1,
         prior_evidence=(
             "Not one of last year's hypotheses (it was first measured for Summer 2026). A retroactive "
-            "Spring 2026 check found Spearman r = -0.46 (p = 0.002, n = 42), taking the most-forecast "
-            "bot's question count as the season total."
+            "Spring 2026 check that counted every season question, including those before a bot's "
+            "first forecast, found Spearman r = -0.46 (p = 0.002, n = 42)."
         ),
     ),
     PrecommittedHypothesis(

@@ -9,9 +9,9 @@ internal consistency. Runs without env vars or local data.
 from __future__ import annotations
 
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 
-from aib_analysis.survey_analysis import config, parsing
+from aib_analysis.survey_analysis import config, parsing, season_notes
 from aib_analysis.survey_analysis.config import MODEL_REGISTRY, FRONTIER_RELEASE_CUTOFF
 
 
@@ -105,9 +105,29 @@ def test_empty_token_matches_nothing():
 # --------------------------------------------------------------------------- #
 # is_frontier_final on realistic cell text
 # --------------------------------------------------------------------------- #
+def _newest_flagship_display() -> str:
+    flagships = [model for model in MODEL_REGISTRY if model.high_power and model.release_date]
+    return max(flagships, key=lambda model: model.release_date).display
+
+
 def test_frontier_final_any_frontier_flips_true():
-    assert parsing.is_frontier_final("GPT-4o, GPT-5.4") is True
-    assert parsing.is_frontier_final("Claude Sonnet 4.5, gpt-5.1") is True
+    newest = _newest_flagship_display()
+    assert parsing.is_frontier_final(f"GPT-4o, {newest}") is True
+    assert parsing.is_frontier_final(f"Claude Sonnet 4.5, {newest.lower()}") is True
+
+
+def test_frontier_cutoff_reproduces_spring_and_tracks_season_start():
+    assert config.frontier_release_cutoff(date(2026, 1, 5)) == date(2025, 11, 1)
+    assert config.frontier_release_cutoff(date(2026, 5, 18)) == date(2026, 3, 14)
+    assert FRONTIER_RELEASE_CUTOFF == config.frontier_release_cutoff(season_notes.SEASON_START_DATE)
+
+
+def test_flagship_line_below_a_pricier_tier_is_high_power():
+    by_display = {model.display: model for model in MODEL_REGISTRY}
+    assert by_display["Claude Opus 5"].high_power is True
+    assert by_display["GPT-6 Sol"].high_power is True
+    assert by_display["Claude Sonnet 5"].high_power is False
+    assert by_display["GPT-5.6 Terra"].high_power is False
 
 
 def test_frontier_final_all_non_frontier_stays_false():

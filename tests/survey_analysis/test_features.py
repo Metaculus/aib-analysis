@@ -8,9 +8,17 @@ the documented treatment of blank answers. Runs without env vars or local data.
 
 from __future__ import annotations
 
-from aib_analysis.survey_analysis import config
+import pytest
+
+from aib_analysis.survey_analysis import config, season_notes
 from aib_analysis.survey_analysis.features import build_features
 from aib_analysis.survey_analysis.loading import Respondent
+
+
+@pytest.fixture(autouse=True)
+def _no_local_adjustments(tmp_path, monkeypatch):
+    # Synthetic bots must not pick up the season's reviewed adjustments from local/.
+    monkeypatch.setattr(config, "MANUAL_ANSWER_ADJUSTMENTS_CSV", str(tmp_path / "none.csv"))
 
 
 def _respondent(**answers: str) -> Respondent:
@@ -69,14 +77,28 @@ def test_not_in_a_team_becomes_solo_one():
     assert feature.variables["team_size"] == 1.0
 
 
-def test_write_in_research_captured_as_other_and_not_counted():
+def test_unlisted_write_in_research_captured_as_other_and_not_counted():
     feature = build_features(
         [_respondent(research="Exa, my custom homemade scraper")]
     )[0]
     cell = feature.cells["research"]
     assert cell.matched == ["Exa"]
     assert cell.other == ["my custom homemade scraper"]
-    assert feature.variables["n_research_sources"] == 1.0  # write-in not counted
+    assert feature.variables["n_research_sources"] == 1.0
+
+
+def test_listed_write_in_research_source_adds_to_the_count():
+    feature = build_features(
+        [_respondent(research="Exa, Other AskNews, AskNews DeepNews, a few RSS feeds")]
+    )[0]
+    assert feature.cells["research"].other == ["a few RSS feeds"]
+    assert feature.variables["n_research_sources"] == 4.0
+
+
+def test_spotlight_model_features_follow_season_notes():
+    feature = build_features([_respondent(final_model=season_notes.SPOTLIGHT_OPUS_MODEL)])[0]
+    assert feature.variables["spotlight_opus_model"] == 1.0
+    assert feature.variables["spotlight_openai_model"] == 0.0
 
 
 def test_unrecognized_ordinal_value_is_none_not_zero():
@@ -93,3 +115,17 @@ def test_non_frontier_final_model_flags_false():
 def test_mini_variant_final_is_not_frontier():
     feature = build_features([_respondent(final_model="GPT-5.4 mini")])[0]
     assert feature.frontier is False
+
+
+def test_final_model_text_naming_no_known_model_is_unknown_not_no():
+    feature = build_features([_respondent(final_model="Our own forecasting system")])[0]
+    assert feature.variables["frontier"] is None
+    assert feature.variables["gpt_5x_high"] is None
+    assert feature.variables["opus"] is None
+
+
+def test_questions_missed_comes_from_the_leaderboard_join():
+    respondent = _respondent()
+    respondent.questions_missed = 12
+    assert build_features([respondent])[0].variables["questions_missed"] == 12.0
+    assert build_features([_respondent()])[0].variables["questions_missed"] is None

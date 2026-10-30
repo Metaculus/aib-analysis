@@ -1,6 +1,6 @@
 """Whole-pipeline sanity checks against the real local survey data.
 
-Unlike the pure unit tests, these load the actual Spring 2026 survey + cached
+Unlike the pure unit tests, these load the actual season's survey + cached
 leaderboard and assert invariants on the joined result: no two respondents share
 a leaderboard row, every score is finite and matches sum/questions, the
 correlation pool respects the question floor, and every final-model token the

@@ -9,7 +9,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-OUT_DIR="$REPO_ROOT/local/spring_survey_analysis"
+OUT_DIR="$REPO_ROOT/local/summer_survey_analysis"
 
 CACHE_BASE="${TMPDIR:-/tmp}/quarto_survey_v2"
 export XDG_CACHE_HOME="$CACHE_BASE/cache"
@@ -26,7 +26,7 @@ done
 CHROME_PROFILE="$CACHE_BASE/chrome-profile"
 
 cd "$OUT_DIR"
-for doc in spring_survey_analysis parsing_decisions parsing_review; do
+for doc in summer_survey_analysis parsing_decisions parsing_review; do
   echo "Rendering $doc.md -> $doc.html"
   quarto render "$doc.md" --to html --embed-resources -M toc=true -M toc-location=left
   if [ -n "$CHROME_BIN" ]; then

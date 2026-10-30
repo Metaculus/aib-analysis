@@ -16,10 +16,10 @@ from aib_analysis.survey_analysis.features import NUMERIC_VARIABLE_SPECS, variab
 
 
 # --------------------------------------------------------------------------- #
-# Column accounting: the review doc claims "every one of the 27 columns"
+# Column accounting: the review doc claims "every one of the 24 columns"
 # --------------------------------------------------------------------------- #
 def test_column_count_matches_review_doc_claim():
-    assert len(config.COLUMNS) == 27
+    assert len(config.COLUMNS) == 24
 
 
 def test_every_column_is_charted_excluded_or_used_for_joining():
@@ -50,9 +50,10 @@ def test_charted_and_excluded_do_not_overlap():
     ],
 )
 def test_midpoint_keys_match_vocab_exactly(slug, midpoint_map):
-    # Any option without a midpoint would be silently dropped from correlations;
-    # any stray midpoint key would be dead config.
-    assert set(midpoint_map) == set(config.SINGLE_SELECT_VOCAB[slug])
+    # Any option without a midpoint would be silently dropped from correlations
+    # (unless declared unordered); any stray midpoint key would be dead config.
+    unordered = set(config.UNORDERED_OPTIONS.get(slug, []))
+    assert set(midpoint_map) == set(config.SINGLE_SELECT_VOCAB[slug]) - unordered
 
 
 @pytest.mark.parametrize(
@@ -76,7 +77,14 @@ def test_midpoints_are_non_decreasing_along_ordinal_order(slug, midpoint_map):
 # --------------------------------------------------------------------------- #
 def test_ordinal_order_matches_single_select_vocab():
     for slug, order in config.ORDINAL_ORDER.items():
-        assert set(order) == set(config.SINGLE_SELECT_VOCAB[slug]), slug
+        unordered = set(config.UNORDERED_OPTIONS.get(slug, []))
+        assert set(order) == set(config.SINGLE_SELECT_VOCAB[slug]) - unordered, slug
+
+
+def test_unordered_options_are_real_options_of_ordinal_questions():
+    for slug, options in config.UNORDERED_OPTIONS.items():
+        assert slug in config.ORDINAL_ORDER, slug
+        assert set(options) <= set(config.SINGLE_SELECT_VOCAB[slug]), slug
 
 
 # --------------------------------------------------------------------------- #
@@ -108,9 +116,12 @@ def test_every_correlation_key_resolves():
             assert resolved.kind in {"binary", "count", "ordinal", "continuous"}
 
 
-def test_every_question_spec_slug_is_a_real_column():
+def test_every_question_spec_slug_is_a_real_column_or_explained():
     for spec in config.QUESTION_SPECS:
-        assert spec.slug in config.COLUMNS, spec.slug
+        if spec.kind == "derived":
+            assert spec.slug in config.DERIVED_SPEC_SOURCES, spec.slug
+        else:
+            assert spec.slug in config.COLUMNS, spec.slug
 
 
 def test_charted_correlations_cover_every_measured_feature():

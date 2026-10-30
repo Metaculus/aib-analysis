@@ -1,4 +1,4 @@
-"""Pure parsing functions for the Spring 2026 survey.
+"""Pure parsing functions for the bot-maker survey.
 
 Every function returns both the normalized value AND whatever it could not map,
 so the review doc can show exactly what was matched and what was set aside. No
@@ -78,6 +78,15 @@ def parse_multiselect(
     return matched_ordered, others
 
 
+def match_write_in_sources(write_ins: list[str], sources: dict[str, str]) -> list[str]:
+    """Names of the sources (name -> regex) that any write-in mentions, each at most once."""
+    return [
+        name
+        for name, pattern in sources.items()
+        if any(re.search(pattern, write_in, re.IGNORECASE) for write_in in write_ins)
+    ]
+
+
 def parse_single_select(
     raw: str, options: list[str]
 ) -> tuple[str | None, str | None]:
@@ -130,11 +139,6 @@ def feature_present(matched_options: list[str], match_substring: str) -> bool:
     """
     lowered = match_substring.lower()
     return any(lowered in option.lower() for option in matched_options)
-
-
-def count_research_sources(raw: str, research_options: list[str]) -> int:
-    matched, _others = parse_multiselect(raw, research_options)
-    return len(matched)
 
 
 # --------------------------------------------------------------------------- #

@@ -1,8 +1,13 @@
 """Human-reviewed manual adjustments layered on top of automatic parsing.
 
-Two CSVs in the non-committed private input directory drive this module. They
+Three CSVs in the non-committed private input directory drive this module. They
 live next to the raw survey data because, like it, they reference individual
 bots; keeping them there means they persist for reruns without entering git.
+
+- manual_bot_name_aliases.csv (survey_bot_name, tournament_bot_name, reason)
+    Joins a survey bot name to its tournament entry when the automatic matcher
+    cannot safely bridge the two (e.g. a name too short to match without
+    risking a wrong join). Verified by hand against the prize sheet.
 
 - manual_winner_overrides.csv (bot_name, is_winner, reason)
     Bot-level winner status where the prize sheet cannot provide it: the sheet
@@ -61,6 +66,28 @@ class AnswerAdjustment:
         if self.action == "map":
             return f"{self.column_slug}: {self.write_in!r} -> {self.canonical_option!r}"
         return f"{self.column_slug}: {self.write_in!r} ({self.action})"
+
+
+def load_bot_name_aliases() -> dict[str, str]:
+    """Survey bot name -> tournament bot name, from the reviewed alias CSV."""
+    path = config.MANUAL_BOT_NAME_ALIASES_CSV
+    if not os.path.exists(path):
+        logger.info("No bot name alias file at %s; none applied", path)
+        return {}
+    aliases: dict[str, str] = {}
+    with open(path, newline="") as handle:
+        for line_number, row in enumerate(csv.DictReader(handle), start=2):
+            survey_name = (row.get("survey_bot_name") or "").strip()
+            tournament_name = (row.get("tournament_bot_name") or "").strip()
+            if not survey_name or not tournament_name:
+                raise ValueError(
+                    f"{path} line {line_number}: needs survey_bot_name and tournament_bot_name"
+                )
+            if survey_name in aliases:
+                raise ValueError(f"{path} line {line_number}: duplicate alias for {survey_name!r}")
+            aliases[survey_name] = tournament_name
+    logger.info("Loaded %d bot name aliases from %s", len(aliases), path)
+    return aliases
 
 
 def load_winner_overrides() -> list[WinnerOverride]:

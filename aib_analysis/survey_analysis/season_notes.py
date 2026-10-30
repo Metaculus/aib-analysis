@@ -6,27 +6,32 @@ lives here, where it is reviewed once per season. When re-running for a new
 season, every constant in this file must be re-checked.
 """
 
-SEASON_LABEL = "Spring 2026"
-TOURNAMENT_NAME = "Spring 2026 FutureEval Bot Tournament"
-TOURNAMENT_URL = "https://www.metaculus.com/tournament/spring-aib-2026/"
+from datetime import date
+
+SEASON_LABEL = "Summer 2026"
+TOURNAMENT_NAME = "Summer 2026 FutureEval Bot Tournament"
+TOURNAMENT_URL = "https://www.metaculus.com/tournament/summer-futureeval-2026/"
+
+# Day the season's first bot question opened (Spring 2026: 2026-01-05). The
+# frontier release-date cutoff in config.py is derived from it, and refreshing
+# the leaderboard checks it against the tournament's first forecast.
+SEASON_START_DATE = date(2026, 5, 18)
+
+# Specific final-prediction models with their own feature: the most common
+# OpenAI final model among respondents, and the Claude Opus release closest to
+# it in time as a like-for-like comparison (Spring 2026: GPT-5.4 and Claude
+# Opus 4.6). Both must be MODEL_REGISTRY display names.
+SPOTLIGHT_OPENAI_MODEL = "GPT-5.6 Sol"
+SPOTLIGHT_OPUS_MODEL = "Claude Opus 5"
 
 # Human-authored headline findings shown at the top of the report. Filled in
 # once per season after reading the generated charts; the report renders each
 # entry as a bullet verbatim.
 MAIN_TAKEAWAYS: list[str] = [
-    "<add takeaway>",
-    "<add takeaway>",
-    "<add takeaway>",
+    "[===Fill me: takeaway 1===]",
+    "[===Fill me: takeaway 2===]",
+    "[===Fill me: takeaway 3===]",
 ]
-
-# Survey bot names that refer to a tournament entry under a slightly different
-# name, where the automatic join cannot safely bridge the gap on its own (e.g.
-# a name too short to match without risking a wrong join). Key is the exact
-# survey bot_name; value is the tournament/prize-sheet name it denotes. Verified
-# by hand against the prize sheet and re-checked per season.
-BOT_NAME_ALIASES: dict[str, str] = {
-    "MWG Bot": "MWG",  # prize sheet lists this entry as "MWG" (owner MWGHuman)
-}
 
 # How the excluded (no scored-leaderboard row) respondents are characterized.
 # The count of any respondents with no tournament record at all is computed at
@@ -40,7 +45,7 @@ EXCLUDED_MINIBENCH_LABEL = "MiniBench-only participants"
 # in the parsing review doc.
 RANK_VS_OFFICIAL_NOTE = (
     "Note: rank is the raw sum-of-spot-peer-score position over all {leaderboard_size} bots. This "
-    "can differ from the official prize leaderboard, which excludes prize-ineligible bots. For "
-    "example Preseen-Chestnut ranks 5th here but is excluded on the official board, so nostreambot "
-    "shows as 11th here versus 10th there. The top-10 group uses these raw ranks by design."
+    "can differ from the official prize leaderboard, which excludes prize-ineligible bots. In Summer "
+    "2026 the top 15 match the official board exactly; below that they drift apart. The top-10 group "
+    "uses these raw ranks by design."
 )
