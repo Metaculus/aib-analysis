@@ -71,6 +71,15 @@ TITLE_SUGGESTIONS = {
 INDIVIDUAL_CHART_ROWS = 20
 TOP_BOTS_CHART_ROWS = 20
 METAC_CHART_ROWS = 15
+ONGOING_DATA_NOTES = (
+    "Numeric questions have an upper and lower bound that forecasters on the site are generally expected to forecast "
+    "within. To ensure numerical stability (and non-astronomically-negative scores), our API rejects predictions "
+    "that put no or very little probability mass in bounds. Occasionally, some Metac Bots would forecast out of "
+    "bounds in this way (especially those running lower-quality models), and it is expected that some participants "
+    "encountered this error as well. Our forecasting user interface does not let humans make forecasts that bad "
+    "either, so in this sense, they're on equal footing. However, it does mean that bots are not punished for their "
+    "very worst numeric forecasts.",
+)
 METAC_BOT_PROMPT = """You are a professional forecaster interviewing for a job.
 
 Your interview question is:
@@ -624,16 +633,6 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
                     "track record on the platform and for their history of clearly describing their rationales.",
                 ]
             ),
-            "### Notes on data collection",
-            "* **Very bad numeric forecasts can be rejected:** Numeric questions have an upper and lower bound that "
-            "forecasters on the site are generally expected to forecast within. To ensure numerical stability (and "
-            "non-astronomically-negative scores), our API rejects predictions that put no or very little probability "
-            "mass in bounds. Occasionally, some Metac Bots would forecast out of bounds in this way (especially those "
-            "running lower-quality models), and it is expected that some participants encountered this error as "
-            "well. Our forecasting user interface does not let humans make forecasts that bad either, so in this "
-            "sense, they're on equal footing. However, it does mean that bots are not punished for their very worst "
-            "numeric forecasts.\n"
-            "* **Season-specific notes:** See Appendix C.",
             "This analysis generally follows the methodology we laid out at the beginning of the tournament series, "
             "but now uses a simplified bot team selection algorithm we started using in Q1 2025 (as described above).",
         ]
@@ -714,10 +713,8 @@ def _data_notes_appendix(results: SeasonResults, config: SeasonConfig) -> str:
             f"{head_to_head.non_pro_member_count} non-Pro {plural(head_to_head.non_pro_member_count, 'member')}. "
             "Decide whether to disclose or fix this."
         )
-    disclosures = _season_disclosures(results, config)
-    blocks = ["## Appendix C: Season data notes"]
-    if disclosures:
-        blocks.append("\n".join(f"* {item}" for item in disclosures))
+    notes = [*ONGOING_DATA_NOTES, *_season_disclosures(results, config)]
+    blocks = ["## Appendix C: Season data notes", "\n".join(f"* {item}" for item in notes)]
     blocks.append(
         fill_me(
             "add anything else unusual about this season's data in short bullets, and delete what doesn't apply. "

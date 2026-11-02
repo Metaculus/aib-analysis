@@ -99,6 +99,10 @@ def test_writeup_describes_a_mid_season_window_change(pros_ahead_folder: Path, s
     assert "Some bot tournament questions were given weights" in writeup
     assert "Pro questions all have a weight of 1. The Pro vs bot comparison uses the Pro questions' weights." in writeup
     appendix = _appendix_c(writeup)
+    assert "Notes on data collection" not in writeup
+    assert appendix.index("our API rejects predictions that put no or very little probability mass in bounds") < appendix.index(
+        "metac-autocast was named"
+    )
     assert "metac-autocast was named metac-agent until October 15, 2026" in appendix
     assert "The bot question window changed during the season" in appendix
     assert "human account" not in appendix
