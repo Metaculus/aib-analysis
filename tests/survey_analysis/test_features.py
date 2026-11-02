@@ -67,6 +67,7 @@ def test_blank_answers_yield_false_booleans_and_none_numerics():
     assert feature.variables["frontier"] is None  # blank final_model -> None (excluded)
     # Numerics from skipped ordinal/count columns are None (dropped pairwise).
     assert feature.variables["n_research_sources"] is None
+    assert feature.variables["moderate_research_sources"] is None
     assert feature.variables["hours_mid"] is None
     assert feature.variables["llm_calls_mid"] is None
     assert feature.variables["team_size"] is None  # blank team_size answer -> None
@@ -93,6 +94,19 @@ def test_listed_write_in_research_source_adds_to_the_count():
     )[0]
     assert feature.cells["research"].other == ["a few RSS feeds"]
     assert feature.variables["n_research_sources"] == 4.0
+
+
+def _research_answer(source_count: int) -> str:
+    return ", ".join(config.MULTISELECT_VOCAB["research"][:source_count])
+
+
+def test_moderate_research_sources_includes_both_bounds():
+    fewest, most = config.MODERATE_RESEARCH_SOURCE_RANGE
+    expected_by_count = {fewest - 1: 0.0, fewest: 1.0, most: 1.0, most + 1: 0.0}
+    for source_count, expected in expected_by_count.items():
+        feature = build_features([_respondent(research=_research_answer(source_count))])[0]
+        assert feature.variables["n_research_sources"] == source_count
+        assert feature.variables["moderate_research_sources"] == expected
 
 
 def test_spotlight_model_features_follow_season_notes():

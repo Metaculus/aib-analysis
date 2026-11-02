@@ -689,6 +689,8 @@ def _caveats_section(features, corr_pool, counts, leaderboard_size) -> str:
         )
     if season_notes.FRONTIER_LATE_DEFINITION_CAVEAT:
         lines.append(f"- Frontier definition: {season_notes.FRONTIER_LATE_DEFINITION_CAVEAT}")
+    if season_notes.POST_HOC_FEATURE_CAVEAT:
+        lines.append(f"- Features added after seeing results: {season_notes.POST_HOC_FEATURE_CAVEAT}")
     return "\n".join(lines)
 
 

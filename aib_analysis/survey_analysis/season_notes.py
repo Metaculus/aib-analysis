@@ -36,6 +36,12 @@ FRONTIER_LATE_DEFINITION_CAVEAT = (
     "tier were set after an earlier draft of these results had been seen. The frontier results are "
     "exploratory either way."
 )
+# Exploratory features added after this season's results had been seen. Empty
+# when none.
+POST_HOC_FEATURE_CAVEAT = (
+    "The \"Uses 2 to 5 research sources\" feature was added after the Summer results had been "
+    "seen, to follow up a pattern in them, so its p-value and q-value overstate the evidence."
+)
 
 # Human-authored headline findings shown at the top of the report. Filled in
 # once per season after reading the generated charts; the report renders each

@@ -403,6 +403,9 @@ RESEARCH_WRITE_IN_SOURCES: dict[str, str] = {
     "Prediction-market prices": r"polymarket|kalshi|prediction[- ]markets?\b",
 }
 
+# Inclusive bounds of the binary "moderate number of research sources" feature.
+MODERATE_RESEARCH_SOURCE_RANGE: tuple[int, int] = (2, 5)
+
 # --------------------------------------------------------------------------- #
 # Single-select canonical option sets. A raw value that matches one of these
 # (exactly, case-insensitively) is kept; anything else is bucketed as
@@ -609,8 +612,8 @@ QUESTION_SPECS: list[QuestionSpec] = [
     ),
     QuestionSpec("support_model", "Supporting-role models", "model", ["frontier_support"]),
     QuestionSpec("research", "How bots researched questions", "multiselect",
-                 ["n_research_sources", "uses_asknews", "uses_exa", "uses_perplexity",
-                  "uses_openai_search", "uses_scraping"]),
+                 ["n_research_sources", "moderate_research_sources", "uses_asknews", "uses_exa",
+                  "uses_perplexity", "uses_openai_search", "uses_scraping"]),
     QuestionSpec("strategies", "Forecasting strategies used", "multiselect",
                  ["uses_aggregation", "uses_base_rates", "uses_similar_qs", "uses_subquestions",
                   "uses_scenarios", "uses_self_critique", "uses_capping", "uses_extremizing"]),

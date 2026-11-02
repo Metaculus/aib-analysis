@@ -35,6 +35,7 @@ def _registry_model(display: str) -> ModelInfo:
 
 _SPOTLIGHT_OPENAI_MODEL = _registry_model(season_notes.SPOTLIGHT_OPENAI_MODEL)
 _SPOTLIGHT_OPUS_MODEL = _registry_model(season_notes.SPOTLIGHT_OPUS_MODEL)
+_MODERATE_SOURCES_MIN, _MODERATE_SOURCES_MAX = config.MODERATE_RESEARCH_SOURCE_RANGE
 
 
 @dataclass
@@ -93,6 +94,11 @@ NUMERIC_VARIABLE_SPECS: list[VariableSpec] = [
     ),
     VariableSpec("final_model_release", "Final model release date (flagship models only)", "continuous"),
     VariableSpec("n_research_sources", "Number of research sources", "count"),
+    VariableSpec(
+        "moderate_research_sources",
+        f"Uses {_MODERATE_SOURCES_MIN} to {_MODERATE_SOURCES_MAX} research sources (vs fewer or more)",
+        "binary",
+    ),
     VariableSpec("team_size", "Team size", "ordinal"),
     VariableSpec("iterations_mid", "Iterations that went live (midpoint)", "ordinal"),
     VariableSpec("hours_mid", "Total development hours (midpoint)", "ordinal"),
@@ -326,6 +332,12 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         variables["n_research_sources"] = (
             float(len(cells["research"].matched) + len(research_write_in_sources))
             if answers.get("research")
+            else None
+        )
+        n_research_sources = variables["n_research_sources"]
+        variables["moderate_research_sources"] = (
+            float(_MODERATE_SOURCES_MIN <= n_research_sources <= _MODERATE_SOURCES_MAX)
+            if n_research_sources is not None
             else None
         )
         variables["team_size"] = cells["team_size"].numeric
