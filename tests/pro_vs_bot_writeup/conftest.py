@@ -32,6 +32,8 @@ SHARED_QUESTION_COUNT = 36
 ANNULLED_BOT_QUESTION_IDS = (79, 80)
 ANNULLED_PRO_QUESTION_ID = 500
 TEAM_SIZES = (1, 2, 3, "all")
+MAIN_TEAM_SIZE = 3
+VS_MAIN_SIZE_EFFECTS = {1: -1.0, 2: 0.5, "all": -4.0}
 
 
 def make_question(question_id: int, question_type: str = "binary", resolution: Any = True, title: str | None = None) -> dict[str, Any]:
@@ -105,16 +107,25 @@ def combined_question_notes(pro_question_id: int, bot_question_id: int) -> str:
     )
 
 
-def make_team_tournament(bot_scores: list[float], bot_members: tuple[tuple[str, str], ...], pro_members: tuple[tuple[str, str], ...]) -> dict[str, Any]:
+def make_team_tournament(
+    bot_scores: list[float],
+    bot_members: tuple[tuple[str, str], ...],
+    opponent_members: tuple[tuple[str, str], ...],
+    opponent_name: str = "Pro Team",
+) -> dict[str, Any]:
     bot_team = make_user("Bot Team", "aggregate", bot_members)
-    pro_team = make_user("Pro Team", "aggregate", pro_members)
+    opponent = make_user(opponent_name, "aggregate", opponent_members)
     entries: list[tuple[dict[str, Any], dict[str, Any], float | None]] = []
     for question_index, bot_score in enumerate(bot_scores, start=1):
         question = make_question(question_index, QUESTION_TYPE_CYCLE[question_index % len(QUESTION_TYPE_CYCLE)])
         question["notes"] = combined_question_notes(question_index, question_index)
         entries.append((bot_team, question, bot_score))
-        entries.append((pro_team, question, -bot_score))
+        entries.append((opponent, question, -bot_score))
     return make_tournament(entries)
+
+
+def vs_main_file_name(team_size: int | str) -> str:
+    return f"10_bot_team_vs_top_{MAIN_TEAM_SIZE}_bot_team__teams_size_{team_size}.json"
 
 
 def write_simulation_folder(folder: Path, bot_team_advantage: float, seed: int = 7) -> Path:
@@ -163,6 +174,7 @@ def write_simulation_folder(folder: Path, bot_team_advantage: float, seed: int =
         "6_pro_with_bot_tourn__no_teams.json": make_tournament(entries_for(pros + bots, shared_questions)),
     }
     pro_members = tuple((name, "pro") for name in PRO_NAMES)
+    vs_main_rng = random.Random(seed + 1)
     for team_size in TEAM_SIZES:
         member_count = len(NON_METAC_BOT_NAMES) if team_size == "all" else team_size
         bot_members = tuple((name, "bot") for name in NON_METAC_BOT_NAMES[:member_count])
@@ -171,6 +183,12 @@ def write_simulation_folder(folder: Path, bot_team_advantage: float, seed: int =
         files[f"7_pro_vs_bot_tournament__teams_size_{team_size}.json"] = make_team_tournament(
             bot_scores, bot_members, pro_members
         )
+        if team_size != MAIN_TEAM_SIZE:
+            main_members = tuple((name, "bot") for name in NON_METAC_BOT_NAMES[:MAIN_TEAM_SIZE])
+            vs_main_scores = [VS_MAIN_SIZE_EFFECTS[team_size] + vs_main_rng.gauss(0, 2) for _ in range(SHARED_QUESTION_COUNT)]
+            files[vs_main_file_name(team_size)] = make_team_tournament(
+                vs_main_scores, bot_members, main_members, f"Top {MAIN_TEAM_SIZE} Bot Team"
+            )
     for file_name, content in files.items():
         (folder / file_name).write_text(json.dumps(content))
     return folder
@@ -178,7 +196,7 @@ def write_simulation_folder(folder: Path, bot_team_advantage: float, seed: int =
 
 @pytest.fixture
 def synthetic_config() -> SeasonConfig:
-    return replace(SEASONS["summer_2026"], key="synthetic", main_bot_team_size=3)
+    return replace(SEASONS["summer_2026"], key="synthetic", main_bot_team_size=MAIN_TEAM_SIZE)
 
 
 @pytest.fixture

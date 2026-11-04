@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from scipy import stats as scipy_stats
 
 from aib_analysis.pro_vs_bot_writeup.results import (
     LeaderboardRow,
@@ -30,10 +31,13 @@ from aib_analysis.pro_vs_bot_writeup.season_config import SeasonConfig
 from tests.pro_vs_bot_writeup.conftest import (
     ANNULLED_BOT_QUESTION_IDS,
     BOT_QUESTION_COUNT,
+    MAIN_TEAM_SIZE,
+    NON_METAC_BOT_NAMES,
     NON_PRIMARY_BOT_NAME,
     SHARED_QUESTION_COUNT,
     make_question,
     make_team_tournament,
+    vs_main_file_name,
 )
 
 PRO_MEMBERS = (("pro_user_1", "pro"), ("pro_user_2", "pro"))
@@ -49,25 +53,26 @@ def _scores(mean: float, spread: float, count: int = 40) -> list[float]:
 
 
 @pytest.mark.parametrize(
-    ("bot_mean", "spread", "leader", "evidence"),
+    ("bot_mean", "spread", "leader", "is_significant"),
     [
-        (-10.0, 5.0, "pros", "strong"),
-        (-2.0, 7.0, "pros", "weak"),
-        (-0.5, 10.0, "pros", "none"),
-        (10.0, 5.0, "bots", "strong"),
-        (2.0, 7.0, "bots", "weak"),
-        (0.5, 10.0, "bots", "none"),
+        (-10.0, 5.0, "pros", True),
+        (-2.0, 7.0, "pros", False),
+        (-0.5, 10.0, "pros", False),
+        (10.0, 5.0, "bots", True),
+        (2.0, 7.0, "bots", False),
+        (0.5, 10.0, "bots", False),
     ],
 )
-def test_head_to_head_direction_and_evidence(
-    synthetic_config: SeasonConfig, bot_mean: float, spread: float, leader: str, evidence: str
+def test_head_to_head_direction_and_significance(
+    synthetic_config: SeasonConfig, bot_mean: float, spread: float, leader: str, is_significant: bool
 ) -> None:
-    raw = make_team_tournament(_scores(bot_mean, spread), BOT_MEMBERS, PRO_MEMBERS)
+    bot_scores = _scores(bot_mean, spread)
+    raw = make_team_tournament(bot_scores, BOT_MEMBERS, PRO_MEMBERS)
     result = compute_head_to_head(raw, synthetic_config)
     assert result.leader == leader
-    assert result.evidence == evidence
+    assert result.is_significant == is_significant
     assert result.question_count == 40
-    assert result.p_pros_better + result.p_bots_better == pytest.approx(1)
+    assert result.p_value == pytest.approx(scipy_stats.ttest_1samp(bot_scores, 0).pvalue)
     assert result.pro_member_count == 2
 
 
@@ -211,7 +216,7 @@ def test_compute_field_groups_bots() -> None:
         _row("metac-uniform-probability-bot", -12, questions=100, rank=13),
         _row("weak", -20, questions=90, rank=14),
     ]
-    field = compute_field(rows, [1.0, -1.0, 3.0, -3.0], scored_question_count=100)
+    field = compute_field(rows, scored_question_count=100)
     assert field.eligible_min_questions == 50
     assert field.promising_min_questions == 10
     assert [row.name for row in field.promising] == ["promising"]
@@ -219,7 +224,6 @@ def test_compute_field_groups_bots() -> None:
     assert field.worst_eligible.name == "weak"
     assert field.uniform_reference is not None and field.uniform_reference.average_score == -12
     assert field.tenth_place.name == "top-9"
-    assert field.per_question_score_sd == pytest.approx(math.sqrt(5))
     assert field.top_bot_clearly_ahead is False
 
 
@@ -281,25 +285,47 @@ def test_compute_season_results_on_synthetic_folder(pros_ahead_folder: Path, syn
     assert results.example_questions[0].title == "Short?"
 
 
-def test_accuracy_results_on_synthetic_folder(pros_ahead_folder: Path, synthetic_config: SeasonConfig) -> None:
-    results = compute_season_results(pros_ahead_folder, synthetic_config)
-    field_accuracy = results.bot_field_accuracy
-    assert field_accuracy.top_bot.name == results.field.rows[0].name
-    assert field_accuracy.worst_bot.name == results.field.worst_eligible.name
-    assert field_accuracy.top_bot.typical_probability > field_accuracy.median_probability > field_accuracy.worst_bot.typical_probability
-    assert "metac-uniform-probability-bot" not in {bot.name for bot in field_accuracy.eligible_bots}
-    assert 0 < field_accuracy.yes_rate < 1
-    assert 0 <= field_accuracy.share_below_base_rate <= 1
-    team_accuracy = results.team_accuracy
-    assert team_accuracy.binary_question_count == results.head_to_head.question_type_counts["binary"]
-    assert team_accuracy.bot_to_pro_ratio == pytest.approx(
-        team_accuracy.bot_team_probability / team_accuracy.pro_team_probability
-    )
-
-
 def test_compute_season_results_requires_main_team_file(pros_ahead_folder: Path, synthetic_config: SeasonConfig) -> None:
     with pytest.raises(FileNotFoundError, match="main bot team size 7"):
         compute_season_results(pros_ahead_folder, replace(synthetic_config, main_bot_team_size=7))
+
+
+def test_team_sizes_read_head_to_head_scores_against_the_main_team(pros_ahead_folder: Path, synthetic_config: SeasonConfig) -> None:
+    results = compute_season_results(pros_ahead_folder, synthetic_config)
+    by_size = {result.team_size: result for result in results.team_sizes}
+    assert by_size[MAIN_TEAM_SIZE].head_to_head_vs_main_mean is None
+    for size_label, team_size in ((1, 1), (2, 2), ("all", len(NON_METAC_BOT_NAMES))):
+        raw = json.loads((pros_ahead_folder / vs_main_file_name(size_label)).read_text())
+        bot_team_scores = [
+            score["score"]
+            for score in raw["scores_cache"].values()
+            if score["type"] == "spot_peer" and score["forecast"]["user"]["name"] == "Bot Team"
+        ]
+        assert by_size[team_size].head_to_head_vs_main_mean == pytest.approx(sum(bot_team_scores) / len(bot_team_scores))
+        assert by_size[team_size].head_to_head_vs_main_ci is not None
+
+
+def test_team_sizes_require_vs_main_files_unless_the_season_predates_them(
+    pros_ahead_folder: Path, synthetic_config: SeasonConfig
+) -> None:
+    (pros_ahead_folder / vs_main_file_name(2)).unlink()
+    with pytest.raises(FileNotFoundError, match="team size 2"):
+        compute_season_results(pros_ahead_folder, synthetic_config)
+    results = compute_season_results(pros_ahead_folder, replace(synthetic_config, has_bot_team_vs_main_simulations=False))
+    assert all(result.head_to_head_vs_main_mean is None for result in results.team_sizes)
+
+
+def test_vs_main_files_must_use_the_main_bot_team(pros_ahead_folder: Path, synthetic_config: SeasonConfig) -> None:
+    wrong_main_team = (("bot-a", "bot"), ("bot-b", "bot"), ("bot-z", "bot"))
+    (pros_ahead_folder / vs_main_file_name(1)).write_text(
+        json.dumps(
+            make_team_tournament(
+                _scores(0, 2, count=SHARED_QUESTION_COUNT), (("bot-a", "bot"),), wrong_main_team, f"Top {MAIN_TEAM_SIZE} Bot Team"
+            )
+        )
+    )
+    with pytest.raises(ValueError, match="members differ from the main bot team"):
+        compute_season_results(pros_ahead_folder, synthetic_config)
 
 
 def test_team_sizes_reject_human_accounts_unless_the_season_allows_them(
@@ -309,4 +335,7 @@ def test_team_sizes_reject_human_accounts_unless_the_season_allows_them(
     team_file.write_text(json.dumps(make_team_tournament(_scores(-1, 5, count=SHARED_QUESTION_COUNT), BOT_MEMBERS + (("a_human", "pro"),), PRO_MEMBERS)))
     with pytest.raises(ValueError, match="1 human accounts"):
         compute_season_results(pros_ahead_folder, synthetic_config)
-    compute_season_results(pros_ahead_folder, replace(synthetic_config, human_accounts_in_bot_teams_allowed=True))
+    compute_season_results(
+        pros_ahead_folder,
+        replace(synthetic_config, human_accounts_in_bot_teams_allowed=True, has_bot_team_vs_main_simulations=False),
+    )

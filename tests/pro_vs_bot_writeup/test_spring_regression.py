@@ -57,8 +57,8 @@ def test_head_to_head_matches_published_post(spring_results: SeasonResults) -> N
     assert head_to_head.question_count == 99
     assert round(head_to_head.bot_team_mean, 2) == -1.25
     assert tuple(round(bound, 2) for bound in head_to_head.ci) == (-4.87, 2.37)
-    assert round(head_to_head.p_pros_better, 3) == 0.247
-    assert (head_to_head.leader, head_to_head.evidence) == ("pros", "none")
+    assert round(head_to_head.p_value / 2, 3) == 0.247
+    assert (head_to_head.leader, head_to_head.is_significant) == ("pros", False)
     assert head_to_head.bot_team_members == PUBLISHED_BOT_TEAM
 
 
