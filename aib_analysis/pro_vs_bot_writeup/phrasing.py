@@ -30,17 +30,13 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     require_head_to_head_vs_main,
     split_baseline_name,
 )
+from aib_analysis.pro_vs_bot_writeup.season_config import MULTIPLE_COMPARISONS_URL
 
 FILL_ME = "[===Fill me===]"
 LATE_START_MIN_WEEKS = 2
 COUNT_WORDS = ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
-HEAD_TO_HEAD_REMINDER = (
-    "(Reminder: 0 would mean bots and Pros did equally well, and a positive number would mean bots beat Pros.)"
-)
-INDIVIDUAL_COMPARISON_CAVEAT = (
-    "Note that though this type of comparison is interesting, unlike the Pro vs bot team comparison, the more "
-    "individuals we compare, the higher the chance of one bot or Pro getting incorrectly ranked due to luck."
-)
+HEAD_TO_HEAD_SCALE = "(0 would mean bots and Pros did equally well, and a positive number would mean bots beat Pros)"
+MULTIPLE_COMPARISONS_LINK = f"[multiple comparison problems]({MULTIPLE_COMPARISONS_URL})"
 
 
 def fill_me(reminder: str) -> str:
@@ -131,8 +127,11 @@ def headline_takeaway(head_to_head: HeadToHeadResult, pro_count: int, bot_team_s
 
 def head_to_head_paragraph(head_to_head: HeadToHeadResult) -> str:
     lower, upper = (format_score(value) for value in head_to_head.ci)
+    winner, loser = ("Pro team", "bot team") if head_to_head.leader == "pros" else ("bot team", "Pro team")
+    margin_clause = "." if head_to_head.evidence == "strong" else ", but only marginally."
     sentences = [
-        "We then calculated the head-to-head scores of the two teams, along with 95% confidence intervals "
+        f"In the end, the {winner} beat the {loser}{margin_clause}",
+        "We calculated the head-to-head scores of the two teams, along with 95% confidence intervals "
         "using a t-distribution.",
         f"The bot team's average head-to-head score was {format_score(head_to_head.bot_team_mean)} with a 95% "
         f"confidence interval of {lower} to {upper} over {head_to_head.question_count} questions.",
@@ -180,28 +179,25 @@ def question_wins_sentence(head_to_head: HeadToHeadResult) -> str:
 
 
 def season_result(point: SeasonTrendPoint) -> str:
-    """A season is a clear win when its 95% CI sits entirely on one side of zero."""
+    """A season is a significant win when its 95% CI sits entirely on one side of zero."""
     if point.ci[1] < 0:
-        return "Pros clearly ahead"
+        return "Pros significantly ahead"
     if point.ci[0] > 0:
-        return "Bots clearly ahead"
+        return "Bots significantly ahead"
     return "No clear winner"
 
 
 def clear_wins_sentence(trend: SeasonTrend) -> str:
-    pro_wins = [point.season_label for point in trend.points if season_result(point) == "Pros clearly ahead"]
-    bot_wins = [point.season_label for point in trend.points if season_result(point) == "Bots clearly ahead"]
+    pro_wins = [point.season_label for point in trend.points if season_result(point) == "Pros significantly ahead"]
+    bot_wins = [point.season_label for point in trend.points if season_result(point) == "Bots significantly ahead"]
     clauses = []
     if pro_wins:
-        clauses.append(f"Pros won clearly in {join_names(pro_wins)}")
+        clauses.append(f"Pros won with significance in {join_names(pro_wins)}")
     if bot_wins:
-        clauses.append(f"{'bots' if clauses else 'Bots'} won clearly in {join_names(bot_wins)}")
+        clauses.append(f"{'bots' if clauses else 'Bots'} won with significance in {join_names(bot_wins)}")
     if not clauses:
-        return "No season had a clear winner."
-    sentence = " and ".join(clauses)
-    if len(pro_wins) + len(bot_wins) < len(trend.points):
-        sentence += "; the other seasons had no clear winner"
-    return f"{sentence}."
+        return "No season had a significant winner."
+    return f"{' and '.join(clauses)}."
 
 
 def season_change_clause(trend: SeasonTrend) -> str | None:
@@ -240,7 +236,7 @@ def trend_takeaway(trend: SeasonTrend) -> str:
     if previous is None or trend.change_p_value is None:
         return (
             f"**The bot team scored {format_compact(current.mean)} against Pros:** The bot team's head-to-head "
-            f"score against Pros was {current_text}. {HEAD_TO_HEAD_REMINDER} {clear_wins_sentence(trend)}"
+            f"score against Pros was {current_text} {HEAD_TO_HEAD_SCALE}. {clear_wins_sentence(trend)}"
         )
     if trend.change_p_value >= SIGNIFICANCE_LEVEL:
         heading = f"No clear change in the bot team's standing since {previous.season_label}"
@@ -250,8 +246,8 @@ def trend_takeaway(trend: SeasonTrend) -> str:
         heading = f"The bot team fell back relative to Pros since {previous.season_label}"
     earlier = ", ".join(f"{format_compact(point.mean)} in {point.season_label}" for point in trend.points[:-1])
     return (
-        f"**{heading}:** The bot team's head-to-head score against Pros was {earlier}, and {current_text}. "
-        f"{HEAD_TO_HEAD_REMINDER} {clear_wins_sentence(trend)} {season_change_clause(trend)}"
+        f"**{heading}:** The bot team's head-to-head score against Pros was {earlier}, and {current_text} "
+        f"{HEAD_TO_HEAD_SCALE}. {clear_wins_sentence(trend)} {season_change_clause(trend)}"
     )
 
 
@@ -297,7 +293,7 @@ def individuals_takeaway(individuals: IndividualResults) -> str:
             f"every individual bot:** {setup} In this comparison, {pros_in_top} of the top {TOP_N} places would be "
             "taken by Pros."
         )
-    return f"{body} {INDIVIDUAL_COMPARISON_CAVEAT}"
+    return body
 
 
 def individuals_paragraph(individuals: IndividualResults, shown_count: int) -> str:
@@ -314,7 +310,7 @@ def individuals_paragraph(individuals: IndividualResults, shown_count: int) -> s
         sentences.append("Every Pro placed above every bot.")
     sentences.append(
         "This comparison is provided for reference, with the knowledge that the Pro team vs bot team comparison "
-        "is more rigorous."
+        f"is more rigorous and not liable to {MULTIPLE_COMPARISONS_LINK}."
     )
     return " ".join(sentences)
 
@@ -357,7 +353,7 @@ def team_size_takeaway(team_sizes: list[TeamSizeResult], main_size: int) -> str:
         heading = "Bot team size made no clear difference"
     else:
         heading = "Bot team size had mixed effects"
-    sentence = f"**{heading}:** The top {main_size} bots scored {format_score(main.mean)} against Pros"
+    sentence = f"**{heading}:** The top {main_size} bots scored {format_score(main.mean)} head-to-head points against Pros"
     if larger:
         largest = larger[-1]
         sentence += f", and a team of {_team_size_label(largest)} scored {format_score(largest.mean)}"
@@ -393,13 +389,17 @@ def team_size_paragraph(team_sizes: list[TeamSizeResult], main_size: int) -> str
     ]
     if single_bot is not None and single_bot is not best:
         sentences.append(f"The top bot by itself scored {format_score(single_bot.mean)}.")
+    sentences.append(
+        f"Note that we do not correct for {MULTIPLE_COMPARISONS_LINK}, so we expect some aggregates to stand out by "
+        "chance rather than because of a meaningful underlying driver."
+    )
     return " ".join(sentences)
 
 
 def team_size_vs_main_paragraph(team_sizes: list[TeamSizeResult], main_size: int) -> str:
     require_head_to_head_vs_main(team_sizes, main_size)
     sentences = [
-        "Comparing the bands in that chart can't show whether two bot teams differ from each other, because "
+        "Comparing the bands in the chart above can't show whether two bot teams differ from each other, because "
         "neighboring teams share most of their members, so a question that goes well for one team usually goes "
         "well for the others.",
         f"To compare each team with the top {main_size} directly, we also scored each team head-to-head against "
@@ -417,6 +417,7 @@ def team_size_vs_main_paragraph(team_sizes: list[TeamSizeResult], main_size: int
             sentences.append(f"{label[0].upper()}{label[1:]} did significantly {verdict} than the top {main_size}.")
     if not any(verdict_groups.values()):
         sentences.append(f"No team did significantly better or worse than the top {main_size}.")
+    sentences.append(f"Note that we do not correct for {MULTIPLE_COMPARISONS_LINK} in this chart.")
     sentences.append(
         "Neighboring team sizes share most of their members, and we compared many sizes, so a single significant "
         "difference between small teams can easily be luck."
@@ -439,7 +440,7 @@ def top_baseline_takeaway(metac: MetacResults) -> str:
     if higher_average_rows:
         standout = higher_average_rows[0]
         sentence += (
-            f" {standout.name} had a higher average ({format_score(standout.average_score)}) but forecast on "
+            f" {standout.name} had a higher average ({format_score(standout.average_score)}) but forecast on only "
             f"{standout.question_count} questions{_late_start_clause(metac, standout)}."
         )
     return sentence
@@ -650,7 +651,7 @@ def bot_field_accuracy_paragraph(accuracy: BotFieldAccuracy) -> str:
         f"{format_percent(accuracy.median_probability)} and the lowest-scoring bot "
         f"{format_percent(accuracy.worst_bot.typical_probability)} (among the {len(accuracy.eligible_bots)} bots that "
         f"forecast on at least half of the questions). Always forecasting this season's Yes rate of "
-        f"{format_percent(accuracy.yes_rate)} would score {format_percent(accuracy.base_rate_probability)}, and "
+        f"{format_percent(accuracy.yes_rate)} (the observed percentage of times questions resolved \"Yes\") would score {format_percent(accuracy.base_rate_probability)}, and "
         f"{round(100 * accuracy.share_below_base_rate)}% of these bots scored below that."
     )
 
@@ -690,7 +691,7 @@ def team_accuracy_paragraph(team: TeamAccuracy) -> str:
 
 def peer_score_translation_paragraph(accuracy: BotFieldAccuracy) -> str:
     return (
-        "Peer scores translate into this scale. A binary peer score of +X means a forecaster gave the actual outcome "
+        "Peer scores can translate into this scale. A binary peer score of +X means a forecaster gave the actual outcome "
         "about e^(X/100) times the typical probability the rest of the field did (+10 ≈ 1.11×, +20 ≈ 1.22×), and the "
         f"field's typical probability this season was {format_percent(accuracy.field_probability)}. Numeric and "
         "discrete peer scores are halved, so there +X means about e^(2X/100) times the field's probability density at "

@@ -112,12 +112,12 @@ def test_trend_takeaway_branches(previous_mean: float, current_mean: float, chan
     assert text.startswith(heading)
     assert "-20.03 in Q2 2025, " in text
     assert "95% CI" not in text
-    assert phrasing.HEAD_TO_HEAD_REMINDER in text
+    assert f"this season {phrasing.HEAD_TO_HEAD_SCALE}. Pros won" in text
 
 
 def test_trend_takeaway_states_clear_winners_and_change() -> None:
     text = phrasing.trend_takeaway(_trend(-1.25, -0.26, 0.784))
-    assert "Pros won clearly in Q2 2025; the other seasons had no clear winner." in text
+    assert "Pros won with significance in Q2 2025. The bot team's score" in text
     assert (
         "The bot team's score went from -1.25 in Spring 2026 to -0.26 this season, a change too small to be "
         "statistically significant (p = 0.784)." in text
@@ -132,7 +132,7 @@ def test_trend_takeaway_without_history() -> None:
 def test_trend_paragraph_lists_clear_wins_and_skipped_seasons() -> None:
     text = phrasing.trend_paragraph(_trend(5.0, 12.0, 0.04))
     assert "when its 95% confidence interval is entirely on one side of zero." in text
-    assert "Pros won clearly in Q2 2025 and bots won clearly in Spring 2026 and Summer 2026." in text
+    assert "Pros won with significance in Q2 2025 and bots won with significance in Spring 2026 and Summer 2026." in text
     assert "There was no Pro comparison in Fall 2025, so it is not shown." in text
 
 
@@ -142,7 +142,7 @@ def test_clear_wins_sentence_without_clear_winners() -> None:
         change_p_value=0.784,
         skipped_seasons=(),
     )
-    assert phrasing.clear_wins_sentence(trend) == "No season had a clear winner."
+    assert phrasing.clear_wins_sentence(trend) == "No season had a significant winner."
     assert [phrasing.season_result(point) for point in trend.points] == ["No clear winner", "No clear winner"]
 
 
@@ -161,7 +161,7 @@ def test_individuals_takeaway_when_some_pros_beat_every_bot() -> None:
     text = phrasing.individuals_takeaway(_individuals(["pro"] * 4 + ["bot"] + ["pro"] * 6 + ["bot"] * 5))
     assert text.startswith("**Four of ten individual Pros beat every individual bot:**")
     assert "9 of the top 10 places would be taken by Pros" in text
-    assert phrasing.INDIVIDUAL_COMPARISON_CAVEAT in text
+    assert "Note that" not in text
 
 
 def test_individuals_takeaway_when_a_bot_is_first() -> None:
@@ -299,7 +299,7 @@ def test_higher_average_bots_that_started_late_are_called_out() -> None:
     history = [BaselineRankPoint("Summer 2026", 24, 282, "metac-model-a+asknews")]
     metac = _metac(history, close=True, late_starter_average=12.84)
     takeaway = phrasing.top_baseline_takeaway(metac)
-    assert "metac-model-c+asknews had a higher average (12.84) but forecast on 150 questions, starting 3 weeks into the season." in takeaway
+    assert "metac-model-c+asknews had a higher average (12.84) but forecast on only 150 questions, starting 3 weeks into the season." in takeaway
     section = phrasing.metac_comparison_sentence(metac)
     assert section.startswith("metac-model-a+asknews ranked first by sum of spot peer scores, with an average of 10.00")
     assert (

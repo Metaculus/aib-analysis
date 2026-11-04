@@ -39,11 +39,14 @@ from aib_analysis.pro_vs_bot_writeup.results import (
 from aib_analysis.pro_vs_bot_writeup.season_config import (
     ANALYSIS_CODE_URL,
     CONTACT_EMAIL,
+    CUSTOM_EVALS_URL,
+    DATA_ACCESS_URL,
     DATA_REQUEST_FORM_URL,
-    FORECASTING_TOOLS_URL,
     FUTUREEVAL_URL,
-    RESOURCES_URL,
+    OPEN_SOURCE_BOTS_URL,
+    RESEARCH_SECTION_URL,
     SCORING_FAQ_URL,
+    SERIES_METHODOLOGY_URL,
     BotQuestionWindow,
     SeasonConfig,
 )
@@ -187,7 +190,8 @@ def _non_primary_sentence(non_primary_bots: tuple[str, ...]) -> str:
     count = len(non_primary_bots)
     return (
         f" {phrasing.count_word(count, capitalize=True)} of the bot makers' bots {'was an extra bot' if count == 1 else 'were extra bots'} marked "
-        "non-primary, which the official leaderboard doesn't rank; we rank every bot here, including Metac Bots."
+        "non-primary, which the official leaderboard doesn't rank (or give prize money to). We include these bots in "
+        "this analysis."
     )
 
 
@@ -240,16 +244,16 @@ def _takeaways_section(results: SeasonResults, config: SeasonConfig) -> str:
     ]
     other_takeaways = [
         phrasing.team_size_takeaway(results.team_sizes, config.main_bot_team_size),
-        phrasing.top_baseline_takeaway(results.metac),
-        phrasing.baseline_history_takeaway(results.metac),
         phrasing.top_10_spread_takeaway(results.field),
-        phrasing.accuracy_takeaway(results.bot_field_accuracy),
         fill_me(
             "add 1-3 takeaways that don't repeat every season, each as a bold one-sentence finding followed by the "
             "numbers. Candidates: results of this season's Metac Bot experiments (search providers, reasoning "
             "effort, agentic Metac Bots; see the LLM section), who the top bot makers were (students and hobbyists "
             "vs companies, from the bot maker survey), and notable rule or question-mix changes"
         ),
+        phrasing.accuracy_takeaway(results.bot_field_accuracy),
+        phrasing.baseline_history_takeaway(results.metac),
+        phrasing.top_baseline_takeaway(results.metac),
     ]
     return "\n".join(
         ["## Main takeaways", "", "**Top findings:**", ""]
@@ -271,7 +275,7 @@ def _introduction_section(results: SeasonResults, config: SeasonConfig) -> str:
             f"{question_dates}. It had two aims: 1) comparing AI bots to the best human forecasters and 2) evaluating "
             f"the best forecasting bots against one another. This is the primary analysis post for {config.label} "
             "FutureEval, and it focuses especially on comparing the rankings of Pros and bots. You can find our "
-            f"other research on the [FutureEval resources page]({RESOURCES_URL}).",
+            f"other research on the [FutureEval resources page]({RESEARCH_SECTION_URL}).",
             f"There were {overview.bot_count} bots ({overview.non_metac_bot_count} excluding the ones run by "
             f"Metaculus) forecasting on {overview.bot_scored_count} scored questions.{_non_primary_sentence(overview.non_primary_bots)} The non-Metaculus bot makers "
             f"competed for a prize pool of {prize_pool}. A team of {head_to_head.pro_member_count} Metaculus Pro "
@@ -318,7 +322,7 @@ def _pros_vs_bots_section(results: SeasonResults, config: SeasonConfig, charts: 
 def _accuracy_section(results: SeasonResults, charts: ChartFiles) -> str:
     return "\n\n".join(
         [
-            "## How accurate are the forecasts?",
+            "## How accurate are the forecasts in absolute terms?",
             phrasing.accuracy_definition_paragraph(),
             _image(charts.accuracy),
             phrasing.bot_field_accuracy_paragraph(results.bot_field_accuracy),
@@ -333,7 +337,7 @@ def _top_bots_section(results: SeasonResults, config: SeasonConfig, charts: Char
     metac = results.metac
     standing = metac.current_standing
     if config.bot_tournament_url is not None:
-        leaderboard_link = f"You can see the full leaderboard [here]({config.bot_tournament_url})."
+        leaderboard_link = f"The full leaderboard can be found [here]({config.bot_tournament_url})."
     else:
         leaderboard_link = fill_me("link the bot tournament page with the full leaderboard")
     return "\n\n".join(
@@ -355,18 +359,23 @@ def _top_bots_section(results: SeasonResults, config: SeasonConfig, charts: Char
                 f"describe the winning bot ({field.rows[0].name}) in 2-4 sentences from its maker's public "
                 "description or survey answers: research sources, models, and how forecasts are combined. Say "
                 "whether it's open source and link it. Note that we pass the description along as reported and "
-                "don't treat any part of it as a causal explanation of the bot's performance"
+                "don't treat any part of it as a causal explanation of the bot's performance. Leave out personal "
+                "details and the maker's self-described limitations, and describe one maker's bugs or mistakes only "
+                "as a pattern across bot makers"
             ),
             "### Open-source bots",
             fill_me(
-                "name the highest-placing open-source bot (rank, license, repo link, 1-2 sentences on how it works), "
-                "then list other public bot repos with their ranks. The FutureEval resources page keeps the list "
-                "of open-source bots"
+                "name the highest-placing open-source bot (rank, license, repo link, 1-2 sentences on how it works)"
             ),
+            f"The [FutureEval resources page]({OPEN_SOURCE_BOTS_URL}) also lists open-source bots from past seasons.",
             "### The best same-prompt Metac Bot",
             f"The top-scoring same-prompt Metac Bot was {standing.bot_name}, which placed {ordinal(standing.rank)} "
             f"of {standing.bot_count} in the bot tournament. The prompt it used is in Appendix B. "
-            + fill_me("link an example question page showing its research and reasoning"),
+            + (
+                f"Code can be found [here]({config.metac_bot_code_url})."
+                if config.metac_bot_code_url is not None
+                else fill_me("link the exact version of the Metac Bot code run this season")
+            ),
         ]
     )
 
@@ -392,7 +401,7 @@ def _model_comparison_section(results: SeasonResults, charts: ChartFiles) -> str
             f"Metac Bots against one another only (no other participants) on the {metac.scored_question_count} scored "
             f"questions; the average same-prompt bot forecast on {round(metac.average_questions_per_baseline_bot)} of "
             f"them. Each bot's name shows its model and search provider: for instance, {metac.top_baseline.name} uses "
-            f"{top_model} with {top_search}. The prompt has stayed generally the same across all the benchmarks since "
+            f"{top_model} with {top_search}. The prompt has stayed generally the same across FutureEval seasons since "
             "2024 (see Appendix B).",
             _image(charts.metac),
             phrasing.metac_comparison_sentence(metac),
@@ -403,9 +412,9 @@ def _model_comparison_section(results: SeasonResults, charts: ChartFiles) -> str
 
 def _links_section(config: SeasonConfig) -> str:
     metac_code = (
-        f"[Metac Bot code]({config.metac_bot_code_url})"
+        f"[{config.label} Metac Bot code]({config.metac_bot_code_url})"
         if config.metac_bot_code_url is not None
-        else f"Metac Bot code {fill_me('link the exact version of the Metac Bot code run this season')}"
+        else f"{config.label} Metac Bot code {fill_me('link the exact version of the Metac Bot code run this season')}"
     )
     tournament = (
         f"[{config.label} bot tournament]({config.bot_tournament_url})"
@@ -418,13 +427,15 @@ def _links_section(config: SeasonConfig) -> str:
             "",
             "Below are links to code and data you may be interested in:",
             "",
-            f"* {metac_code} that was run during {config.label}. You can export this bot from the "
-            f"[forecasting-tools]({FORECASTING_TOOLS_URL}) Python package.",
-            f"* {tournament} with all bot questions, forecasts, and comments.",
+            f"* {metac_code}",
+            f"* {tournament}",
             f"* [Code for this analysis]({ANALYSIS_CODE_URL}), if you want to review our math.",
-            "* We often share data with researchers. If you are interested in running analyses on specific Metaculus "
-            f"data, please fill out our [data request form]({DATA_REQUEST_FORM_URL}) or reach out to us at {CONTACT_EMAIL}.",
-            f"* You can find a list of open-source bots and our other research on the [FutureEval resources page]({RESOURCES_URL}).",
+            "* Our data is available upon request. If you are interested in running analyses on specific Metaculus "
+            f"data, please fill out our [data request form]({DATA_REQUEST_FORM_URL}) or reach out to us at "
+            f"{CONTACT_EMAIL}. Read more about our data sharing policies [here]({DATA_ACCESS_URL}). We can also "
+            f"[run custom evals]({CUSTOM_EVALS_URL}) and are open to research partnerships.",
+            "* You can find a list of open-source bots and our other research on the "
+            f"[FutureEval resources page]({RESEARCH_SECTION_URL}).",
         ]
     )
 
@@ -471,11 +482,12 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
     metac = results.metac
     window_text = _bot_window_text(config.bot_question_windows)
     interval = config.bot_question_interval_hours
-    launch_text = (
-        f"one at a time, every {format_compact(interval)} hours"
-        if interval is not None
-        else fill_me('how bot questions launched, e.g. "one at a time, every 2 hours"')
-    )
+    if config.bot_question_launch_text is not None:
+        launch_text = config.bot_question_launch_text
+    elif interval is not None:
+        launch_text = f"one at a time, every {format_compact(interval)} hours"
+    else:
+        launch_text = fill_me('how bot questions launched, e.g. "one at a time, every 2 hours"')
     closes_before_next = interval is not None and all(
         window.open_hours is not None and window.open_hours <= interval for window in config.bot_question_windows
     )
@@ -527,8 +539,8 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
         "was private and hidden throughout the tournament, which prevented bots from copying the Pros' forecasts. "
         "Pros, however, could see each other's forecasts and could communicate in the comment section of each "
         f"question. Bots would forecast in the last {window_text} of the time that the Pros got to see the "
-        "question, though the bot forecasts were hidden."
-        + (" Appendix C lists shared questions where the two closed at different times." if overview.close_time_differences else "")
+        "question, though the bot forecasts were hidden until the question was closed so that bots could not see "
+        "each other's forecasts/comments."
     )
     metac_text = (
         f"**Metac Bots:** Metaculus ran {metac.metac_bot_count} in-house Metac Bots. {len(metac.baseline_rows)} of "
@@ -538,12 +550,10 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
         f"bot's name indicates which model and research provider it used. For instance, \"{metac.top_baseline.name}\" "
         f"uses {top_model} as its model and {top_search} as its research source."
     )
-    shared_weighted_count = len(overview.shared_question_weights_below_1)
-    shared_clause = f", {shared_weighted_count} of them also asked of the Pros" if shared_weighted_count else ""
     weights_text = (
         "**Weights:** Some bot tournament questions were given weights to counteract possible correlated resolutions "
         f"between questions ({overview.weighted_question_count} of the {overview.bot_scored_count} scored bot "
-        f"questions this season{shared_clause}). {_pro_weight_sentence(overview.pro_weighted_question_count)} The "
+        f"questions this season). {_pro_weight_sentence(overview.pro_weighted_question_count)} The "
         "Pro vs bot comparison uses the Pro questions' weights. The weight, when applied, is noted in the "
         "\"Question Info\" section of the question's listing on the Metaculus website."
     )
@@ -562,7 +572,7 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
             f"{head_to_head.question_count} of the {overview.bot_scored_count} scored bot questions. The Pro forecasts "
             "were hidden from bots to prevent them from being copied. Each tournament launched a series of questions "
             "that were resolved sometime during the season, and participants were asked to assign probabilities to "
-            "outcomes. We then used our established scoring rule to evaluate participants. During the analysis, we "
+            "outcomes. We then used our established scoring rules to evaluate participants. During the analysis, we "
             "aggregated the predictions of groups of forecasters to create \"teams.\"",
             "### Data collection",
             "\n".join(f"* {text}" for text in (bot_tournament_text, pro_tournament_text, metac_text)),
@@ -595,7 +605,7 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
                     "questions it forecast, exp(Σ wᵢ ln pᵢ / Σ wᵢ), using the same question weights wᵢ as the "
                     "leaderboards. It is the exponentiated log score, so it rewards honest forecasts, and it tracks "
                     "peer scores closely. We use it instead of the share of questions forecast on the right side of "
-                    "the base rate, which rewards pushing forecasts past the base rate and ignores confidence. Only "
+                    "the base rate (i.e. traditional \"accuracy\"), which rewards pushing forecasts past the base rate and ignores confidence. Only "
                     "binary questions are used, because for multiple-choice and numeric questions the probability on "
                     "the outcome depends on the number of options or the width of the numeric bins. Confidence "
                     "intervals use a t-distribution on the log probabilities.",
@@ -633,7 +643,7 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
                     "track record on the platform and for their history of clearly describing their rationales.",
                 ]
             ),
-            "This analysis generally follows the methodology we laid out at the beginning of the tournament series, "
+            f"This analysis generally follows the [methodology]({SERIES_METHODOLOGY_URL}) we laid out at the beginning of the tournament series, "
             "but now uses a simplified bot team selection algorithm we started using in Q1 2025 (as described above).",
         ]
     )
@@ -650,7 +660,10 @@ def _prompt_appendix() -> str:
     )
 
 
-def _close_time_note(differences: tuple[CloseTimeDifference, ...], shared_question_count: int) -> list[str]:
+def _close_time_note(
+    differences: tuple[CloseTimeDifference, ...], shared_question_count: int, reason: str | None
+) -> list[str]:
+    reason_text = f", {reason}" if reason is not None else f" {fill_me('say why the close times differed')}"
     notes = []
     for differences_one_way, direction, advantaged in (
         ([difference for difference in differences if difference.minutes_bot_closed_after_pro > 0], "after", "bots"),
@@ -662,10 +675,14 @@ def _close_time_note(differences: tuple[CloseTimeDifference, ...], shared_questi
         gap_text = format_duration(minutes[0]) if len(minutes) == 1 else f"{format_duration(minutes[0])} to {format_duration(minutes[-1])}"
         first_day, last_day = differences_one_way[0].bot_close.date(), differences_one_way[-1].bot_close.date()
         dates = f"on {month_day(first_day)}, {first_day.year}" if first_day == last_day else f"between {format_date_range(first_day, last_day)}"
+        question_count = len(differences_one_way)
+        extra_time = gap_text if len(minutes) == 1 else f"up to {format_duration(minutes[-1])}"
+        affected = "this question" if question_count == 1 else f"these {question_count} questions"
         notes.append(
-            f"On {len(differences_one_way)} of the {shared_question_count} shared questions (closing {dates}), "
-            f"the bot question closed {gap_text} {direction} the Pro question, so {advantaged} had extra time to "
-            "forecast. The comparison scores both teams at the later close."
+            f"On {question_count} of the {shared_question_count} shared questions between bots and Pros (closing "
+            f"{dates}), the bot question closed {gap_text} {direction} the Pro question{reason_text}. This gave "
+            f"{advantaged} {extra_time} when news on {affected} could have changed. We expect this difference to be negligible. The comparison scores both teams at the "
+            "later close time."
         )
     return notes
 
@@ -674,11 +691,19 @@ def _season_disclosures(results: SeasonResults, config: SeasonConfig) -> list[st
     overview = results.overview
     disclosures = list(config.data_notes)
     if len(config.bot_question_windows) > 1:
-        disclosures.append(
-            "The bot question window changed during the season: questions stayed open for "
-            f"{_bot_window_text(config.bot_question_windows)}."
+        window_change = (
+            f"{config.window_change_reason}, the bot question window changed during the season."
+            if config.window_change_reason is not None
+            else f"The bot question window changed during the season. {fill_me('say why the window changed')}"
         )
-    disclosures.extend(_close_time_note(overview.close_time_differences, results.head_to_head.question_count))
+        disclosures.append(
+            f"{window_change} Questions stayed open for {_bot_window_text(config.bot_question_windows)}."
+        )
+    disclosures.extend(
+        _close_time_note(
+            overview.close_time_differences, results.head_to_head.question_count, config.close_time_difference_reason
+        )
+    )
     shared_weights = overview.shared_question_weights_below_1
     if shared_weights:
         weight_range = (
@@ -687,9 +712,14 @@ def _season_disclosures(results: SeasonResults, config: SeasonConfig) -> list[st
             else f"{format_compact(shared_weights[0])} to {format_compact(shared_weights[-1])}"
         )
         disclosures.append(
-            f"{len(shared_weights)} of the shared questions had weights below 1 in the bot tournament ({weight_range}), "
-            "but the Pro vs bot comparison uses the Pro questions' weights"
-            + (" of 1." if overview.pro_weighted_question_count == 0 else ".")
+            f"{len(shared_weights)} of the questions shared between bots and Pros had weights below 1 in the bot "
+            f"tournament ({weight_range}), but the Pro vs bot comparison uses the Pro questions' weights"
+            + (
+                " of 1, since the Pro tournament didn't include the related questions with potential "
+                "dependencies/correlations that initially drove the bot questions to be given a lower weight."
+                if overview.pro_weighted_question_count == 0
+                else "."
+            )
         )
     return disclosures
 
@@ -704,7 +734,7 @@ def _data_notes_appendix(results: SeasonResults, config: SeasonConfig) -> str:
         "Numeric questions converted to discrete after launch (e.g. to stop \"porcupine\" forecasts that spike on "
         "whole numbers), and which questions.",
         "Bots (including Metac Bots) that missed questions because of provider outages or formatting errors.",
-        "Whether these simulated scores match the official leaderboard (ranks and sums), and why if not.",
+        "Whether these scores match the official leaderboard (ranks and sums), and why if not.",
     ]
     if overview.non_pro_accounts_in_pro_tournament or head_to_head.non_pro_member_count:
         checks.append(
