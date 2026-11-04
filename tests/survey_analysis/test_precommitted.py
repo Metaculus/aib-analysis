@@ -7,11 +7,10 @@ from __future__ import annotations
 
 import pytest
 
-from aib_analysis.survey_analysis import precommitted
+from aib_analysis.survey_analysis import precommitted, report
 from aib_analysis.survey_analysis.precommitted import (
     PRECOMMITTED_HYPOTHESES,
-    HypothesisResult,
-    PrecommittedHypothesis,
+    PRECOMMITTED_KEYS,
     holm_adjust,
     one_sided_p,
 )
@@ -52,19 +51,34 @@ def test_one_sided_p_missing_when_untestable():
     assert one_sided_p(_result(None, None), predicted_sign=1) is None
 
 
-def _hypothesis(sign: int) -> PrecommittedHypothesis:
-    return PrecommittedHypothesis(key="k", statement="s", predicted_sign=sign, prior_evidence="e")
+def _pool_tracking_every_hypothesis(size: int = 30) -> list:
+    pool = []
+    for index in range(size):
+        variables = {
+            hypothesis.key: float(index % 2 if hypothesis.predicted_sign > 0 else 1 - index % 2)
+            for hypothesis in PRECOMMITTED_HYPOTHESES
+        }
+        variables["uses_capping"] = float(index % 3 == 0)
+        pool.append(make_feature(variables=variables, score=float(index % 2) + 0.01 * index))
+    return pool
 
 
-def test_verdicts():
-    supported = HypothesisResult(_hypothesis(1), _result(0.4, 0.01), 0.005, 0.015)
-    opposite = HypothesisResult(_hypothesis(1), _result(-0.4, 0.01), 0.995, 1.0)
-    weak = HypothesisResult(_hypothesis(1), _result(0.1, 0.5), 0.25, 0.5)
-    untestable = HypothesisResult(_hypothesis(1), _result(None, None), None, None)
-    assert supported.verdict == "Supported"
-    assert opposite.verdict.startswith("Not supported (the estimate pointed the opposite way")
-    assert weak.verdict == "Not supported"
-    assert untestable.verdict.startswith("Not testable")
+def test_feature_stats_gives_precommitted_features_one_sided_p_and_holm_q():
+    pool = _pool_tracking_every_hypothesis()
+    results, q_by_key = report._feature_stats(pool)
+    for hypothesis_result in precommitted.evaluate_precommitted(pool):
+        key = hypothesis_result.hypothesis.key
+        assert results[key].p_value == pytest.approx(hypothesis_result.one_sided_p)
+        assert q_by_key[key] == pytest.approx(hypothesis_result.holm_p)
+
+
+def test_exploratory_false_discovery_family_excludes_precommitted_features():
+    pool = _pool_tracking_every_hypothesis()
+    results, q_by_key = report._feature_stats(pool)
+    exploratory = [key for key, res in results.items() if key not in PRECOMMITTED_KEYS and res.p_value is not None]
+    assert exploratory == ["uses_capping"]
+    # With one exploratory feature, the Benjamini-Hochberg q equals its own p.
+    assert q_by_key["uses_capping"] == pytest.approx(results["uses_capping"].p_value)
 
 
 def test_untestable_hypothesis_counts_as_p_one_in_the_family():

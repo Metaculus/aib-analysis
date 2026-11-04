@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import os
 import string
+from dataclasses import replace
 from datetime import date
 
 from aib_analysis.survey_analysis import (
@@ -300,14 +301,24 @@ def _feature_stats(
 ) -> tuple[dict[str, "stats.CorrelationResult"], dict[str, float]]:
     """Correlate every measured feature and compute one shared q-value map.
 
-    Returns (results_by_key, q_by_key). q-values are Benjamini-Hochberg adjusted
-    across the whole family of tested features, so the same q is reused wherever a
-    feature appears in the report.
+    Returns (results_by_key, q_by_key). Precommitted hypotheses carry their one-sided
+    p and a Holm-adjusted q; every other feature gets a Benjamini-Hochberg q across
+    the exploratory features. The same q is reused wherever a feature appears.
     """
     results = {key: stats.correlate_with_score(corr_pool, key) for key, _label in _all_feature_keys()}
-    scored = [(key, res) for key, res in results.items() if res.p_value is not None]
-    qvalues = _benjamini_hochberg([res.p_value for _key, res in scored])
-    q_by_key = {key: qvalues[i] for i, (key, _res) in enumerate(scored)}
+    q_by_key: dict[str, float] = {}
+    for hypothesis_result in precommitted.evaluate_precommitted(corr_pool):
+        key = hypothesis_result.hypothesis.key
+        results[key] = replace(results[key], p_value=hypothesis_result.one_sided_p)
+        if hypothesis_result.holm_p is not None:
+            q_by_key[key] = hypothesis_result.holm_p
+    exploratory = [
+        (key, res)
+        for key, res in results.items()
+        if key not in precommitted.PRECOMMITTED_KEYS and res.p_value is not None
+    ]
+    qvalues = _benjamini_hochberg([res.p_value for _key, res in exploratory])
+    q_by_key.update({key: qvalues[i] for i, (key, _res) in enumerate(exploratory)})
     return results, q_by_key
 
 
@@ -317,6 +328,9 @@ def _evidence_summary_section(
     hidden_keys: frozenset[str],
 ) -> str:
     tested = sum(1 for res in results.values() if res.p_value is not None)
+    exploratory_tested = sum(
+        1 for key, res in results.items() if key not in precommitted.PRECOMMITTED_KEYS and res.p_value is not None
+    )
     n_obs = max((res.n for res in results.values()), default=0)
     labels = dict(_all_feature_keys())
 
@@ -339,7 +353,9 @@ def _evidence_summary_section(
     lines.append("")
     lines.append(
         f"In the list, r is correlation, p is the uncorrected p-value, and q is the "
-        f"Benjamini-Hochberg p-value adjusted for testing all {tested} features. \"Significant\" means "
+        f"Benjamini-Hochberg p-value adjusted for testing all {exploratory_tested} exploratory features. "
+        f"For the {len(precommitted.PRECOMMITTED_KEYS)} precommitted hypotheses (marked \"precommitted: "
+        "yes\"), p is one-sided and q is Holm-adjusted across those hypotheses (see Appendix A). \"Significant\" means "
         f"q < {config.EVIDENCE_SIGNIFICANT_Q}. This analysis aims to be primarily hypothesis-generating. "
         f"We can't conclude much with n ≈ {n_obs} bots and {tested} features tested. We also expect "
         "many of these features to be confounded. However, FutureEval hosts the largest group of "
@@ -354,75 +370,16 @@ def _evidence_summary_section(
             lines.append(f"- **{label}**: insufficient data (n = {res.n})")
             continue
         significant = q_value is not None and q_value < config.EVIDENCE_SIGNIFICANT_Q
+        precommitted_marker = " · precommitted: yes" if key in precommitted.PRECOMMITTED_KEYS else ""
         lines.append(
             f"- **{label}**: r = {res.coefficient:+.2f} · p = {_fmt_pq(res.p_value)} · "
-            f"q = {_fmt_pq(q_value)} · significant: {'yes' if significant else 'no'}"
+            f"q = {_fmt_pq(q_value)} · significant: {'yes' if significant else 'no'}{precommitted_marker}"
         )
     hidden_labels = [label for key, label in _all_feature_keys() if key in hidden_keys]
     if hidden_labels:
         lines.append(
             f"- **{len(hidden_labels)} features {_WITHHELD}**: " + "; ".join(hidden_labels)
         )
-    return "\n".join(lines)
-
-
-def _precommitted_section(
-    corr_pool: list[RespondentFeatures], exploratory_tested: int, blind: bool
-) -> str:
-    results = precommitted.evaluate_precommitted(corr_pool)
-    family_size = len(results)
-    alpha = precommitted.FAMILY_ALPHA
-    family_luck = 1 - (1 - alpha) ** family_size
-    exploratory_luck = 1 - (1 - alpha) ** exploratory_tested
-    lines = ["## Precommitted hypotheses", ""]
-    lines.append(
-        f"Before downloading the {season_notes.SEASON_LABEL} responses, we committed to "
-        f"{family_size} hypotheses drawn from the Fall 2025 and Spring 2026 surveys. We chose the "
-        "strongest past findings that measure different things, so each test adds independent "
-        "information. Each is tested on the same bots and with the same correlation as the "
-        "exploratory list below, but only in the direction we committed to (a one-sided test)."
-        + (f" {season_notes.PRECOMMIT_LATE_DEFINITION_NOTE}" if season_notes.PRECOMMIT_LATE_DEFINITION_NOTE else "")
-    )
-    lines.append("")
-    lines.append(
-        f"Guarding against false positives: if none of the {family_size} hypotheses were true, "
-        f"testing each at the usual 5% level would still give a {family_luck:.0%} chance that at least "
-        "one looked supported by luck. Holm's correction raises the p-values just enough to keep that "
-        f"chance at or below 5%, and a hypothesis counts as supported only when its Holm-adjusted p is "
-        f"below {alpha}. For comparison, the exploratory list tests {exploratory_tested} features, where "
-        f"the same chance would be {exploratory_luck:.0%} without a correction. That is why the "
-        "exploratory list is read as hypothesis-generating and these few tests are not."
-    )
-    lines.append("")
-    for number, result in enumerate(results, start=1):
-        hypothesis = result.hypothesis
-        lines.append(f"{number}. **{hypothesis.statement}** Prior evidence: {hypothesis.prior_evidence}")
-        if blind:
-            lines.append(f"   - Result: {_WITHHELD}.")
-            continue
-        correlation = result.correlation
-        if correlation.coefficient is None:
-            lines.append(f"   - Result: {result.verdict} (n = {correlation.n}).")
-            continue
-        lines.append(
-            f"   - Result: **{result.verdict}** ({correlation.method} r = {correlation.coefficient:+.2f}, "
-            f"one-sided p = {_fmt_pq(result.one_sided_p)}, Holm-adjusted p = {_fmt_pq(result.holm_p)}, "
-            f"n = {correlation.n})."
-        )
-        chart, reason = _correlation_chart(corr_pool, hypothesis.key, f"h{number}")
-        if chart is None:
-            lines.append(f"   - [{reason}]")
-        else:
-            lines.append("")
-            lines.append(f"   ![]({_rel(os.path.join(config.CHARTS_DIR, chart))})")
-    lines.append("")
-    lines.append(
-        "Considered and set aside (they stay in the exploratory list, without the precommitted "
-        "correction):"
-    )
-    lines.append("")
-    for hypothesis in precommitted.ALTERNATIVE_HYPOTHESES:
-        lines.append(f"- {hypothesis.statement} {hypothesis.prior_evidence}")
     return "\n".join(lines)
 
 
@@ -446,14 +403,11 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
     feature_results, q_by_key = _feature_stats(corr_pool)
     leaderboard_rows = get_leaderboard_rows()
     leaderboard_size = len(leaderboard_rows)
-    exploratory_tested = sum(1 for res in feature_results.values() if res.p_value is not None)
 
     lines: list[str] = []
     lines.append(f"# {season_notes.SEASON_LABEL} FutureEval bot-maker survey")
     lines.append("")
-    lines.append(_intro())
-    lines.append("")
-    lines.append(_precommitted_section(corr_pool, exploratory_tested, blind))
+    lines.append(_intro(in_scope, excluded, corr_pool))
     lines.append("")
     ordered_specs = sorted(
         config.QUESTION_SPECS,
@@ -499,6 +453,8 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
                 result = feature_results[key]
                 chart, reason = _correlation_chart(scored, key, f"q{index:02d}")
                 sentence = _correlation_sentence(result, q_by_key.get(key))
+                if key in precommitted.PRECOMMITTED_KEYS:
+                    sentence += " Precommitted: p is one-sided and q is Holm-adjusted."
                 if chart is None:
                     sentence += f" [{reason}]"
                 lines.append(sentence)
@@ -533,7 +489,7 @@ def _excluded_detail(excluded) -> str:
     return detail
 
 
-def _intro() -> str:
+def _intro(in_scope, excluded, corr_pool) -> str:
     takeaway_bullets = "\n".join(f"* {item}" for item in season_notes.MAIN_TAKEAWAYS)
     return "\n".join(
         [
@@ -541,14 +497,44 @@ def _intro() -> str:
             f"[FutureEval]({_FUTUREEVAL_URL}) AI forecasting benchmark. This analysis compares answers to "
             f"this survey with performance in the "
             f"[{season_notes.TOURNAMENT_NAME}]({season_notes.TOURNAMENT_URL}) to help surface what works "
-            "and what doesn't when forecasting the future. For who is included, how performance is "
-            "measured, and how each feature is tested, see **Appendix A: Methodology** at the end of this "
-            "post. Caveats are in **Appendix B**.",
+            "and what doesn't when forecasting the future.",
             "",
-            "Main takeaways:",
+            "## Main takeaways",
             "",
             takeaway_bullets,
+            "",
+            "## Introduction",
+            "",
+            f"{len(in_scope) + len(excluded)} bot makers answered the {season_notes.SEASON_LABEL} survey, and "
+            f"this analysis covers the {len(in_scope)} whose bots competed in the scored tournament. For each "
+            "survey question, we show how answers were spread across winners, non-winners, and the top 10, "
+            "and how each feature of a bot (for example its final model, research tools, or cost per "
+            "question) relates to its performance, measured by its average spot peer score. Correlations use "
+            f"the {len(corr_pool)} bots that forecast at least {config.MIN_QUESTIONS_FOR_CORRELATION} scored "
+            "questions.",
+            "",
+            f"We committed in advance to {len(precommitted.PRECOMMITTED_KEYS)} hypotheses from past surveys and "
+            "treat every other feature as exploratory, adjusting both groups for the number of tests we ran. "
+            f"With about {len(corr_pool)} bots, the results are suggestive rather than conclusive, and a "
+            "correlation does not show that a feature caused a better score. **Appendix A** describes the "
+            "methodology in full, and **Appendix B** lists the caveats.",
         ]
+    )
+
+
+def _precommitted_methodology() -> str:
+    names = [
+        f"\"{variable_spec(hypothesis.key).label}\" ({'higher' if hypothesis.predicted_sign > 0 else 'lower'} score)"
+        for hypothesis in precommitted.PRECOMMITTED_HYPOTHESES
+    ]
+    listed = ", ".join(names[:-1]) + f", and {names[-1]}" if len(names) > 1 else names[0]
+    late_note = f" {season_notes.PRECOMMIT_LATE_DEFINITION_NOTE}" if season_notes.PRECOMMIT_LATE_DEFINITION_NOTE else ""
+    return (
+        f"We chose {len(names)} hypotheses from past surveys before downloading the responses, and confirmed "
+        f"them before looking at any hypothesis result: {listed}. Each is tested only in the predicted "
+        f"direction (a one-sided test), and the {len(names)} are corrected together with Holm's method "
+        "instead of joining the false-discovery correction, so their q-values are Holm-adjusted p-values. "
+        f"They are marked \"precommitted: yes\" in the evidence summary.{late_note}"
     )
 
 
@@ -589,8 +575,10 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
         "Each feature is correlated with a bot's average spot peer score using Pearson's r for yes/no "
         "traits and Spearman's rank correlation for ordered or counted ones. Because many features are "
         "tested at once, every p-value also carries a Benjamini-Hochberg q-value (its p adjusted for "
-        "the false-discovery rate across all tested features), and a result is called \"significant\" "
+        "the false-discovery rate across all exploratory features), and a result is called \"significant\" "
         "only when q < 0.05.",
+        "",
+        _precommitted_methodology(),
         "",
         "For the frontier model chart, a bot is called \"frontier\" if the model it used for its final "
         "prediction is a flagship model (not a mini, flash, or fast variant) and was "

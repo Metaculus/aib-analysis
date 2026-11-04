@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import os
 
-from aib_analysis.survey_analysis import config, precommitted, season_notes
+from aib_analysis.survey_analysis import config, season_notes
 
 logger = logging.getLogger(__name__)
 
@@ -186,9 +186,10 @@ def generate_parsing_decisions() -> str:
     )
     lines.append(
         "- Precommitted hypotheses (`precommitted.py`) use the same correlations, but each p-value is "
-        "one-sided in the committed direction, and the family is corrected with Holm's method. A "
-        f"hypothesis is supported when its Holm-adjusted p is below {precommitted.FAMILY_ALPHA}. A "
-        "hypothesis that cannot be tested enters the correction with p = 1."
+        "one-sided in the committed direction, and the family is corrected with Holm's method instead "
+        "of joining the exploratory Benjamini-Hochberg correction. Its Holm-adjusted p is shown as its q, "
+        f"so it is significant when that is below {config.EVIDENCE_SIGNIFICANT_Q}. A hypothesis that "
+        "cannot be tested enters the correction with p = 1."
     )
     lines.append(
         "- Yes/no and plain-number traits vs peer score: Pearson's r. (For a yes/no trait coded 0/1 "

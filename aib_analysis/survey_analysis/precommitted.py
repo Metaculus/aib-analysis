@@ -1,11 +1,9 @@
 """Hypotheses committed to before the Summer 2026 survey responses were downloaded.
 
-They are the strongest Fall 2025 and Spring 2026 survey findings that measure
-different things (pairwise Spearman |rho| <= 0.18 across the Spring 2026 bots).
-Each is tested one-sided in its committed direction and the family is corrected
-with Holm's method, so these few tests avoid most of the multiple-comparison
-penalty the exploratory feature list pays. Do not edit a hypothesis after seeing
-Summer results; new ideas belong in the exploratory list.
+They are the strongest past survey findings that measure different things. Each is
+tested one-sided in its committed direction and the family is corrected with Holm's
+method instead of joining the exploratory false-discovery correction. Do not edit a
+hypothesis after seeing results; new ideas belong in the exploratory list.
 
 The picks were confirmed on 2026-10-30, after the responses were downloaded but
 before anyone looked at a hypothesis result. At the same time, the research-source
@@ -21,15 +19,12 @@ from dataclasses import dataclass
 from aib_analysis.survey_analysis import stats
 from aib_analysis.survey_analysis.features import RespondentFeatures
 
-FAMILY_ALPHA = 0.05
-
 
 @dataclass(frozen=True)
 class PrecommittedHypothesis:
     key: str
     statement: str
     predicted_sign: int
-    prior_evidence: str
 
 
 PRECOMMITTED_HYPOTHESES: list[PrecommittedHypothesis] = [
@@ -37,28 +32,16 @@ PRECOMMITTED_HYPOTHESES: list[PrecommittedHypothesis] = [
         key="uses_similar_qs",
         statement="Bots that check forecasts on similar Metaculus questions or prediction markets score higher.",
         predicted_sign=1,
-        prior_evidence=(
-            "Fall 2025: 34% of winners vs 0% of non-winners did this (p = 0.04). Spring 2026: "
-            "r = +0.34 (p = 0.031, n = 41), the strongest link of any feature that is not a model choice."
-        ),
     ),
     PrecommittedHypothesis(
         key="n_research_sources",
         statement="Bots that use more distinct research sources score higher.",
         predicted_sign=1,
-        prior_evidence=(
-            "Fall 2025: the strongest result of that survey (r = +0.42 with total score, p = 0.006). "
-            "Spring 2026: Spearman r = +0.19 (p = 0.23, n = 42)."
-        ),
     ),
     PrecommittedHypothesis(
         key="uses_extremizing",
         statement="Bots that mathematically extremize their predictions score lower.",
         predicted_sign=-1,
-        prior_evidence=(
-            "Spring 2026: r = -0.30 (p = 0.055, n = 41). Fall 2025 did not report it. In Spring it was "
-            "nearly unrelated to the other two hypotheses (|rho| <= 0.07), so it is the most independent test."
-        ),
     ),
 ]
 
@@ -69,42 +52,25 @@ ALTERNATIVE_HYPOTHESES: list[PrecommittedHypothesis] = [
         key="questions_missed",
         statement="Bots that miss fewer questions after their first forecast score higher.",
         predicted_sign=-1,
-        prior_evidence=(
-            "Not one of last year's hypotheses (it was first measured for Summer 2026). A retroactive "
-            "Spring 2026 check that counted every season question, including those before a bot's "
-            "first forecast, found Spearman r = -0.46 (p = 0.002, n = 42)."
-        ),
     ),
     PrecommittedHypothesis(
         key="llm_calls_mid",
         statement="Bots that make more LLM calls per question score higher.",
         predicted_sign=1,
-        prior_evidence=(
-            "Fall 2025: winners made a median of about 28 calls per question vs 7 for non-winners "
-            "(p = 0.022). Spring 2026: Spearman r = +0.20 (p = 0.21). Set aside because in Spring it "
-            "overlapped with checking similar questions (rho = +0.38) and research breadth (rho = +0.37)."
-        ),
     ),
     PrecommittedHypothesis(
         key="hours_mid",
         statement="Bots with more total development hours score higher.",
         predicted_sign=1,
-        prior_evidence=(
-            "Spring 2026: Spearman r = +0.32 (p = 0.039), but Fall 2025 found no link (r = 0.08). Set "
-            "aside because the two seasons disagree."
-        ),
     ),
     PrecommittedHypothesis(
         key="uses_scraping",
         statement="Bots that scrape web pages during research score higher.",
         predicted_sign=1,
-        prior_evidence=(
-            "Spring 2026: r = +0.33 (p = 0.032). Set aside because in Spring it overlapped with research "
-            "breadth (rho = +0.57) and checking similar questions (rho = +0.41)."
-        ),
     ),
 ]
 
+PRECOMMITTED_KEYS: frozenset[str] = frozenset(hypothesis.key for hypothesis in PRECOMMITTED_HYPOTHESES)
 BLINDED_KEYS: frozenset[str] = frozenset(
     hypothesis.key for hypothesis in PRECOMMITTED_HYPOTHESES + ALTERNATIVE_HYPOTHESES
 )
@@ -116,21 +82,6 @@ class HypothesisResult:
     correlation: stats.CorrelationResult
     one_sided_p: float | None
     holm_p: float | None
-
-    @property
-    def supported(self) -> bool:
-        return self.holm_p is not None and self.holm_p < FAMILY_ALPHA
-
-    @property
-    def verdict(self) -> str:
-        coefficient = self.correlation.coefficient
-        if coefficient is None:
-            return "Not testable (too few answers)"
-        if self.supported:
-            return "Supported"
-        if coefficient * self.hypothesis.predicted_sign < 0:
-            return "Not supported (the estimate pointed the opposite way)"
-        return "Not supported"
 
 
 def one_sided_p(result: stats.CorrelationResult, predicted_sign: int) -> float | None:
