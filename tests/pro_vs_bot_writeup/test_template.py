@@ -133,6 +133,19 @@ def test_writeup_with_one_window_and_no_season_notes(pros_ahead_folder: Path, sy
     assert "window changed" not in writeup
 
 
+def test_openrouter_pinning_is_described_only_for_pinned_seasons(
+    pros_ahead_folder: Path, synthetic_config: SeasonConfig, tmp_path: Path
+) -> None:
+    unpinned = _render(pros_ahead_folder, synthetic_config, tmp_path / "unpinned")
+    assert "OpenRouter" not in unpinned
+    pinned = _render(
+        pros_ahead_folder, dataclasses.replace(synthetic_config, metac_bots_pinned_openrouter_hosts=True), tmp_path / "pinned"
+    )
+    methodology = pinned[pinned.index("## Appendix A: Methodology") : pinned.index("## Appendix B")]
+    assert "research source. Some Metac Bots use open-weight models through OpenRouter" in methodology
+    assert "Metac Bots that were moved to a different OpenRouter host during the season" in _appendix_c(pinned)
+
+
 def _edit_bot_question(folder: Path, question_id: int, changes: dict[str, object]) -> None:
     path = folder / "2_bot_tournament.json"
     raw = json.loads(path.read_text())

@@ -59,6 +59,7 @@ class SeasonConfig:
     bot_question_launch_text: str | None = None
     window_change_reason: str | None = None
     close_time_difference_reason: str | None = None
+    metac_bots_pinned_openrouter_hosts: bool = True
 
     def __post_init__(self) -> None:
         if not self.bot_question_windows or self.bot_question_windows[0].first_open_date is not None:
@@ -125,6 +126,7 @@ SEASONS: dict[str, SeasonConfig] = {
         # Spring's simulations predate the bot team vs top-10 bot team files, so its results still compute
         # but its team-size section can't be rendered.
         has_bot_team_vs_main_simulations=False,
+        metac_bots_pinned_openrouter_hosts=False,
     ),
     "summer_2026": SeasonConfig(
         key="summer_2026",
@@ -153,6 +155,8 @@ SEASONS: dict[str, SeasonConfig] = {
         bot_question_launch_text="at random times spread throughout the week",
         window_change_reason="Due to reliability issues in GitHub Actions, where most bot makers run their bots",
         close_time_difference_reason="because we spread out questions that bots had to forecast in parallel",
+        # forecasting-tools started pinning OpenRouter hosts on Sept 25, 2026 (PR #351), after this season.
+        metac_bots_pinned_openrouter_hosts=False,
     ),
 }
 

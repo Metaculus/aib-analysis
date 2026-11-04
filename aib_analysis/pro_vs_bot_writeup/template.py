@@ -69,6 +69,14 @@ TITLE_SUGGESTIONS = {
     ("bots", True): "Bots Beat Pros",
     ("bots", False): "Bots Edge Out Pros, Without Statistical Significance",
 }
+OPENROUTER_PINNING_TEXT = (
+    "Some Metac Bots use open-weight models through OpenRouter, which can send each request to one of several "
+    "hosting companies, and hosts can serve the same model differently (e.g., at lower precision). So that these "
+    "bots' results don't depend on which host happened to answer, we pin each of them to one host with fallbacks "
+    "turned off: the lab's own endpoint when OpenRouter lists one, and otherwise the host serving the model at the "
+    "highest declared precision (bf16/fp16, then fp8, then fp4/int4). Models that only the lab that made them "
+    "serves are not pinned."
+)
 INDIVIDUAL_CHART_ROWS = 20
 TOP_BOTS_CHART_ROWS = 20
 METAC_CHART_ROWS = 15
@@ -536,6 +544,7 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
         "prompt (Appendix B), forecast 5 times with that prompt, and submit an aggregation of these forecasts. Each "
         f"bot's name indicates which model and research provider it used. For instance, \"{metac.top_baseline.name}\" "
         f"uses {top_model} as its model and {top_search} as its research source."
+        + (f" {OPENROUTER_PINNING_TEXT}" if config.metac_bots_pinned_openrouter_hosts else "")
     )
     weights_text = (
         "**Weights:** Some bot tournament questions were given weights to counteract possible correlated resolutions "
@@ -715,6 +724,11 @@ def _data_notes_appendix(results: SeasonResults, config: SeasonConfig) -> str:
         "Bots (including Metac Bots) that missed questions because of provider outages or formatting errors.",
         "Whether these scores match the official leaderboard (ranks and sums), and why if not.",
     ]
+    if config.metac_bots_pinned_openrouter_hosts:
+        checks.append(
+            "Metac Bots that were moved to a different OpenRouter host during the season (e.g. because their host "
+            "stopped serving the model), with the dates and the old and new hosts' precision."
+        )
     if overview.non_pro_accounts_in_pro_tournament or head_to_head.non_pro_member_count:
         checks.append(
             f"The Pro tournament has {overview.non_pro_accounts_in_pro_tournament} scored non-Pro "
