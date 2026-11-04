@@ -451,17 +451,7 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
     lines: list[str] = []
     lines.append(f"# {season_notes.SEASON_LABEL} FutureEval bot-maker survey")
     lines.append("")
-    lines.append(
-        _intro(
-            in_scope,
-            excluded,
-            corr_pool,
-            counts,
-            leaderboard_size,
-        )
-    )
-    lines.append("")
-    lines.append(_caveats_section(in_scope, corr_pool, counts, leaderboard_size))
+    lines.append(_intro())
     lines.append("")
     lines.append(_precommitted_section(corr_pool, exploratory_tested, blind))
     lines.append("")
@@ -518,6 +508,10 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
                     lines.append("")
         lines.append("")
 
+    lines.append(_methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_size))
+    lines.append("")
+    lines.append(_caveats_section(in_scope, corr_pool, counts, leaderboard_size))
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -539,21 +533,29 @@ def _excluded_detail(excluded) -> str:
     return detail
 
 
-def _intro(in_scope, excluded, corr_pool, counts, leaderboard_size) -> str:
-    total = len(in_scope) + len(excluded)
+def _intro() -> str:
     takeaway_bullets = "\n".join(f"* {item}" for item in season_notes.MAIN_TAKEAWAYS)
+    return "\n".join(
+        [
+            f"Every season Metaculus sends out a survey to bot makers who participated in the "
+            f"[FutureEval]({_FUTUREEVAL_URL}) AI forecasting benchmark. This analysis compares answers to "
+            f"this survey with performance in the "
+            f"[{season_notes.TOURNAMENT_NAME}]({season_notes.TOURNAMENT_URL}) to help surface what works "
+            "and what doesn't when forecasting the future. For who is included, how performance is "
+            "measured, and how each feature is tested, see **Appendix A: Methodology** at the end of this "
+            "post. Caveats are in **Appendix B**.",
+            "",
+            "Main takeaways:",
+            "",
+            takeaway_bullets,
+        ]
+    )
+
+
+def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_size) -> str:
+    total = len(in_scope) + len(excluded)
     parts = [
-        f"Every season Metaculus sends out a survey to bot makers who participated in the "
-        f"[FutureEval]({_FUTUREEVAL_URL}) AI forecasting benchmark. This analysis compares answers to "
-        f"this survey with performance in the "
-        f"[{season_notes.TOURNAMENT_NAME}]({season_notes.TOURNAMENT_URL}) to help surface what works "
-        "and what doesn't when forecasting the future.",
-        "",
-        "Main takeaways:",
-        "",
-        takeaway_bullets,
-        "",
-        "## Methodology",
+        "## Appendix A: Methodology",
         "",
         f"{total} bot makers answered the {season_notes.SEASON_LABEL} survey. This report covers the "
         f"{len(in_scope)} whose bots competed in the scored FutureEval tournament. It shows, for each "
@@ -581,7 +583,7 @@ def _intro(in_scope, excluded, corr_pool, counts, leaderboard_size) -> str:
         "",
         f"Correlations use a stricter set of the {len(corr_pool)} bots that forecast at least "
         f"{config.MIN_QUESTIONS_FOR_CORRELATION} scored questions, so a bot with only a few questions "
-        "cannot swing a result due to lucky forecasting. The distributions above still use all "
+        "cannot swing a result due to lucky forecasting. The distribution charts still use all "
         f"{len(in_scope)} participants, and only the performance correlations apply the question floor.",
         "",
         "Each feature is correlated with a bot's average spot peer score using Pearson's r for yes/no "
@@ -635,7 +637,7 @@ def _caveats_section(features, corr_pool, counts, leaderboard_size) -> str:
     winning_owners = sum(1 for owner in owners if owner.won_any)
     respondent_winner_pct = round(100 * counts["winner"] / len(features)) if features else 0
     field_winner_pct = round(100 * winning_owners / len(owners)) if owners else 0
-    lines = ["## Caveats", ""]
+    lines = ["## Appendix B: Caveats", ""]
     lines.append(
         f"- Self-selection: Only {len(features)} of the {leaderboard_size} scored bots answered the "
         "survey, and winners were far likelier to respond since the survey was required to receive "

@@ -29,7 +29,7 @@ SPOTLIGHT_OPUS_MODEL = "Claude Opus 5"
 PRECOMMIT_LATE_DEFINITION_NOTE = (
     "One definition was settled after the responses were downloaded but before anyone looked at a "
     "hypothesis result: the research-source count also counts sources named in write-ins (see "
-    "Methodology)."
+    "Appendix A)."
 )
 FRONTIER_LATE_DEFINITION_CAVEAT = (
     "The Summer release-date cutoff and the rule that a flagship line still counts below a pricier "
@@ -50,6 +50,7 @@ MAIN_TAKEAWAYS: list[str] = [
     "[===Fill me: takeaway 1===]",
     "[===Fill me: takeaway 2===]",
     "[===Fill me: takeaway 3===]",
+    "[===Fill me: takeaway 4===]",
 ]
 
 # How the excluded (no scored-leaderboard row) respondents are characterized.
