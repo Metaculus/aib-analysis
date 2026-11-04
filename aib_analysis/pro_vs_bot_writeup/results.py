@@ -19,15 +19,6 @@ from typing import Any, Literal
 
 from scipy import stats as scipy_stats
 
-from aib_analysis.math.accuracy import (
-    base_rate_geometric_mean_probability,
-    binary_probability_on_outcome,
-    field_probability_multiplier,
-    geometric_mean_probability,
-    geometric_mean_probability_ci,
-    paired_probability_ratio,
-    yes_rate,
-)
 from aib_analysis.math.stats import (
     ConfidenceIntervalCalculator,
     MeanHypothesisCalculator,
@@ -54,7 +45,6 @@ TOP_N = 10
 ELIGIBLE_SHARE_OF_QUESTIONS = 0.5
 PROMISING_MIN_SHARE_OF_QUESTIONS = 0.1
 FIELD_CHART_MIN_QUESTIONS = 10
-LUCK_BAND_Z = scipy_stats.norm.ppf(0.975)
 QUESTION_TYPE_ORDER = ("binary", "numeric", "discrete", "multiple_choice")
 TEAM_SIZE_FILE_PATTERN = re.compile(r"^\d+_pro_vs_bot_tournament__teams_size_(?P<size>\d+|all)\.json$")
 BOT_TEAM_VS_MAIN_FILE_PATTERN = re.compile(
@@ -251,15 +241,6 @@ class IndividualResults:
 
 
 @dataclass(frozen=True)
-class LuckBandCounts:
-    shown: int
-    above: int
-    below: int
-    expected_per_side: float
-    more_spread_than_luck: bool
-
-
-@dataclass(frozen=True)
 class FieldSummary:
     rows: list[LeaderboardRow]
     scored_question_count: int
@@ -271,7 +252,6 @@ class FieldSummary:
     tenth_place: LeaderboardRow
     promising: list[LeaderboardRow]
     promising_min_questions: int
-    per_question_score_sd: float
     uniform_reference: LeaderboardRow | None
     top_10_average_ci_width: float | None
 
@@ -284,73 +264,6 @@ class FieldSummary:
         top_ci = self.rows[0].ci
         tenth_ci = self.tenth_place.ci
         return top_ci is not None and tenth_ci is not None and top_ci[0] > tenth_ci[1]
-
-    def luck_band_half_width(self, question_count: float) -> float:
-        """Where a bot with a true average of 0 lands about 95% of the time, treating its scores like the field's."""
-        return LUCK_BAND_Z * self.per_question_score_sd / math.sqrt(question_count)
-
-    def luck_band_counts(self, min_questions: int) -> LuckBandCounts:
-        shown = [row for row in self.rows if row.question_count >= min_questions]
-        above = sum(1 for row in shown if row.average_score > self.luck_band_half_width(row.question_count))
-        below = sum(1 for row in shown if row.average_score < -self.luck_band_half_width(row.question_count))
-        share_outside_each_side = 1 - scipy_stats.norm.cdf(LUCK_BAND_Z)
-        p_values = [
-            scipy_stats.binomtest(count, len(shown), share_outside_each_side, alternative="greater").pvalue
-            for count in (above, below)
-        ]
-        return LuckBandCounts(
-            shown=len(shown),
-            above=above,
-            below=below,
-            expected_per_side=share_outside_each_side * len(shown),
-            more_spread_than_luck=min(p_values) < SIGNIFICANCE_LEVEL,
-        )
-
-
-@dataclass(frozen=True)
-class BotTypicalProbability:
-    name: str
-    typical_probability: float
-    binary_question_count: int
-
-
-@dataclass(frozen=True)
-class BotFieldAccuracy:
-    """Typical probability on the outcome across the bot tournament's binary questions."""
-
-    binary_question_count: int
-    yes_rate: float
-    base_rate_probability: float
-    field_probability: float
-    eligible_bots: list[BotTypicalProbability]
-    top_bot: BotTypicalProbability
-    top_bot_average_peer_score: float
-    top_bot_field_multiplier: float
-    worst_bot: BotTypicalProbability
-
-    @property
-    def median_probability(self) -> float:
-        return statistics.median(bot.typical_probability for bot in self.eligible_bots)
-
-    @property
-    def share_below_base_rate(self) -> float:
-        below = sum(1 for bot in self.eligible_bots if bot.typical_probability < self.base_rate_probability)
-        return below / len(self.eligible_bots)
-
-
-@dataclass(frozen=True)
-class TeamAccuracy:
-    """Typical probability on the outcome for the Pro team and bot team on the shared binary questions."""
-
-    binary_question_count: int
-    yes_rate: float
-    base_rate_probability: float
-    pro_team_probability: float
-    pro_team_ci: tuple[float, float] | None
-    bot_team_probability: float
-    bot_team_ci: tuple[float, float] | None
-    bot_to_pro_ratio: float
-    bot_to_pro_ratio_ci: tuple[float, float] | None
 
 
 @dataclass(frozen=True)
@@ -438,8 +351,6 @@ class SeasonResults:
     metac: MetacResults
     experiment_groups: MetacExperimentGroups
     example_questions: list[ExampleQuestion]
-    bot_field_accuracy: BotFieldAccuracy
-    team_accuracy: TeamAccuracy
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -508,19 +419,6 @@ def spot_peer_participants(raw: dict[str, Any]) -> dict[str, Participant]:
             QuestionScore(question["question_id"], question["type"], score["score"], question["weight"])
         )
     return participants
-
-
-def binary_outcome_probabilities(raw: dict[str, Any]) -> dict[str, dict[int, tuple[float, float]]]:
-    """user name -> question id -> (probability on the outcome, question weight), for scored binary spot forecasts."""
-    probabilities: dict[str, dict[int, tuple[float, float]]] = {}
-    for score in raw["scores_cache"].values():
-        forecast = score["forecast"]
-        question = forecast["question"]
-        if score["type"] != "spot_peer" or question["type"] != "binary" or not is_scored(question):
-            continue
-        probability = binary_probability_on_outcome(forecast["prediction"][0], question["resolution"])
-        probabilities.setdefault(forecast["user"]["name"], {})[question["question_id"]] = (probability, question["weight"])
-    return probabilities
 
 
 def questions_by_id(raw: dict[str, Any]) -> dict[int, dict[str, Any]]:
@@ -873,7 +771,7 @@ def compute_individuals(
     )
 
 
-def compute_field(bot_rows: list[LeaderboardRow], all_scores: list[float], scored_question_count: int) -> FieldSummary:
+def compute_field(bot_rows: list[LeaderboardRow], scored_question_count: int) -> FieldSummary:
     eligible_min_questions = math.ceil(scored_question_count * ELIGIBLE_SHARE_OF_QUESTIONS)
     promising_min_questions = math.ceil(scored_question_count * PROMISING_MIN_SHARE_OF_QUESTIONS)
     eligible = [
@@ -906,7 +804,6 @@ def compute_field(bot_rows: list[LeaderboardRow], all_scores: list[float], score
         tenth_place=tenth_place,
         promising=promising,
         promising_min_questions=promising_min_questions,
-        per_question_score_sd=statistics.pstdev(all_scores),
         uniform_reference=uniform_rows[0] if uniform_rows else None,
         top_10_average_ci_width=statistics.fmean(top_10_widths) if top_10_widths else None,
     )
@@ -970,93 +867,6 @@ def compute_metac(metac_raw: dict[str, Any], bot_rows: list[LeaderboardRow], sea
         first_question_close=min(close_date(question) for question in questions_by_id(metac_raw).values()),
         first_scored_close_by_name=first_scored_close_by_name(metac_raw),
         runner_up_comparison=compare_with_runner_up(baseline_rows, metac_participants),
-    )
-
-
-def _typical_probability(name: str, probabilities_by_question: dict[int, tuple[float, float]]) -> BotTypicalProbability:
-    probabilities = [probability for probability, _weight in probabilities_by_question.values()]
-    weights = [weight for _probability, weight in probabilities_by_question.values()]
-    return BotTypicalProbability(name, geometric_mean_probability(probabilities, weights), len(probabilities))
-
-
-def compute_bot_field_accuracy(
-    bot_raw: dict[str, Any], field: FieldSummary, bot_participants: dict[str, Participant]
-) -> BotFieldAccuracy:
-    outcome_probabilities = binary_outcome_probabilities(bot_raw)
-    bot_names = {row.name for row in field.rows}
-    questions = {
-        question_id: question
-        for question_id, question in questions_by_id(bot_raw).items()
-        if question["type"] == "binary" and is_scored(question)
-    }
-    question_ids = sorted(questions)
-    resolutions = [questions[question_id]["resolution"] for question_id in question_ids]
-    weights = [questions[question_id]["weight"] for question_id in question_ids]
-    field_probabilities = []
-    for question_id in question_ids:
-        bot_probabilities = [
-            outcome_probabilities[name][question_id][0]
-            for name in bot_names
-            if question_id in outcome_probabilities.get(name, {})
-        ]
-        field_probabilities.append(geometric_mean_probability(bot_probabilities))
-    eligible_names = [
-        row.name
-        for row in field.rows
-        if row.question_count >= field.eligible_min_questions and row.name != UNIFORM_REFERENCE_BOT
-    ]
-    eligible_without_binary = [name for name in eligible_names if not outcome_probabilities.get(name)]
-    if eligible_without_binary:
-        logger.warning(f"{len(eligible_without_binary)} eligible bots made no binary forecasts and are left out of the accuracy numbers")
-    eligible_bots = [
-        _typical_probability(name, outcome_probabilities[name]) for name in eligible_names if outcome_probabilities.get(name)
-    ]
-    top_row = field.rows[0]
-    if not outcome_probabilities.get(top_row.name):
-        raise ValueError(f"The top bot {top_row.name} made no binary forecasts")
-    top_scores = bot_participants[top_row.name].scores
-    return BotFieldAccuracy(
-        binary_question_count=len(question_ids),
-        yes_rate=yes_rate(resolutions),
-        base_rate_probability=base_rate_geometric_mean_probability(resolutions, weights),
-        field_probability=geometric_mean_probability(field_probabilities, weights),
-        eligible_bots=eligible_bots,
-        top_bot=_typical_probability(top_row.name, outcome_probabilities[top_row.name]),
-        top_bot_average_peer_score=top_row.average_score,
-        top_bot_field_multiplier=field_probability_multiplier(
-            [question_score.score for question_score in top_scores],
-            [question_score.weight for question_score in top_scores],
-            [question_score.question_type in ("numeric", "discrete") for question_score in top_scores],
-        ),
-        worst_bot=next(bot for bot in eligible_bots if bot.name == field.worst_eligible.name),
-    )
-
-
-def compute_team_accuracy(team_raw: dict[str, Any]) -> TeamAccuracy:
-    outcome_probabilities = binary_outcome_probabilities(team_raw)
-    pro_team = outcome_probabilities.get(PRO_TEAM_NAME, {})
-    bot_team = outcome_probabilities.get(BOT_TEAM_NAME, {})
-    if set(pro_team) != set(bot_team) or not pro_team:
-        raise ValueError("The Pro Team and Bot Team need forecasts on the same, non-empty set of binary questions")
-    question_ids = sorted(pro_team)
-    weights = [pro_team[question_id][1] for question_id in question_ids]
-    if any(weight != 1 for weight in weights):
-        logger.warning("Some shared binary questions have weights below 1; the team accuracy CIs ignore weights")
-    questions = questions_by_id(team_raw)
-    resolutions = [questions[question_id]["resolution"] for question_id in question_ids]
-    pro_probabilities = [pro_team[question_id][0] for question_id in question_ids]
-    bot_probabilities = [bot_team[question_id][0] for question_id in question_ids]
-    ratio, ratio_ci = paired_probability_ratio(bot_probabilities, pro_probabilities)
-    return TeamAccuracy(
-        binary_question_count=len(question_ids),
-        yes_rate=yes_rate(resolutions),
-        base_rate_probability=base_rate_geometric_mean_probability(resolutions, weights),
-        pro_team_probability=geometric_mean_probability(pro_probabilities, weights),
-        pro_team_ci=geometric_mean_probability_ci(pro_probabilities),
-        bot_team_probability=geometric_mean_probability(bot_probabilities, weights),
-        bot_team_ci=geometric_mean_probability_ci(bot_probabilities),
-        bot_to_pro_ratio=ratio,
-        bot_to_pro_ratio_ci=ratio_ci,
     )
 
 
@@ -1169,7 +979,6 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
         raise FileNotFoundError(f"No team comparison file for the main bot team size {main_size_key}")
     main_team_raw = load_json(team_size_files[main_size_key])
     head_to_head = compute_head_to_head(main_team_raw, config)
-    team_accuracy = compute_team_accuracy(main_team_raw)
     question_pairs = shared_question_pairs(main_team_raw)
     del main_team_raw
     season_trend = compute_season_trend(config, head_to_head)
@@ -1189,12 +998,7 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
     bot_rows = build_leaderboard(bots)
     scored_bot_questions = [question for question in bot_questions.values() if is_scored(question)]
     scored_binary = [question for question in scored_bot_questions if question["type"] == "binary"]
-    field = compute_field(
-        bot_rows,
-        [score for participant in bots for score in participant.score_values],
-        len(scored_bot_questions),
-    )
-    bot_field_accuracy = compute_bot_field_accuracy(bot_raw, field, bot_participants)
+    field = compute_field(bot_rows, len(scored_bot_questions))
     non_primary_bots = find_non_primary_bots(bot_raw)
     del bot_raw
 
@@ -1266,6 +1070,4 @@ def compute_season_results(simulations_folder: Path, config: SeasonConfig) -> Se
         metac=metac,
         experiment_groups=find_metac_experiment_groups(metac.baseline_rows, metac.other_rows),
         example_questions=pick_example_questions(bot_questions, config.example_question_ids),
-        bot_field_accuracy=bot_field_accuracy,
-        team_accuracy=team_accuracy,
     )

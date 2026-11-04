@@ -216,7 +216,7 @@ def test_compute_field_groups_bots() -> None:
         _row("metac-uniform-probability-bot", -12, questions=100, rank=13),
         _row("weak", -20, questions=90, rank=14),
     ]
-    field = compute_field(rows, [1.0, -1.0, 3.0, -3.0], scored_question_count=100)
+    field = compute_field(rows, scored_question_count=100)
     assert field.eligible_min_questions == 50
     assert field.promising_min_questions == 10
     assert [row.name for row in field.promising] == ["promising"]
@@ -224,7 +224,6 @@ def test_compute_field_groups_bots() -> None:
     assert field.worst_eligible.name == "weak"
     assert field.uniform_reference is not None and field.uniform_reference.average_score == -12
     assert field.tenth_place.name == "top-9"
-    assert field.per_question_score_sd == pytest.approx(math.sqrt(5))
     assert field.top_bot_clearly_ahead is False
 
 
@@ -284,22 +283,6 @@ def test_compute_season_results_on_synthetic_folder(pros_ahead_folder: Path, syn
     assert runner_up.shared_question_count == BOT_QUESTION_COUNT - len(ANNULLED_BOT_QUESTION_IDS)
     assert results.season_trend.current.season_label == "Summer 2026"
     assert results.example_questions[0].title == "Short?"
-
-
-def test_accuracy_results_on_synthetic_folder(pros_ahead_folder: Path, synthetic_config: SeasonConfig) -> None:
-    results = compute_season_results(pros_ahead_folder, synthetic_config)
-    field_accuracy = results.bot_field_accuracy
-    assert field_accuracy.top_bot.name == results.field.rows[0].name
-    assert field_accuracy.worst_bot.name == results.field.worst_eligible.name
-    assert field_accuracy.top_bot.typical_probability > field_accuracy.median_probability > field_accuracy.worst_bot.typical_probability
-    assert "metac-uniform-probability-bot" not in {bot.name for bot in field_accuracy.eligible_bots}
-    assert 0 < field_accuracy.yes_rate < 1
-    assert 0 <= field_accuracy.share_below_base_rate <= 1
-    team_accuracy = results.team_accuracy
-    assert team_accuracy.binary_question_count == results.head_to_head.question_type_counts["binary"]
-    assert team_accuracy.bot_to_pro_ratio == pytest.approx(
-        team_accuracy.bot_team_probability / team_accuracy.pro_team_probability
-    )
 
 
 def test_compute_season_results_requires_main_team_file(pros_ahead_folder: Path, synthetic_config: SeasonConfig) -> None:

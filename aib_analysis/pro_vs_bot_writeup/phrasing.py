@@ -15,7 +15,6 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     PROMISING_MIN_SHARE_OF_QUESTIONS,
     SIGNIFICANCE_LEVEL,
     TOP_N,
-    BotFieldAccuracy,
     FieldSummary,
     HeadToHeadResult,
     IndividualResults,
@@ -25,7 +24,6 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     SeasonResults,
     SeasonTrend,
     SeasonTrendPoint,
-    TeamAccuracy,
     TeamSizeResult,
     require_head_to_head_vs_main,
     split_baseline_name,
@@ -414,27 +412,6 @@ def team_size_vs_main_paragraph(team_sizes: list[TeamSizeResult], main_size: int
     return " ".join(sentences)
 
 
-def top_baseline_takeaway(metac: MetacResults) -> str:
-    top = metac.top_baseline
-    standing = metac.current_standing
-    sentence = (
-        f"**The top-ranked same-prompt Metac Bot was {top.name}:** Metaculus ran "
-        f"{len(metac.baseline_rows)} bots that used the same prompt but different LLMs or search setups. "
-        f"{top.name} finished first among these, and {ordinal(standing.rank)} of {standing.bot_count} overall in "
-        "the bot tournament."
-    )
-    if metac.runner_up_comparison is not None:
-        sentence += f" {runner_up_sentence(metac.runner_up_comparison)}"
-    higher_average_rows = metac.higher_average_on_fewer_questions()
-    if higher_average_rows:
-        standout = higher_average_rows[0]
-        sentence += (
-            f" {standout.name} had a higher average ({format_score(standout.average_score)}) but forecast on only "
-            f"{standout.question_count} questions{_late_start_clause(metac, standout)}."
-        )
-    return sentence
-
-
 def runner_up_sentence(comparison: RunnerUpComparison) -> str:
     runner_up = comparison.runner_up.name
     ci = comparison.difference_ci
@@ -553,7 +530,7 @@ def top_10_spread_takeaway(field: FieldSummary) -> str:
 
 def field_paragraph(field: FieldSummary, chart_min_questions: int, hidden_count: int) -> str:
     sentences = [
-        f"The first chart below shows every bot with at least {chart_min_questions} scored questions in leaderboard "
+        f"The chart below shows every bot with at least {chart_min_questions} scored questions in leaderboard "
         "order, with its average spot peer score and 95% confidence interval.",
         f"Among the {field.eligible_count} bots that forecast on at least half of the "
         f"{field.scored_question_count} questions, the highest average was "
@@ -582,112 +559,8 @@ def field_paragraph(field: FieldSummary, chart_min_questions: int, hidden_count:
     return " ".join(sentences)
 
 
-def field_band_paragraph(field: FieldSummary, chart_min_questions: int) -> str:
-    counts = field.luck_band_counts(chart_min_questions)
-    lead = (
-        "Luck alone can't explain how spread out the bots are"
-        if counts.more_spread_than_luck
-        else "The spread is about what luck alone would produce"
-    )
-    return (
-        "The second chart plots each bot's average against how many questions it forecast. The shaded band shows "
-        "how much luck alone moves an average: a bot exactly as good as the typical bot in the field (a true average "
-        "of 0) would land inside the band about 95% of the time, given how much bot scores vary from question to "
-        "question. The band is wide on the left because an average over a few questions swings a lot, and narrow on "
-        "the right because more questions even out the luck. Bots above the band did better than luck alone "
-        f"explains. {lead}: {counts.above} of the {counts.shown} bots shown sit above the band and {counts.below} "
-        f"below it, where we'd expect only about {round(counts.expected_per_side)} on each side if every bot were "
-        "exactly as good as the typical bot. Lines show 95% confidence intervals for the highlighted bots."
-    )
-
-
 def format_whole_percent(share: float) -> str:
     return f"{100 * share:.0f}%"
-
-
-def format_percent(probability: float) -> str:
-    return f"{100 * probability:.1f}%"
-
-
-def accuracy_takeaway(accuracy: BotFieldAccuracy) -> str:
-    return (
-        "**The top bot gave the actual outcome a typical probability of "
-        f"{format_percent(accuracy.top_bot.typical_probability)}, vs {format_percent(accuracy.median_probability)} "
-        "for the median bot:** The lowest-scoring bot gave a typical probability of "
-        f"{format_percent(accuracy.worst_bot.typical_probability)}. For reference, a coin flip scores 50%, and always "
-        f"forecasting {format_percent(accuracy.yes_rate)} (the share of binary questions that resolved Yes) scores "
-        f"{format_percent(accuracy.base_rate_probability)}. {round(100 * accuracy.share_below_base_rate)}% of bots did "
-        "worse than that. These figures pertain to only binary questions among the "
-        f"{len(accuracy.eligible_bots)} bots that forecast on at least half of the questions."
-    )
-
-
-def accuracy_definition_paragraph() -> str:
-    return (
-        "Peer scores only say how a forecaster compares with the others. To show accuracy in absolute terms, we use "
-        "each forecaster's typical probability on the outcome: on each binary question, take the probability it "
-        "gave to the outcome that actually happened, then take the geometric mean across questions. The geometric "
-        "mean counts confident misses heavily, just as peer scores do. A coin flip scores 50% and a perfect "
-        "forecaster 100%."
-    )
-
-
-def bot_field_accuracy_paragraph(accuracy: BotFieldAccuracy) -> str:
-    return (
-        f"On the {accuracy.binary_question_count} binary questions in the bot tournament, the top bot "
-        f"({accuracy.top_bot.name}) gave the outcome that happened a typical probability of "
-        f"{format_percent(accuracy.top_bot.typical_probability)}. The median bot gave "
-        f"{format_percent(accuracy.median_probability)} and the lowest-scoring bot "
-        f"{format_percent(accuracy.worst_bot.typical_probability)} (among the {len(accuracy.eligible_bots)} bots that "
-        f"forecast on at least half of the questions). Always forecasting this season's Yes rate of "
-        f"{format_percent(accuracy.yes_rate)} (the observed percentage of times questions resolved \"Yes\") would score {format_percent(accuracy.base_rate_probability)}, and "
-        f"{round(100 * accuracy.share_below_base_rate)}% of these bots scored below that."
-    )
-
-
-def team_accuracy_paragraph(team: TeamAccuracy) -> str:
-    sentences = [
-        f"On the {team.binary_question_count} binary questions in the Pro comparison, the Pro team gave the actual "
-        f"outcome a typical probability of {format_percent(team.pro_team_probability)} and the bot team "
-        f"{format_percent(team.bot_team_probability)}."
-    ]
-    ratio_text = f"{team.bot_to_pro_ratio:.2f}×"
-    if team.bot_to_pro_ratio_ci is None:
-        sentences.append(f"The bot team's typical probability was {ratio_text} the Pro team's.")
-    else:
-        lower, upper = team.bot_to_pro_ratio_ci
-        sentences.append(
-            f"The bot team's typical probability was {ratio_text} the Pro team's (95% CI: {lower:.2f}× to {upper:.2f}×)."
-        )
-        if lower <= 1 <= upper:
-            sentences.append("The interval includes 1 (equal accuracy), so this gap could be due to chance.")
-        elif upper < 1:
-            sentences.append(
-                "The interval is entirely below 1, so the Pro team's edge on these questions is unlikely to be due to "
-                "chance alone."
-            )
-        else:
-            sentences.append(
-                "The interval is entirely above 1, so the bot team's edge on these questions is unlikely to be due to "
-                "chance alone."
-            )
-    sentences.append(
-        f"These values depend on the question mix (the Yes rate on these questions was {format_percent(team.yes_rate)}), "
-        "so compare them only with values on the same questions."
-    )
-    return " ".join(sentences)
-
-
-def peer_score_translation_paragraph(accuracy: BotFieldAccuracy) -> str:
-    return (
-        "Peer scores can translate into this scale. A binary peer score of +X means a forecaster gave the actual outcome "
-        "about e^(X/100) times the typical probability the rest of the field did (+10 ≈ 1.11×, +20 ≈ 1.22×), and the "
-        f"field's typical probability this season was {format_percent(accuracy.field_probability)}. Numeric and "
-        "discrete peer scores are halved, so there +X means about e^(2X/100) times the field's probability density at "
-        f"the outcome. Counting every question type this way, {accuracy.top_bot.name}'s average spot peer score of "
-        f"{format_score(accuracy.top_bot_average_peer_score)} means it gave the actual outcome about "
-        f"{accuracy.top_bot_field_multiplier:.2f}× the probability (or probability density) the rest of the field did."
-    )
 
 
 def experiment_fact_lines(results: SeasonResults) -> list[str]:

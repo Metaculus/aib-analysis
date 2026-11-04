@@ -19,7 +19,6 @@ EXPECTED_SECTION_ORDER = [
     "## Main takeaways",
     "## Introduction",
     "## Are bots better than human Pros?",
-    "## How accurate are the forecasts in absolute terms?",
     "## Which bots did best?",
     "## How do LLMs compare?",
     "## Links to code and data",

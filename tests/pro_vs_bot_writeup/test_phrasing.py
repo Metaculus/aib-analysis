@@ -8,8 +8,6 @@ import pytest
 from aib_analysis.pro_vs_bot_writeup import phrasing
 from aib_analysis.pro_vs_bot_writeup.results import (
     BaselineRankPoint,
-    BotFieldAccuracy,
-    BotTypicalProbability,
     FieldSummary,
     HeadToHeadResult,
     IndividualResults,
@@ -18,7 +16,6 @@ from aib_analysis.pro_vs_bot_writeup.results import (
     RunnerUpComparison,
     SeasonTrend,
     SeasonTrendPoint,
-    TeamAccuracy,
     TeamSizeResult,
 )
 
@@ -225,16 +222,6 @@ def test_team_size_text_requires_head_to_head_scores_against_the_main_team() -> 
         phrasing.team_size_vs_main_paragraph(missing, 10)
 
 
-def test_field_band_paragraph_counts_bots_outside_the_band() -> None:
-    field = _field([(10.0, 20.0)] * 10)
-    rows = [_row(rank, f"bot-{rank}", average=average, questions=100) for rank, average in enumerate([30.0] * 6 + [0.0] * 30 + [-30.0] * 4, start=1)]
-    text = phrasing.field_band_paragraph(dataclasses.replace(field, rows=rows), chart_min_questions=10)
-    assert "about 95% of the time" in text
-    assert "Luck alone can't explain how spread out the bots are: 6 of the 40 bots shown sit above the band and 4 below it, where we'd expect only about 1 on each side" in text
-    calm = [_row(rank, f"bot-{rank}", average=0.0, questions=100) for rank in range(1, 41)]
-    assert "The spread is about what luck alone would produce" in phrasing.field_band_paragraph(dataclasses.replace(field, rows=calm), 10)
-
-
 def _metac(
     history: list[BaselineRankPoint],
     close: bool,
@@ -267,16 +254,6 @@ def _metac(
     )
 
 
-def test_top_baseline_takeaway_compares_with_the_runner_up() -> None:
-    history = [BaselineRankPoint("Summer 2026", 24, 282, "metac-model-a+asknews")]
-    text = phrasing.top_baseline_takeaway(_metac(history, close=True))
-    assert "24th of 282 overall" in text
-    assert (
-        "However, it scored only 0.71 points higher than the runner-up, metac-model-b+asknews, on the 309 questions "
-        'both forecast (95% CI: [-3.14, 4.56]), so it\'s hard to declare any one setup "the best."' in text
-    )
-
-
 @pytest.mark.parametrize(
     ("gap", "expected"),
     [
@@ -296,8 +273,6 @@ def test_runner_up_sentence_branches(gap: tuple[float, tuple[float, float] | Non
 def test_higher_average_bots_that_started_late_are_called_out() -> None:
     history = [BaselineRankPoint("Summer 2026", 24, 282, "metac-model-a+asknews")]
     metac = _metac(history, close=True, late_starter_average=12.84)
-    takeaway = phrasing.top_baseline_takeaway(metac)
-    assert "metac-model-c+asknews had a higher average (12.84) but forecast on only 150 questions, starting 3 weeks into the season." in takeaway
     section = phrasing.metac_comparison_sentence(metac)
     assert section.startswith("metac-model-a+asknews ranked first by sum of spot peer scores, with an average of 10.00")
     assert (
@@ -340,7 +315,6 @@ def _field(top_cis: list[tuple[float, float]]) -> FieldSummary:
         tenth_place=rows[min(10, len(rows)) - 1],
         promising=[],
         promising_min_questions=30,
-        per_question_score_sd=40.0,
         uniform_reference=None,
         top_10_average_ci_width=8.0,
     )
@@ -366,62 +340,6 @@ def test_top_10_spread_takeaway() -> None:
     text = phrasing.top_10_spread_takeaway(separated)
     assert text.startswith("**Some top-10 bots are clearly separated from others:**")
     assert "9 of the 45 pairs" in text
-
-
-def _team_accuracy(ratio_ci: tuple[float, float] | None) -> TeamAccuracy:
-    return TeamAccuracy(
-        binary_question_count=46,
-        yes_rate=0.391,
-        base_rate_probability=0.512,
-        pro_team_probability=0.637,
-        pro_team_ci=(0.538, 0.756),
-        bot_team_probability=0.630,
-        bot_team_ci=(0.53, 0.75),
-        bot_to_pro_ratio=0.988,
-        bot_to_pro_ratio_ci=ratio_ci,
-    )
-
-
-@pytest.mark.parametrize(
-    ("ratio_ci", "expected"),
-    [
-        ((0.918, 1.064), "The interval includes 1 (equal accuracy), so this gap could be due to chance."),
-        ((0.90, 0.97), "the Pro team's edge on these questions is unlikely to be due to chance alone."),
-        ((1.02, 1.10), "the bot team's edge on these questions is unlikely to be due to chance alone."),
-    ],
-)
-def test_team_accuracy_paragraph_branches(ratio_ci: tuple[float, float], expected: str) -> None:
-    text = phrasing.team_accuracy_paragraph(_team_accuracy(ratio_ci))
-    assert "the Pro team gave the actual outcome a typical probability of 63.7% and the bot team 63.0%" in text
-    assert expected in text
-
-
-def test_accuracy_takeaway() -> None:
-    eligible = [
-        BotTypicalProbability("laertes", 0.635, 160),
-        BotTypicalProbability("middle", 0.556, 150),
-        BotTypicalProbability("weakest", 0.417, 150),
-        BotTypicalProbability("below-base", 0.50, 150),
-    ]
-    accuracy = BotFieldAccuracy(
-        binary_question_count=167,
-        yes_rate=0.383,
-        base_rate_probability=0.515,
-        field_probability=0.554,
-        eligible_bots=eligible,
-        top_bot=eligible[0],
-        top_bot_average_peer_score=17.91,
-        top_bot_field_multiplier=1.302,
-        worst_bot=eligible[2],
-    )
-    text = phrasing.accuracy_takeaway(accuracy)
-    assert text.startswith("**The top bot gave the actual outcome a typical probability of 63.5%, vs 52.8% for the median bot:**")
-    assert "The lowest-scoring bot gave a typical probability of 41.7%." in text
-    assert "always forecasting 38.3% (the share of binary questions that resolved Yes) scores 51.5%. 50% of bots did worse than that." in text
-    assert text.endswith("These figures pertain to only binary questions among the 4 bots that forecast on at least half of the questions.")
-    translation = phrasing.peer_score_translation_paragraph(accuracy)
-    assert "there +X means about e^(2X/100) times the field's probability density" in translation
-    assert "laertes's average spot peer score of 17.91 means it gave the actual outcome about 1.30× the probability (or probability density)" in translation
 
 
 @pytest.mark.parametrize(

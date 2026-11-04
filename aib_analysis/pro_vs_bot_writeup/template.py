@@ -116,10 +116,8 @@ class ChartFiles:
     team_size: str
     team_size_vs_main: str
     individuals: str
-    accuracy: str
     top_bots: str
     field_rank: str
-    field: str
     metac: str
 
 
@@ -129,7 +127,6 @@ def render_writeup(results: SeasonResults, config: SeasonConfig, charts: ChartFi
         _takeaways_section(results, config),
         _introduction_section(results, config),
         _pros_vs_bots_section(results, config, charts),
-        _accuracy_section(results, charts),
         _top_bots_section(results, config, charts, field_hidden_count),
         _model_comparison_section(results, charts),
         _links_section(config),
@@ -249,9 +246,7 @@ def _takeaways_section(results: SeasonResults, config: SeasonConfig) -> str:
             "effort, agentic Metac Bots; see the LLM section), who the top bot makers were (students and hobbyists "
             "vs companies, from the bot maker survey), and notable rule or question-mix changes"
         ),
-        phrasing.accuracy_takeaway(results.bot_field_accuracy),
         phrasing.baseline_history_takeaway(results.metac),
-        phrasing.top_baseline_takeaway(results.metac),
     ]
     return "\n".join(
         ["## Main takeaways", "", "**Top findings:**", ""]
@@ -317,19 +312,6 @@ def _pros_vs_bots_section(results: SeasonResults, config: SeasonConfig, charts: 
     )
 
 
-def _accuracy_section(results: SeasonResults, charts: ChartFiles) -> str:
-    return "\n\n".join(
-        [
-            "## How accurate are the forecasts in absolute terms?",
-            phrasing.accuracy_definition_paragraph(),
-            _image(charts.accuracy),
-            phrasing.bot_field_accuracy_paragraph(results.bot_field_accuracy),
-            phrasing.team_accuracy_paragraph(results.team_accuracy),
-            phrasing.peer_score_translation_paragraph(results.bot_field_accuracy),
-        ]
-    )
-
-
 def _top_bots_section(results: SeasonResults, config: SeasonConfig, charts: ChartFiles, field_hidden_count: int) -> str:
     field = results.field
     metac = results.metac
@@ -350,8 +332,6 @@ def _top_bots_section(results: SeasonResults, config: SeasonConfig, charts: Char
             "### The whole field",
             phrasing.field_paragraph(field, FIELD_CHART_MIN_QUESTIONS, field_hidden_count),
             _image(charts.field_rank),
-            phrasing.field_band_paragraph(field, FIELD_CHART_MIN_QUESTIONS),
-            _image(charts.field),
             "### The winning bot",
             fill_me(
                 f"describe the winning bot ({field.rows[0].name}) in 2-4 sentences from its maker's public "
@@ -597,16 +577,6 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
                     "head-to-head score for a question that resolves Yes is 100 × ln(bot_team_prediction / "
                     "pro_team_prediction).",
                     f"* {weights_text}",
-                    "* **Typical probability on the outcome:** On a binary question that resolved Yes, a forecaster's "
-                    "probability on the outcome is the P(Yes) it forecast; if it resolved No, it is 1 − P(Yes). A "
-                    "forecaster's typical probability on the outcome is the geometric mean of these across the binary "
-                    "questions it forecast, exp(Σ wᵢ ln pᵢ / Σ wᵢ), using the same question weights wᵢ as the "
-                    "leaderboards. It is the exponentiated log score, so it rewards honest forecasts, and it tracks "
-                    "peer scores closely. We use it instead of the share of questions forecast on the right side of "
-                    "the base rate (i.e. traditional \"accuracy\"), which rewards pushing forecasts past the base rate and ignores confidence. Only "
-                    "binary questions are used, because for multiple-choice and numeric questions the probability on "
-                    "the outcome depends on the number of options or the width of the numeric bins. Confidence "
-                    "intervals use a t-distribution on the log probabilities.",
                     "* **Ranking by sum:** We rank participants on leaderboards by the sum of their spot peer scores "
                     "to reduce the noise caused by bots that got high averages by getting lucky on only a few "
                     "questions. Ranking by sum incentivizes forecasting on more questions, which reduces our "
