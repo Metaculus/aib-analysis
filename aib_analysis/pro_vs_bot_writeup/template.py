@@ -64,12 +64,10 @@ QUESTION_TYPE_DESCRIPTIONS = {
     "multiple_choice": "Multiple choice",
 }
 TITLE_SUGGESTIONS = {
-    ("pros", "strong"): "Pros Beat Bots",
-    ("pros", "weak"): "Pros Edge Out Bots",
-    ("pros", "none"): "Pros Edge Out Bots, Without Statistical Significance",
-    ("bots", "strong"): "Bots Beat Pros",
-    ("bots", "weak"): "Bots Edge Out Pros",
-    ("bots", "none"): "Bots Edge Out Pros, Without Statistical Significance",
+    ("pros", True): "Pros Beat Bots",
+    ("pros", False): "Pros Edge Out Bots, Without Statistical Significance",
+    ("bots", True): "Bots Beat Pros",
+    ("bots", False): "Bots Edge Out Pros, Without Statistical Significance",
 }
 INDIVIDUAL_CHART_ROWS = 20
 TOP_BOTS_CHART_ROWS = 20
@@ -224,7 +222,7 @@ def _season_trend_table(trend: SeasonTrend) -> str:
 
 def _title_block(results: SeasonResults, config: SeasonConfig) -> str:
     head_to_head = results.head_to_head
-    suggestion = TITLE_SUGGESTIONS[(head_to_head.leader, head_to_head.evidence)]
+    suggestion = TITLE_SUGGESTIONS[(head_to_head.leader, head_to_head.is_significant)]
     return "\n\n".join(
         [
             f"# FutureEval {config.label} Results: {phrasing.FILL_ME}",
@@ -614,8 +612,12 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
                     "questions. Ranking by sum incentivizes forecasting on more questions, which reduces our "
                     "uncertainty (i.e., gives tighter error bars).",
                     "* **Statistical tests:** Confidence intervals are 95% intervals using a t-distribution. We test "
-                    "whether one team outperformed the other with a one-sided t-test on the per-question head-to-head "
-                    "scores, and call a result significant when p < 0.05. To compare a season with the previous one, "
+                    "whether the two teams' scores differ with a two-sided t-test on the per-question head-to-head "
+                    "scores, since we don't assume in advance which team will do better, and call a result "
+                    "significant when p < 0.05. A significant result means the 95% confidence interval excludes "
+                    "zero, and the side of zero it falls on shows which team did better. Our posts from Q1 2025 to "
+                    "Spring 2026 reported one-sided p-values, which are half as large; none of their conclusions "
+                    "change under a two-sided test. To compare a season with the previous one, "
                     "we use a two-sample z-test on the two seasons' means and confidence intervals.",
                 ]
             ),

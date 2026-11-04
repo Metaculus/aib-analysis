@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from scipy import stats as scipy_stats
 
 from aib_analysis.pro_vs_bot_writeup.results import (
     LeaderboardRow,
@@ -52,25 +53,26 @@ def _scores(mean: float, spread: float, count: int = 40) -> list[float]:
 
 
 @pytest.mark.parametrize(
-    ("bot_mean", "spread", "leader", "evidence"),
+    ("bot_mean", "spread", "leader", "is_significant"),
     [
-        (-10.0, 5.0, "pros", "strong"),
-        (-2.0, 7.0, "pros", "weak"),
-        (-0.5, 10.0, "pros", "none"),
-        (10.0, 5.0, "bots", "strong"),
-        (2.0, 7.0, "bots", "weak"),
-        (0.5, 10.0, "bots", "none"),
+        (-10.0, 5.0, "pros", True),
+        (-2.0, 7.0, "pros", False),
+        (-0.5, 10.0, "pros", False),
+        (10.0, 5.0, "bots", True),
+        (2.0, 7.0, "bots", False),
+        (0.5, 10.0, "bots", False),
     ],
 )
-def test_head_to_head_direction_and_evidence(
-    synthetic_config: SeasonConfig, bot_mean: float, spread: float, leader: str, evidence: str
+def test_head_to_head_direction_and_significance(
+    synthetic_config: SeasonConfig, bot_mean: float, spread: float, leader: str, is_significant: bool
 ) -> None:
-    raw = make_team_tournament(_scores(bot_mean, spread), BOT_MEMBERS, PRO_MEMBERS)
+    bot_scores = _scores(bot_mean, spread)
+    raw = make_team_tournament(bot_scores, BOT_MEMBERS, PRO_MEMBERS)
     result = compute_head_to_head(raw, synthetic_config)
     assert result.leader == leader
-    assert result.evidence == evidence
+    assert result.is_significant == is_significant
     assert result.question_count == 40
-    assert result.p_pros_better + result.p_bots_better == pytest.approx(1)
+    assert result.p_value == pytest.approx(scipy_stats.ttest_1samp(bot_scores, 0).pvalue)
     assert result.pro_member_count == 2
 
 

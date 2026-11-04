@@ -63,7 +63,6 @@ BOT_TEAM_VS_MAIN_FILE_PATTERN = re.compile(
 COMBINED_QUESTION_NOTES_PATTERN = re.compile(r"^Combined \S+ \(QID:(?P<pro_id>\d+)\) and \S+ \(QID:(?P<bot_id>\d+)\)")
 
 Leader = Literal["pros", "bots"]
-Evidence = Literal["strong", "weak", "none"]
 
 
 @dataclass(frozen=True)
@@ -158,8 +157,7 @@ class HeadToHeadResult:
     question_count: int
     bot_team_mean: float
     ci: tuple[float, float]
-    p_pros_better: float
-    p_bots_better: float
+    p_value: float
     pro_wins: int
     bot_wins: int
     ties: int
@@ -175,17 +173,8 @@ class HeadToHeadResult:
         return "bots" if self.bot_team_mean > 0 else "pros"
 
     @property
-    def leader_p_value(self) -> float:
-        return self.p_bots_better if self.leader == "bots" else self.p_pros_better
-
-    @property
-    def evidence(self) -> Evidence:
-        lower, upper = self.ci
-        if upper < 0 or lower > 0:
-            return "strong"
-        if self.leader_p_value < SIGNIFICANCE_LEVEL:
-            return "weak"
-        return "none"
+    def is_significant(self) -> bool:
+        return self.p_value < SIGNIFICANCE_LEVEL
 
 
 @dataclass(frozen=True)
@@ -689,7 +678,6 @@ def compute_head_to_head(raw: dict[str, Any], config: SeasonConfig) -> HeadToHea
 
     question_ids = sorted(bot_scores_by_question)
     bot_scores = [bot_scores_by_question[question_id] for question_id in question_ids]
-    pro_scores = [pro_scores_by_question[question_id] for question_id in question_ids]
     bot_team_mean = statistics.fmean(bot_scores)
     if bot_team_mean == 0:
         raise ValueError("The bot team and Pro team tied exactly; the precommitted phrasing has no tie branch")
@@ -698,18 +686,22 @@ def compute_head_to_head(raw: dict[str, Any], config: SeasonConfig) -> HeadToHea
         raise ValueError(
             f"Could not compute a t-based 95% CI for the head-to-head scores ({len(bot_scores)} questions)"
         )
+    p_value = MeanHypothesisCalculator.test_if_mean_is_equal_to_than_hypothesis_mean(
+        bot_scores, 0, CONFIDENCE_LEVEL
+    ).p_value
+    ci_excludes_zero = interval[0] > 0 or interval[1] < 0
+    if (p_value < SIGNIFICANCE_LEVEL) != ci_excludes_zero:
+        raise ValueError(
+            f"The two-sided p-value ({p_value:.4f}) and the 95% CI ({interval[0]:.2f} to {interval[1]:.2f}) "
+            "disagree on significance, but the write-up describes them as agreeing"
+        )
     bot_win_scores = [score for score in bot_scores if score > 0]
     pro_win_scores = [-score for score in bot_scores if score < 0]
     return HeadToHeadResult(
         question_count=len(bot_scores),
         bot_team_mean=bot_team_mean,
         ci=interval,
-        p_pros_better=MeanHypothesisCalculator.test_if_mean_is_greater_than_hypothesis_mean(
-            pro_scores, 0, CONFIDENCE_LEVEL
-        ).p_value,
-        p_bots_better=MeanHypothesisCalculator.test_if_mean_is_greater_than_hypothesis_mean(
-            bot_scores, 0, CONFIDENCE_LEVEL
-        ).p_value,
+        p_value=p_value,
         pro_wins=len(pro_win_scores),
         bot_wins=len(bot_win_scores),
         ties=len(bot_scores) - len(pro_win_scores) - len(bot_win_scores),

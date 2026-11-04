@@ -23,13 +23,12 @@ from aib_analysis.pro_vs_bot_writeup.results import (
 )
 
 
-def _head_to_head(mean: float, ci: tuple[float, float], p_pros_better: float) -> HeadToHeadResult:
+def _head_to_head(mean: float, ci: tuple[float, float], p_value: float) -> HeadToHeadResult:
     return HeadToHeadResult(
         question_count=97,
         bot_team_mean=mean,
         ci=ci,
-        p_pros_better=p_pros_better,
-        p_bots_better=1 - p_pros_better,
+        p_value=p_value,
         pro_wins=60,
         bot_wins=37,
         ties=0,
@@ -47,42 +46,41 @@ def _row(rank: int, name: str, user_type: str = "bot", average: float = 10.0, ci
 
 
 HEADLINE_CASES = [
-    (-10.0, (-14.0, -6.0), 0.0001, "**Pro forecasters significantly outperformed bots:**", "entirely below zero"),
-    (-3.0, (-6.1, 0.1), 0.03, "**Pro forecasters outperformed bots, but the evidence is weak:**", "still includes zero"),
-    (-0.26, (-6.47, 5.96), 0.468, "**Pro forecasters beat bots but without significance:**", "confirm Pros were genuinely ahead"),
-    (10.0, (6.0, 14.0), 0.9999, "**Bots significantly outperformed Pro forecasters:**", "entirely above zero"),
-    (3.0, (-0.1, 6.1), 0.97, "**Bots outperformed Pro forecasters, but the evidence is weak:**", "still includes zero"),
-    (0.26, (-5.96, 6.47), 0.532, "**Bots beat Pro forecasters but without significance:**", "confirm bots were genuinely ahead"),
+    (-10.0, (-14.0, -6.0), 0.0001, "**Pro forecasters significantly outperformed bots:**", "(two-sided p < 0.001)"),
+    (-3.0, (-6.1, 0.1), 0.06, "**Pro forecasters beat bots but without significance:**", "(two-sided p = 0.060)"),
+    (-0.26, (-6.47, 5.96), 0.935, "**Pro forecasters beat bots but without significance:**", "confirm Pros were genuinely ahead"),
+    (10.0, (6.0, 14.0), 0.0001, "**Bots significantly outperformed Pro forecasters:**", "entirely above zero"),
+    (0.26, (-5.96, 6.47), 0.935, "**Bots beat Pro forecasters but without significance:**", "confirm bots were genuinely ahead"),
 ]
 
 
-@pytest.mark.parametrize(("mean", "ci", "p_pros_better", "heading", "phrase"), HEADLINE_CASES)
-def test_headline_takeaway_branches(mean: float, ci: tuple[float, float], p_pros_better: float, heading: str, phrase: str) -> None:
-    text = phrasing.headline_takeaway(_head_to_head(mean, ci, p_pros_better), pro_count=10, bot_team_size=10)
+@pytest.mark.parametrize(("mean", "ci", "p_value", "heading", "phrase"), HEADLINE_CASES)
+def test_headline_takeaway_branches(mean: float, ci: tuple[float, float], p_value: float, heading: str, phrase: str) -> None:
+    text = phrasing.headline_takeaway(_head_to_head(mean, ci, p_value), pro_count=10, bot_team_size=10)
     assert text.startswith(heading)
     assert phrase in text
     assert f"{abs(mean):.2f} head-to-head points per question" in text
 
 
 def test_headline_names_the_winner_first() -> None:
-    pros_text = phrasing.headline_takeaway(_head_to_head(-0.26, (-6.47, 5.96), 0.468), 10, 10)
-    bots_text = phrasing.headline_takeaway(_head_to_head(0.26, (-5.96, 6.47), 0.532), 10, 10)
+    pros_text = phrasing.headline_takeaway(_head_to_head(-0.26, (-6.47, 5.96), 0.935), 10, 10)
+    bots_text = phrasing.headline_takeaway(_head_to_head(0.26, (-5.96, 6.47), 0.935), 10, 10)
     assert "Our team of 10 Metaculus Pro Forecasters outperformed the top-10 bot team" in pros_text
     assert "The top-10 bot team outperformed our team of 10 Metaculus Pro Forecasters" in bots_text
 
 
 @pytest.mark.parametrize(
-    ("mean", "ci", "p_pros_better", "expected"),
+    ("mean", "ci", "p_value", "expected"),
     [
-        (-10.0, (-14.0, -6.0), 0.0001, "demonstrates that Pros significantly outperformed bots (p < 0.001)"),
-        (-3.0, (-6.1, 0.1), 0.03, "so the evidence is weak"),
-        (-0.26, (-6.47, 5.96), 0.468, "did not demonstrate that Pros outperformed bots"),
-        (0.26, (-5.96, 6.47), 0.532, "did not demonstrate that bots outperformed Pros"),
-        (10.0, (6.0, 14.0), 0.9999, "The positive score indicates that the bot team had higher accuracy"),
+        (-10.0, (-14.0, -6.0), 0.0001, "A two-sided t-test demonstrates that Pros significantly outperformed bots (p < 0.001)"),
+        (-3.0, (-6.1, 0.1), 0.06, "did not demonstrate that Pros outperformed bots to a statistically significant degree (p = 0.060)"),
+        (-0.26, (-6.47, 5.96), 0.935, "did not demonstrate that Pros outperformed bots"),
+        (0.26, (-5.96, 6.47), 0.935, "did not demonstrate that bots outperformed Pros"),
+        (10.0, (6.0, 14.0), 0.0001, "The positive score indicates that the bot team had higher accuracy"),
     ],
 )
-def test_head_to_head_paragraph_branches(mean: float, ci: tuple[float, float], p_pros_better: float, expected: str) -> None:
-    text = phrasing.head_to_head_paragraph(_head_to_head(mean, ci, p_pros_better))
+def test_head_to_head_paragraph_branches(mean: float, ci: tuple[float, float], p_value: float, expected: str) -> None:
+    text = phrasing.head_to_head_paragraph(_head_to_head(mean, ci, p_value))
     assert expected in text
     assert "Pros scored better on 60 of the 97 questions (62%) and bots on 37 (38%)." in text
 

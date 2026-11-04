@@ -97,7 +97,7 @@ def headline_takeaway(head_to_head: HeadToHeadResult, pro_count: int, bot_team_s
     pro_team = f"our team of {pro_count} Metaculus Pro Forecasters"
     bot_team = f"the top-{bot_team_size} bot team"
     margin = format_score(abs(head_to_head.bot_team_mean))
-    p_text = format_p(head_to_head.leader_p_value)
+    p_text = format_p(head_to_head.p_value)
     lower, upper = (format_score(value) for value in head_to_head.ci)
     if head_to_head.leader == "pros":
         winner, loser, winner_label, loser_label, side = pro_team, bot_team, "Pro forecasters", "bots", "below"
@@ -106,21 +106,15 @@ def headline_takeaway(head_to_head: HeadToHeadResult, pro_count: int, bot_team_s
         winner, loser, winner_label, loser_label, side = bot_team, pro_team, "Bots", "Pro forecasters", "above"
         short_winner = "bots"
     edge = f"{winner[0].upper()}{winner[1:]} outperformed {loser} by an average of {margin} head-to-head points per question."
-    if head_to_head.evidence == "strong":
+    if head_to_head.is_significant:
         return (
             f"**{winner_label} significantly outperformed {loser_label}:** {edge} This edge is statistically "
-            f"significant (one-sided {p_text}), and the bot team's 95% confidence interval ({lower} to {upper}) "
+            f"significant (two-sided {p_text}), and the bot team's 95% confidence interval ({lower} to {upper}) "
             f"sits entirely {side} zero."
-        )
-    if head_to_head.evidence == "weak":
-        return (
-            f"**{winner_label} outperformed {loser_label}, but the evidence is weak:** {edge} A one-sided t-test "
-            f"finds this edge significant ({p_text}), but the bot team's 95% confidence interval ({lower} to "
-            f"{upper}) still includes zero."
         )
     return (
         f"**{winner_label} beat {loser_label} but without significance:** {edge} But this edge is small relative "
-        f"to the question-to-question variation and not statistically significant (one-sided {p_text}), so this "
+        f"to the question-to-question variation and not statistically significant (two-sided {p_text}), so this "
         f"sample doesn't give us enough evidence to confirm {short_winner} were genuinely ahead this season."
     )
 
@@ -128,7 +122,7 @@ def headline_takeaway(head_to_head: HeadToHeadResult, pro_count: int, bot_team_s
 def head_to_head_paragraph(head_to_head: HeadToHeadResult) -> str:
     lower, upper = (format_score(value) for value in head_to_head.ci)
     winner, loser = ("Pro team", "bot team") if head_to_head.leader == "pros" else ("bot team", "Pro team")
-    margin_clause = "." if head_to_head.evidence == "strong" else ", but only marginally."
+    margin_clause = "." if head_to_head.is_significant else ", but only marginally."
     sentences = [
         f"In the end, the {winner} beat the {loser}{margin_clause}",
         "We calculated the head-to-head scores of the two teams, along with 95% confidence intervals "
@@ -142,20 +136,15 @@ def head_to_head_paragraph(head_to_head: HeadToHeadResult) -> str:
     else:
         sentences.append("The positive score indicates that the bot team had higher accuracy than the Pro team.")
         leader, trailer = "bots", "Pros"
-    p_text = format_p(head_to_head.leader_p_value)
-    if head_to_head.evidence == "strong":
+    p_text = format_p(head_to_head.p_value)
+    if head_to_head.is_significant:
         sentences.append(
-            f"A one-sided t-test demonstrates that {leader} significantly outperformed {trailer} ({p_text}), and "
+            f"A two-sided t-test demonstrates that {leader} significantly outperformed {trailer} ({p_text}), and "
             "the 95% confidence interval does not include zero."
-        )
-    elif head_to_head.evidence == "weak":
-        sentences.append(
-            f"A one-sided t-test demonstrates that {leader} outperformed {trailer} ({p_text}), though the 95% "
-            "confidence interval still includes zero, so the evidence is weak."
         )
     else:
         sentences.append(
-            f"A one-sided t-test did not demonstrate that {leader} outperformed {trailer} to a statistically "
+            f"A two-sided t-test did not demonstrate that {leader} outperformed {trailer} to a statistically "
             f"significant degree ({p_text}). The 95% confidence interval includes zero."
         )
     sentences.append(question_wins_sentence(head_to_head))
