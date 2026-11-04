@@ -56,7 +56,7 @@ def test_headline_takeaway_branches(mean: float, ci: tuple[float, float], p_valu
     text = phrasing.headline_takeaway(_head_to_head(mean, ci, p_value), pro_count=10, bot_team_size=10)
     assert text.startswith(heading)
     assert phrase in text
-    assert f"{abs(mean):.2f} head-to-head points per question" in text
+    assert f"by an average of {abs(mean):.2f} points per question" in text
 
 
 def test_headline_names_the_winner_first() -> None:
@@ -128,7 +128,24 @@ def test_trend_paragraph_lists_clear_wins_and_skipped_seasons() -> None:
     text = phrasing.trend_paragraph(_trend(5.0, 12.0, 0.04))
     assert "when its 95% confidence interval is entirely on one side of zero." in text
     assert "Pros won with significance in Q2 2025 and bots won with significance in Spring 2026 and Summer 2026." in text
+    assert "Between Spring and Summer, the bot team's score went from 5 to 12, a statistically significant change" in text
     assert "There was no Pro comparison in Fall 2025, so it is not shown." in text
+
+
+def test_trend_paragraph_notes_near_misses() -> None:
+    trend = SeasonTrend(
+        points=[
+            SeasonTrendPoint("Q3 2024", -11.3, (-21.8, -0.7), None, False),
+            SeasonTrendPoint("Q4 2024", -8.9, (-18.8, 1.0), None, False),
+            SeasonTrendPoint("Spring 2026", -1.25, (-4.87, 2.37), 99, True),
+        ],
+        change_p_value=0.01,
+        skipped_seasons=(),
+    )
+    text = phrasing.trend_paragraph(trend)
+    assert "Pros won with significance in Q3 2024, with Q4 2024 barely crossing into non-significance." in text
+    assert "Between Q4 2024 and Spring 2026, the bot team's score went from -8.9 to -1.25" in text
+    assert "barely" not in phrasing.trend_takeaway(trend)
 
 
 def test_clear_wins_sentence_without_clear_winners() -> None:
@@ -147,22 +164,42 @@ def _individuals(order: list[str]) -> IndividualResults:
 
 
 def test_individuals_takeaway_when_every_pro_beats_every_bot() -> None:
-    text = phrasing.individuals_takeaway(_individuals(["pro"] * 3 + ["bot"] * 10))
+    text = phrasing.individuals_takeaway(_individuals(["pro"] * 3 + ["bot"] * 10), _trend(-1.25, -0.26, 0.784))
     assert text.startswith("**Every individual Pro beat every individual bot:**")
-    assert "the top 3 places would all be taken by Pros" in text
+    assert "On a leaderboard ranking bots and Pros individually, the top 3 spots are all taken by Pros." in text
+    assert "This is down from 9 of the top 10 spots last season." in text
 
 
 def test_individuals_takeaway_when_some_pros_beat_every_bot() -> None:
-    text = phrasing.individuals_takeaway(_individuals(["pro"] * 4 + ["bot"] + ["pro"] * 6 + ["bot"] * 5))
+    text = phrasing.individuals_takeaway(
+        _individuals(["pro"] * 4 + ["bot"] + ["pro"] * 2 + ["bot"] * 3 + ["pro"] * 4), _trend(-1.25, -0.26, 0.784)
+    )
     assert text.startswith("**Four of ten individual Pros beat every individual bot:**")
-    assert "9 of the top 10 places would be taken by Pros" in text
+    assert (
+        "On a leaderboard ranking bots and Pros individually, the top 4 spots are taken by Pros, and they take 6 of "
+        "the top 10. This is down from 9 of the top 10 spots last season." in text
+    )
     assert "Note that" not in text
 
 
+def test_individuals_takeaway_compares_with_the_previous_pro_comparison(monkeypatch: pytest.MonkeyPatch) -> None:
+    nine_pros_in_top_10 = _individuals(["pro"] * 4 + ["bot"] + ["pro"] * 5 + ["bot"] * 5)
+    assert phrasing.individuals_takeaway(nine_pros_in_top_10, _trend(-1.25, -0.26, 0.784)).endswith("This is the same as last season.")
+    across_fall_2025 = dataclasses.replace(
+        _trend(-1.25, -0.26, 0.784),
+        points=[SeasonTrendPoint("Q2 2025", -20.03, (-28.63, -11.41), 93, False), SeasonTrendPoint("Spring 2026", -1.25, (-4.87, 2.37), 99, True)],
+    )
+    assert "PUBLISHED_PROS_IN_INDIVIDUAL_TOP_10" in phrasing.individuals_takeaway(nine_pros_in_top_10, across_fall_2025)
+    monkeypatch.setitem(phrasing.PUBLISHED_PROS_IN_INDIVIDUAL_TOP_10, "Q2 2025", 10)
+    assert phrasing.individuals_takeaway(nine_pros_in_top_10, across_fall_2025).endswith(
+        "This is down from 10 of the top 10 spots in Q2 2025."
+    )
+
+
 def test_individuals_takeaway_when_a_bot_is_first() -> None:
-    text = phrasing.individuals_takeaway(_individuals(["bot", "pro", "pro", "bot"]))
+    text = phrasing.individuals_takeaway(_individuals(["bot", "pro", "pro", "bot"]), _trend(-1.25, -0.26, 0.784))
     assert text.startswith("**A bot topped the combined leaderboard of Pros and bots:**")
-    assert "name-1 would take 1st place" in text
+    assert "name-1 takes 1st place, and Pros take 2 of the top 10." in text
 
 
 def test_individuals_paragraph_counts_bots_above_lowest_pro() -> None:
@@ -185,16 +222,22 @@ def test_team_size_takeaway_when_larger_teams_did_worse() -> None:
         _team_size(274, -12.1, (-17.98, -5.7), is_all=True),
     ]
     text = phrasing.team_size_takeaway(sizes, 10)
-    assert text.startswith("**Bot teams of 30 or more bots did worse than the top 10:**")
-    assert "a team of all 274 bots scored -12.10" in text
-    assert "Smaller teams, down to the top bot alone, scored between -3.59 and 0.89." in text
-    assert "Merely increasing the size of a bot team" in text
+    assert text.startswith("**Bot teams of 30 or more bots did worse than a team of the top 10 bots:**")
+    assert "a team of all 274 bots scored -12.10." in text
+    assert (
+        "No smaller team did significantly worse than the top 10. The top bot alone scored -3.59, and a team of the "
+        "top 8 bots scored 0.89. However, bot teams of size 30 and greater did significantly worse, so increasing the "
+        "size of a bot team does not automatically improve accuracy." in text
+    )
     assert "peak" not in text
     pro_chart_paragraph = phrasing.team_size_paragraph(sizes, 10)
+    assert "The largest team includes all 274 bots that forecast on at least one bot-only question." in pro_chart_paragraph
     assert "The chart below shows each team's average head-to-head score against the Pro team" in pro_chart_paragraph
     assert "The highest point estimate came from a team of the top 8 bots (0.89 [-5.11, 6.89])." in pro_chart_paragraph
     assert "significantly" not in pro_chart_paragraph
     paragraph = phrasing.team_size_vs_main_paragraph(sizes, 10)
+    assert paragraph.startswith("The chart above shows performance vs Pros but doesn't properly indicate whether")
+    assert "There is more statistical power here (smaller error bars)" in paragraph
     assert "we also scored each team head-to-head against the top-10 team on the same questions" in paragraph
     assert "The chart below shows each team's average head-to-head score against the top-10 team" in paragraph
     assert "The top 8 bots did significantly better than the top 10." in paragraph
@@ -208,7 +251,13 @@ def test_team_size_takeaway_other_headings() -> None:
     no_difference = [_team_size(1, -1.0), _team_size(10, 0.0), _team_size(50, 0.5, is_all=True)]
     text = phrasing.team_size_takeaway(no_difference, 10)
     assert text.startswith("**Bot team size made no clear difference:**")
-    assert "Merely increasing" not in text
+    assert "does not automatically improve accuracy" not in text
+    smaller_worse = [_team_size(1, -8.0, (-9.0, -2.0)), _team_size(5, -1.0), _team_size(10, 0.0), _team_size(30, -3.0, (-4.0, -1.0), is_all=True)]
+    assert (
+        "Of the smaller teams, the top bot alone did significantly worse than the top 10. The top bot alone scored "
+        "-8.00, and a team of the top 5 bots scored -1.00. Bot teams of size 30 and greater did significantly worse"
+        in phrasing.team_size_takeaway(smaller_worse, 10)
+    )
     mixed = [_team_size(1, -1.0), _team_size(10, 0.0), _team_size(30, 3.0, (0.5, 5.5)), _team_size(50, -0.5, is_all=True)]
     assert phrasing.team_size_takeaway(mixed, 10).startswith("**Bot team size had mixed effects:**")
     assert "No team did significantly better or worse than the top 10." in phrasing.team_size_vs_main_paragraph(no_difference, 10)
@@ -274,7 +323,9 @@ def test_higher_average_bots_that_started_late_are_called_out() -> None:
     history = [BaselineRankPoint("Summer 2026", 24, 282, "metac-model-a+asknews")]
     metac = _metac(history, close=True, late_starter_average=12.84)
     section = phrasing.metac_comparison_sentence(metac)
-    assert section.startswith("metac-model-a+asknews ranked first by sum of spot peer scores, with an average of 10.00")
+    assert section.startswith(
+        "metac-model-a+asknews ranked first among the same-prompt bots by sum of spot peer scores, with an average of 10.00"
+    )
     assert (
         "metac-model-c+asknews (12.84 on 150 questions, starting 3 weeks into the season) had a higher average than "
         "metac-model-a+asknews but forecast on fewer questions, so it ranks lower by sum." in section
@@ -299,7 +350,8 @@ def test_baseline_history_takeaway(previous: BaselineRankPoint, expected_heading
     history = [previous, BaselineRankPoint("Summer 2026", 24, 282, "metac-model-a+asknews")]
     text = phrasing.baseline_history_takeaway(_metac(history, close=False))
     assert expected_heading in text
-    assert "and 24th of 282 this season (metac-model-a+asknews)" in text
+    assert "The best standardized Metaculus Bot (metac-model-a+asknews), using our single prompt, placed" in text
+    assert text.endswith("and 24th of 282 this season.")
 
 
 def _field(top_cis: list[tuple[float, float]]) -> FieldSummary:

@@ -89,6 +89,14 @@ PUBLISHED_PRO_VS_BOT_RESULTS: tuple[PublishedTeamResult, ...] = (
     PublishedTeamResult("Spring 2026", -1.25, -4.87, 2.37, 99),
 )
 
+# Seasons with no clear winner whose 95% CI only just crossed zero; the trend paragraph says so.
+NEAR_MISS_SEASONS: tuple[str, ...] = ("Q4 2024",)
+
+# How many of the top 10 spots Pros took on the leaderboard ranking bots and Pros individually.
+PUBLISHED_PROS_IN_INDIVIDUAL_TOP_10: dict[str, int] = {
+    "Spring 2026": 9,
+}
+
 PUBLISHED_BASELINE_BOT_RANKS: tuple[PublishedBaselineBotRank, ...] = (
     PublishedBaselineBotRank("Q3 2024", 4, 55),
     PublishedBaselineBotRank("Q4 2024", 6, 44),

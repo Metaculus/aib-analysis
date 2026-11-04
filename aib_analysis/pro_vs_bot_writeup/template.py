@@ -146,8 +146,11 @@ def _number_or_fill_me(value: float | None, reminder: str) -> str:
     return phrasing.format_compact(value) if value is not None else fill_me(reminder)
 
 
-def _bot_window_text(windows: tuple[BotQuestionWindow, ...]) -> str:
-    """E.g. "1.5 hours", or "1.5 hours (through June 4) or 3 hours (from June 5 on)" when the window changed."""
+def _bot_window_text(windows: tuple[BotQuestionWindow, ...], parenthesized: bool = True) -> str:
+    """E.g. "1.5 hours", or "1.5 hours (through June 4) or 3 hours (from June 5 on)" when the window changed.
+
+    With parenthesized=False: "1.5 hours through June 4 and 3 hours from June 5 on".
+    """
     hours = [_number_or_fill_me(window.open_hours, "hours each bot question stays open, e.g. 1.5") for window in windows]
     if len(windows) == 1:
         return f"{hours[0]} hours"
@@ -161,8 +164,13 @@ def _bot_window_text(windows: tuple[BotQuestionWindow, ...]) -> str:
             span = f"from {month_day(window.first_open_date)} on"
         else:
             span = f"{month_day(window.first_open_date)} to {last_day}"
-        parts.append(f"{window_hours} hours ({span})")
-    return join_names(parts, conjunction="or")
+        if parenthesized:
+            parts.append(f"{window_hours} hours ({span})")
+        elif window.first_open_date is not None and last_day is not None:
+            parts.append(f"{window_hours} hours from {span}")
+        else:
+            parts.append(f"{window_hours} hours {span}")
+    return join_names(parts, conjunction="or" if parenthesized else "and")
 
 
 def _image(path: str) -> str:
@@ -224,8 +232,9 @@ def _title_block(results: SeasonResults, config: SeasonConfig) -> str:
         [
             f"# FutureEval {config.label} Results: {phrasing.FILL_ME}",
             fill_me(
-                "a short headline for the top finding. Past titles: \"Pros Beat Bots, but the Gap is Nearly Gone\" "
-                f"(Spring 2026) and \"Pros Maintain Clear Lead\" (Q2 2025). Precommitted suggestion: \"{suggestion}\""
+                "a short headline for the top finding. Past titles: \"Pros Beat Bots, Gap Remains Small\" (Summer 2026), "
+                "\"Pros Beat Bots, but the Gap is Nearly Gone\" (Spring 2026), and \"Pros Maintain Clear Lead\" "
+                f"(Q2 2025). Precommitted suggestion: \"{suggestion}\""
             ),
         ]
     )
@@ -235,7 +244,7 @@ def _takeaways_section(results: SeasonResults, config: SeasonConfig) -> str:
     top_findings = [
         phrasing.headline_takeaway(results.head_to_head, results.head_to_head.pro_member_count, config.main_bot_team_size),
         phrasing.trend_takeaway(results.season_trend),
-        phrasing.individuals_takeaway(results.individuals),
+        phrasing.individuals_takeaway(results.individuals, results.season_trend),
     ]
     other_takeaways = [
         phrasing.team_size_takeaway(results.team_sizes, config.main_bot_team_size),
@@ -291,7 +300,7 @@ def _pros_vs_bots_section(results: SeasonResults, config: SeasonConfig, charts: 
         [
             "## Are bots better than human Pros?",
             f"To compare the bots to Pros, we used only the {head_to_head.question_count} questions that were "
-            "identical in the bot and Pro tournament and that were not annulled or otherwise had resolution issues. "
+            "identical in the bot and Pro tournaments and that were not annulled or otherwise had resolution issues. "
             "We then aggregated forecasts of the \"bot team\" and the \"Pro team\" (see Appendix A for how teams are "
             f"chosen and scored). The bot team was {join_names(list(head_to_head.bot_team_members))}.",
             phrasing.head_to_head_paragraph(head_to_head),
@@ -583,11 +592,9 @@ def _methodology_appendix(results: SeasonResults, config: SeasonConfig) -> str:
                     "uncertainty (i.e., gives tighter error bars).",
                     "* **Statistical tests:** Confidence intervals are 95% intervals using a t-distribution. We test "
                     "whether the two teams' scores differ with a two-sided t-test on the per-question head-to-head "
-                    "scores, since we don't assume in advance which team will do better, and call a result "
-                    "significant when p < 0.05. A significant result means the 95% confidence interval excludes "
-                    "zero, and the side of zero it falls on shows which team did better. Our posts from Q1 2025 to "
-                    "Spring 2026 reported one-sided p-values, which are half as large; none of their conclusions "
-                    "change under a two-sided test. To compare a season with the previous one, "
+                    "scores, and call a result significant when p < 0.05. A significant result means the 95% "
+                    "confidence interval excludes zero, and the side of zero it falls on shows which team did "
+                    "better. To compare a season with the previous one, "
                     "we use a two-sample z-test on the two seasons' means and confidence intervals.",
                 ]
             ),
@@ -669,7 +676,7 @@ def _season_disclosures(results: SeasonResults, config: SeasonConfig) -> list[st
             else f"The bot question window changed during the season. {fill_me('say why the window changed')}"
         )
         disclosures.append(
-            f"{window_change} Questions stayed open for {_bot_window_text(config.bot_question_windows)}."
+            f"{window_change} Questions stayed open for {_bot_window_text(config.bot_question_windows, parenthesized=False)}."
         )
     disclosures.extend(
         _close_time_note(

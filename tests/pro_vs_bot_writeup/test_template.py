@@ -113,7 +113,8 @@ def test_writeup_describes_a_mid_season_window_change(pros_ahead_folder: Path, s
     assert "metac-autocast was named metac-agent until October 15, 2026" in appendix
     assert (
         "Due to reliability issues in GitHub Actions, where most bot makers run their bots, the bot question window "
-        "changed during the season. Questions stayed open for" in appendix
+        "changed during the season. Questions stayed open for 1.5 hours through June 4 and 3 hours from June 5 on."
+        in appendix
     )
     assert "human account" not in appendix
     assert appendix.index("metac-autocast was named") < appendix.index(FILL_ME)
