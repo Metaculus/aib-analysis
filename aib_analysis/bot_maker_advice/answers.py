@@ -63,9 +63,6 @@ class SurveyAnswers:
     withheld_abandoned_count: int
     open_source_bots: tuple[OpenSourceBot, ...]
 
-    def by_id(self) -> dict[int, Answer]:
-        return {answer.answer_id: answer for answer in self.answers}
-
 
 def assign_answer_ids(count: int, seed: str) -> list[int]:
     """Random two-digit IDs (three digits past 90 answers), so an ID says nothing about when someone answered."""
@@ -113,6 +110,8 @@ def load_answers(survey_csv: Path, id_seed: str) -> SurveyAnswers:
         if any(cell.strip() for cell in row)
     ]
     answered = [record for record in records if record["lessons"] and not _is_null_answer(record["lessons"])]
+    if not answered:
+        raise ValueError(f"No answers to the lessons question in {survey_csv}")
     answer_ids = assign_answer_ids(len(answered), id_seed)
     answers = []
     withheld_abandoned_count = 0

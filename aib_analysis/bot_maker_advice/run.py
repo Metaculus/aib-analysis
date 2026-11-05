@@ -61,8 +61,10 @@ def load_survey_evidence(config: AdviceSeasonConfig) -> list[SurveyEvidence] | N
         return None
     path = REPO_ROOT / config.survey_report_markdown
     if not path.exists():
-        logger.warning(f"No survey analysis report at {path}; skipping the data check. Run the survey analysis first to include it.")
-        return None
+        raise FileNotFoundError(
+            f"No survey analysis report at {path}. Run the survey analysis first, or set survey_report_markdown=None in "
+            "season_config.py to skip the data check."
+        )
     evidence = parse_survey_evidence(path.read_text())
     logger.info(f"Read {len(evidence)} survey analysis results ({sum(item.significant for item in evidence)} significant) from {path}")
     return evidence

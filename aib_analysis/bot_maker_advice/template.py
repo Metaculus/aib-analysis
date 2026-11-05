@@ -65,7 +65,7 @@ def format_q(q_text: str) -> str:
 def render_writeup(result: AnalysisResult, config: AdviceSeasonConfig, code_version: CodeVersion) -> str:
     sections = [
         f"# Advice from Bot Makers to Bot Makers ({config.label})",
-        _introduction(result, config),
+        _introduction(result, config, code_version),
         _themes_section(result, config),
         _one_offs_section(result),
         _open_source_section(result),
@@ -75,9 +75,14 @@ def render_writeup(result: AnalysisResult, config: AdviceSeasonConfig, code_vers
     return "\n\n".join(sections) + "\n"
 
 
-def _introduction(result: AnalysisResult, config: AdviceSeasonConfig) -> str:
+def _is_precommitted(code_version: CodeVersion) -> bool:
+    return code_version.commit is not None and not code_version.method_has_uncommitted_changes
+
+
+def _introduction(result: AnalysisResult, config: AdviceSeasonConfig, code_version: CodeVersion) -> str:
     theme_count = len(result.published_themes)
     example_id = result.published_themes[0].exemplars[0].answer_id if theme_count and result.published_themes[0].exemplars else result.survey.answers[0].answer_id
+    rules = "following rules we fixed before running them" if _is_precommitted(code_version) else "following fixed rules"
     tournament = _link(f"{config.label} FutureEval tournament", config.tournament_url, "link the tournament page")
     pro_vs_bot = _link(f"{config.label} Pros vs bots analysis", config.pro_vs_bot_post_url, "link the season's Pros vs bots post")
     survey = _link(f"{config.label} bot survey analysis", config.survey_post_url, "link the season's bot survey analysis post")
@@ -88,8 +93,7 @@ def _introduction(result: AnalysisResult, config: AdviceSeasonConfig) -> str:
             f"{plural(theme_count, 'theme')}, then lists notable one-off ideas and every answer in full.",
             f"Each bot maker has a random ID (like #{example_id}) that stays the same throughout the post, and all quotes are "
             "verbatim. Many bot makers can't run extensive A/B tests, so some of this advice reflects experience more than "
-            "measured results. AI models found the themes and checked every citation, following rules we fixed before "
-            "running them; Appendix A explains how.",
+            f"measured results. AI models found the themes and checked every citation, {rules}; Appendix A explains how.",
             f"This post complements the {pro_vs_bot} and the {survey}, which compares what bots did with how they scored.",
         ]
     )
@@ -130,8 +134,8 @@ def _themes_section(result: AnalysisResult, config: AdviceSeasonConfig) -> str:
             fill_me(
                 f'the theme "{stats.theme.label}" had {len(stats.supporters)} supporting bot makers, but the two coders agreed '
                 f"too little to publish it automatically (Krippendorff's alpha {stats.alpha or 0:.2f}, below the precommitted "
-                f"{method.MIN_CODER_ALPHA}). Publish it as theme {len(result.published_themes) + 1}, sharpen its definition and "
-                "rerun, or delete this note; qa_review.md lists its citations"
+                f"{method.MIN_CODER_ALPHA}). Publish it as another theme, sharpen its definition and rerun, or delete this "
+                "note; qa_review.md lists its citations"
             )
         )
     if not result.published_themes:
@@ -195,7 +199,7 @@ def _theme_quality_table(result: AnalysisResult) -> str:
 
 
 def _version_sentence(code_version: CodeVersion) -> str:
-    if code_version.commit is None or code_version.method_has_uncommitted_changes:
+    if not _is_precommitted(code_version):
         return fill_me("the analysis ran with uncommitted changes to the method; commit them, rerun, and cite the commit here")
     return f"The rules were fixed in [the analysis code]({ANALYSIS_CODE_URL}) at commit {code_version.commit} before this analysis ran."
 

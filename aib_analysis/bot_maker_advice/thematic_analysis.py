@@ -287,8 +287,8 @@ async def pick_one_offs(
         if item.verdict == "supported" and not item.covered_by_theme and item.answer_id not in {chosen.answer_id for chosen in first_per_answer}:
             first_per_answer.append(item)
     chosen = sorted(first_per_answer, key=lambda item: item.answer_id in quoted_ids)[: method.MAX_ONE_OFFS]
-    chosen_keys = {(item.answer_id, item.label) for item in chosen}
-    return [replace(item, selected=(item.answer_id, item.label) in chosen_keys) for item in reviews]
+    chosen_ids = {id(item) for item in chosen}
+    return [replace(item, selected=id(item) in chosen_ids) for item in reviews]
 
 
 async def check_against_survey(
