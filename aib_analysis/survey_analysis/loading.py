@@ -45,14 +45,13 @@ def _split_bot_list(raw: str) -> list[str]:
 class PrizeOwner:
     owner_username: str
     bot_usernames: list[str]
-    winner_count: int
     aib_prize: float
     total_prize: float
     in_futureeval: bool
 
     @property
     def won_any(self) -> bool:
-        return self.winner_count > 0 or self.aib_prize > 0
+        return self.aib_prize > 0
 
 
 @dataclass
@@ -159,17 +158,16 @@ def load_prize_owners() -> list[PrizeOwner]:
         ]
         owners: list[PrizeOwner] = []
         for row in reader:
-            username = (row.get("owner_username") or "").strip()
-            bots_raw = (row.get("bot_usernames") or "").strip()
+            username = (row["owner_username"] or "").strip()
+            bots_raw = (row["bot_usernames"] or "").strip()
             if not username and not bots_raw:
                 continue  # aggregate/summary row
             owners.append(
                 PrizeOwner(
                     owner_username=username,
                     bot_usernames=_split_bot_list(bots_raw),
-                    winner_count=_to_int(row.get("winner_count")),
-                    aib_prize=_to_float(row.get("aib_prize")),
-                    total_prize=_to_float(row.get("total_prize")),
+                    aib_prize=_to_float(row["aib_prize"]),
+                    total_prize=_to_float(row["total_prize"]),
                     in_futureeval=_to_bool(row["in_aib"]),
                 )
             )
@@ -186,10 +184,6 @@ def _to_float(value: str | None) -> float:
         return float(text)
     except ValueError:
         raise ValueError(f"Expected a number in the prize sheet, got {value!r}") from None
-
-
-def _to_int(value: str | None) -> int:
-    return int(_to_float(value))
 
 
 def _to_bool(value: str) -> bool:
@@ -273,8 +267,7 @@ def _resolve_winner(
     raise ValueError(
         f"Cannot determine bot-level winner status for {bot_name!r}: owner "
         f"{owner.owner_username!r} has {len(owner.bot_usernames)} bots and the prize sheet "
-        f"only records owner-level wins (winner_count={owner.winner_count}, "
-        f"aib_prize={owner.aib_prize}). Add a row for this bot to "
+        f"only records owner-level wins (aib_prize={owner.aib_prize}). Add a row for this bot to "
         f"{config.MANUAL_WINNER_OVERRIDES_CSV}."
     )
 

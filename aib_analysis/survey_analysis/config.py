@@ -50,10 +50,12 @@ PARSING_REVIEW_MD = os.path.join(OUTPUT_DIR, "parsing_review.md")
 # --------------------------------------------------------------------------- #
 # Group definitions (confirmed with user)
 # --------------------------------------------------------------------------- #
-# winner       = won any AIB prize (prize-stats winner_count > 0 OR aib_prize > 0)
+# winner       = won any AIB prize (prize-stats aib_prize > 0)
 # top_10       = top 10 bots by sum of spot peer score on the FULL leaderboard
 # non_winner   = every responding bot that is not a winner
 TOP_N_FOR_TOP_GROUP = 10
+# Bots Metaculus runs itself; they do not answer the survey.
+METACULUS_HOUSE_BOT_PREFIX = "metac-"
 
 # Performance metric for the analysis is each bot's AVERAGE spot peer score
 # (its summed score divided by the number of questions it forecast), which

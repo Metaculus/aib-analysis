@@ -135,14 +135,13 @@ def test_prize_tokenized_match_against_bot_list():
         PrizeOwner(
             owner_username="someone",
             bot_usernames=["5cast-v1", "5cast-v2"],
-            winner_count=1,
             aib_prize=100.0,
             total_prize=100.0,
             in_futureeval=True,
         )
     ]
     owner, kind = _match_prize("5cast-v1", owners)
-    assert owner is not None and owner.winner_count == 1
+    assert owner is not None and owner.aib_prize == 100.0
     assert kind == "exact"
 
 

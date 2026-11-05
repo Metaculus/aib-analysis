@@ -52,7 +52,7 @@ def generate_parsing_decisions() -> str:
 
     lines.append("## Groups")
     lines.append("")
-    lines.append("- Winner: won any AIB prize (prize-stats `winner_count > 0` or `aib_prize > 0`).")
+    lines.append("- Winner: won any AIB prize (prize-stats `aib_prize > 0`).")
     lines.append(
         f"- Top 10: top {config.TOP_N_FOR_TOP_GROUP} bots by sum of spot peer score on the full "
         "leaderboard, computed from the saved bot tournament."
@@ -177,6 +177,12 @@ def generate_parsing_decisions() -> str:
         "- Winner and top-10 groups are defined on total (summed) score, matching the official "
         "leaderboard and prizes; only the performance metric for correlations uses the average."
     )
+    fewest_sources, most_sources = config.MODERATE_RESEARCH_SOURCE_RANGE
+    lines.append(
+        f"- \"Uses {fewest_sources} to {most_sources} research sources\" is yes when the research-source "
+        f"count (ticked options plus listed write-in sources) is between {fewest_sources} and "
+        f"{most_sources}, inclusive, and no otherwise. A blank research answer is missing."
+    )
     lines.append(
         "- Questions missed is the one feature not taken from the survey: the number of scored "
         "questions whose spot-scoring time came after the bot's first forecast, minus the number the "
@@ -196,7 +202,6 @@ def generate_parsing_decisions() -> str:
         "this is the same number as a point-biserial correlation.)"
     )
     lines.append("- Ranked or counted traits vs peer score: Spearman rank correlation.")
-    lines.append("- Winners vs non-winners on a yes/no trait: Fisher exact test on the 2x2 table.")
     lines.append(
         "- Correlations need at least 8 paired, varying observations; otherwise they are reported as "
         "insufficient data."

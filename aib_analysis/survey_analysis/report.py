@@ -21,7 +21,6 @@ from datetime import date
 from aib_analysis.survey_analysis import (
     config,
     loading,
-    parsing,
     plots,
     precommitted,
     season_notes,
@@ -44,11 +43,6 @@ _PEER_SCORE_URL = "https://www.metaculus.com/help/scores-faq/#peer-score"
 _MINIBENCH_URL = "https://www.metaculus.com/aib/minibench/"
 
 _WITHHELD = "withheld until the precommitted hypotheses are reviewed"
-
-# Identifies the research option for Metaculus/Manifold search tools, which
-# overlaps with the similar-questions strategy without counting toward it.
-_MARKET_SEARCH_TOOL_SUBSTRING = "metaculus/manifold"
-
 
 def _rel(path: str) -> str:
     return os.path.relpath(path, config.OUTPUT_DIR)
@@ -186,30 +180,31 @@ def _labeled_scores_numeric(
     features: list[RespondentFeatures], key: str, n_bins: int = 3, value_fmt=_fmt_num
 ) -> list[tuple[str, list[float]]]:
     pairs = sorted(
-        (f.variables[key], f.score)
-        for f in features
-        if f.variables.get(key) is not None and f.score is not None
+        ((f.variables[key], f.score) for f in features if f.variables.get(key) is not None and f.score is not None),
+        key=lambda pair: pair[0],
     )
     total = len(pairs)
+    if total == 0:
+        return []
     if total < 2 * plots.MIN_CELL_SIZE:
         n_bins = 2
-    # Merge any bins that end up with the same range label (e.g. heavily tied
-    # values), preserving first-seen order. Robust to non-adjacent duplicates.
-    merged: dict[str, list[float]] = {}
-    order: list[str] = []
-    for bin_index in range(n_bins):
-        low = bin_index * total // n_bins
-        high = (bin_index + 1) * total // n_bins
+    # Each cut moves forward past tied values, so bots with the same value always
+    # share a bin and a bin's membership never depends on score.
+    cuts = [0]
+    for bin_index in range(1, n_bins):
+        cut = bin_index * total // n_bins
+        while 0 < cut < total and pairs[cut][0] == pairs[cut - 1][0]:
+            cut += 1
+        if cuts[-1] < cut < total:
+            cuts.append(cut)
+    cuts.append(total)
+    labeled: list[tuple[str, list[float]]] = []
+    for low, high in zip(cuts, cuts[1:]):
         chunk = pairs[low:high]
-        if not chunk:
-            continue
         value_min, value_max = chunk[0][0], chunk[-1][0]
         label = value_fmt(value_min) if value_min == value_max else f"{value_fmt(value_min)} to {value_fmt(value_max)}"
-        if label not in merged:
-            merged[label] = []
-            order.append(label)
-        merged[label].extend(score for _value, score in chunk)
-    return [(label, merged[label]) for label in order]
+        labeled.append((label, [score for _value, score in chunk]))
+    return labeled
 
 
 def _correlation_chart(
@@ -403,6 +398,9 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
     feature_results, q_by_key = _feature_stats(corr_pool)
     leaderboard_rows = get_leaderboard_rows()
     leaderboard_size = len(leaderboard_rows)
+    outside_bot_count = sum(
+        1 for row in leaderboard_rows if not row.bot_name.lower().startswith(config.METACULUS_HOUSE_BOT_PREFIX)
+    )
 
     lines: list[str] = []
     lines.append(f"# {season_notes.SEASON_LABEL} FutureEval bot-maker survey")
@@ -466,7 +464,7 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
 
     lines.append(_methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_size))
     lines.append("")
-    lines.append(_caveats_section(in_scope, corr_pool, counts, leaderboard_size))
+    lines.append(_caveats_section(in_scope, corr_pool, counts, outside_bot_count))
     lines.append("")
     return "\n".join(lines)
 
@@ -610,25 +608,15 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
     return "\n".join(parts)
 
 
-def _market_tool_without_strategy_count(corr_pool: list[RespondentFeatures]) -> int:
-    """Bots that ticked the Metaculus/Manifold search-tool research option but not the strategy."""
-    return sum(
-        1
-        for feature in corr_pool
-        if parsing.feature_present(feature.cells["research"].matched, _MARKET_SEARCH_TOOL_SUBSTRING)
-        and feature.variables.get("uses_similar_qs") == 0.0
-    )
-
-
-def _caveats_section(features, corr_pool, counts, leaderboard_size) -> str:
+def _caveats_section(features, corr_pool, counts, outside_bot_count) -> str:
     owners = [owner for owner in loading.load_prize_owners() if owner.in_futureeval]
     winning_owners = sum(1 for owner in owners if owner.won_any)
     respondent_winner_pct = round(100 * counts["winner"] / len(features)) if features else 0
     field_winner_pct = round(100 * winning_owners / len(owners)) if owners else 0
     lines = ["## Appendix B: Caveats", ""]
     lines.append(
-        f"- Self-selection: Only {len(features)} of the {leaderboard_size} scored bots answered the "
-        "survey, and winners were far likelier to respond since the survey was required to receive "
+        f"- Self-selection: Only {len(features)} of the {outside_bot_count} scored bots not run by "
+        "Metaculus answered the survey, and winners were far likelier to respond since the survey was required to receive "
         f"prizes. {counts['winner']} of {len(features)} analyzed respondents won a prize "
         f"({respondent_winner_pct}%), versus {winning_owners} of the {len(owners)} bot makers who "
         f"entered the FutureEval tournament ({field_winner_pct}%). The distributions and correlations "
@@ -638,7 +626,9 @@ def _caveats_section(features, corr_pool, counts, leaderboard_size) -> str:
     )
     lines.append(
         f"- Small samples: At {len(features)} survey responses, this analysis is generally "
-        "underpowered, so results should be treated as suggestive."
+        "underpowered, so results should be treated as suggestive. With the "
+        f"{len(corr_pool)} bots in the correlations, a correlation has to be roughly 0.3 or stronger to "
+        "pass even the precommitted test, so \"not significant\" does not mean \"no effect\"."
     )
     lines.append(
         "- Self-reported answers: Bot makers can misunderstand questions, accidentally click options, "
@@ -660,8 +650,8 @@ def _caveats_section(features, corr_pool, counts, leaderboard_size) -> str:
         "individual bots' averages in that group. Consequently, a bar sits below the strongest bots in "
         "the group because it blends strong and weak bots. A bar shows only a group's average and "
         "hides the spread within the group, so a clean-looking staircase of bars can still reflect a "
-        "weak overall correlation. Each bar carries a 95% confidence interval to show that spread. The "
-        "r, p, and q values are a better guide."
+        "weak overall correlation. Each bar carries a 95% confidence interval for the group's average, "
+        "not the spread across its bots. The r, p, and q values are a better guide."
     )
     lines.append(
         "- Questions missed: The count cannot tell a bot that stopped early from one that crashed "
@@ -669,18 +659,8 @@ def _caveats_section(features, corr_pool, counts, leaderboard_size) -> str:
         f"{config.MIN_QUESTIONS_FOR_CORRELATION} scored questions, bots that stopped very early are "
         "left out of that analysis."
     )
-    market_tool_only = _market_tool_without_strategy_count(corr_pool)
-    if market_tool_only:
-        lines.append(
-            "- Checking similar questions or markets: This counts only bots whose makers ticked that "
-            f"strategy. {market_tool_only} bots in the correlation set ticked the research option for "
-            "Metaculus/Manifold search tools without ticking the strategy, so they count as not "
-            "checking."
-        )
-    if season_notes.FRONTIER_LATE_DEFINITION_CAVEAT:
-        lines.append(f"- Frontier definition: {season_notes.FRONTIER_LATE_DEFINITION_CAVEAT}")
-    if season_notes.POST_HOC_FEATURE_CAVEAT:
-        lines.append(f"- Features added after seeing results: {season_notes.POST_HOC_FEATURE_CAVEAT}")
+    for caveat in season_notes.LATE_DEFINITION_CAVEATS:
+        lines.append(f"- {caveat}")
     return "\n".join(lines)
 
 

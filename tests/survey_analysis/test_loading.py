@@ -23,7 +23,6 @@ from aib_analysis.survey_analysis.loading import (
     _resolve_winner,
     _split_bot_list,
     _to_float,
-    _to_int,
     load_survey,
     normalize_name,
 )
@@ -48,11 +47,7 @@ def test_split_bot_list_on_commas_and_semicolons():
     assert _split_bot_list("") == []
 
 
-def test_to_int_and_to_float_parse_numbers_and_blanks():
-    assert _to_int("3") == 3
-    assert _to_int("3.0") == 3
-    assert _to_int("") == 0
-    assert _to_int(None) == 0
+def test_to_float_parses_numbers_and_blanks():
     assert _to_float("2.5") == 2.5
     assert _to_float("3,374.02") == pytest.approx(3374.02)
     assert _to_float("") == 0.0
@@ -103,7 +98,6 @@ def _owner(bots: list[str], **kw) -> PrizeOwner:
     return PrizeOwner(
         owner_username=kw.get("owner", "someone"),
         bot_usernames=bots,
-        winner_count=kw.get("winner_count", 1),
         aib_prize=kw.get("aib_prize", 100.0),
         total_prize=kw.get("total_prize", 100.0),
         in_futureeval=True,
@@ -178,25 +172,25 @@ def test_groups_include_top10_only_when_flagged():
 # Bot-level winner resolution (the prize sheet is owner-level)
 # --------------------------------------------------------------------------- #
 def test_single_bot_owner_status_transfers_to_bot():
-    won = _owner(["solo-bot"], winner_count=1, aib_prize=50.0)
+    won = _owner(["solo-bot"], aib_prize=50.0)
     assert _resolve_winner("solo-bot", won, None) == (True, "owner_single_bot")
-    lost = _owner(["solo-bot"], winner_count=0, aib_prize=0.0)
+    lost = _owner(["solo-bot"], aib_prize=0.0)
     assert _resolve_winner("solo-bot", lost, None) == (False, "owner_single_bot")
 
 
 def test_multi_bot_owner_with_no_wins_means_no_winner():
-    owner = _owner(["bot-1", "bot-2"], winner_count=0, aib_prize=0.0)
+    owner = _owner(["bot-1", "bot-2"], aib_prize=0.0)
     assert _resolve_winner("bot-1", owner, None) == (False, "owner_multi_bot_no_wins")
 
 
 def test_multi_bot_owner_with_wins_requires_override():
-    owner = _owner(["bot-1", "bot-2"], winner_count=1, aib_prize=100.0)
+    owner = _owner(["bot-1", "bot-2"], aib_prize=100.0)
     with pytest.raises(ValueError, match="owner-level"):
         _resolve_winner("bot-1", owner, None)
 
 
 def test_override_resolves_ambiguous_multi_bot_owner():
-    owner = _owner(["bot-1", "bot-2"], winner_count=1, aib_prize=100.0)
+    owner = _owner(["bot-1", "bot-2"], aib_prize=100.0)
     override = WinnerOverride(bot_name="bot-1", is_winner=True, reason="best ranked")
     assert _resolve_winner("bot-1", owner, override) == (True, "manual_override")
     loser_override = WinnerOverride(bot_name="bot-2", is_winner=False, reason="worse ranked")

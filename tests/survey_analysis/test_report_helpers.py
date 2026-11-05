@@ -105,6 +105,19 @@ def test_numeric_binning_merges_equal_labels():
     assert len(labeled[0][1]) == 12
 
 
+def test_numeric_binning_never_splits_tied_values_by_score():
+    # Ten bots tied at 1 straddle the first tertile cut; they must all land in one bin,
+    # so the bin cannot be filled with the tied bots that happened to score lowest.
+    values = [0.0, 0.0] + [1.0] * 10 + [2.0, 3.0, 4.0]
+    features = [
+        make_feature(variables={"n_research_sources": value}, score=float(-index))
+        for index, value in enumerate(values)
+    ]
+    labeled = report._labeled_scores_numeric(features, "n_research_sources", n_bins=3)
+    assert [label for label, _scores in labeled] == ["0 to 1", "2 to 4"]
+    assert len(labeled[0][1]) == 12
+
+
 # --------------------------------------------------------------------------- #
 # _labeled_scores_ordinal
 # --------------------------------------------------------------------------- #
