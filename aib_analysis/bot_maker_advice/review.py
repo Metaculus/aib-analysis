@@ -175,8 +175,8 @@ def render_qa_review(result: AnalysisResult, code_version: CodeVersion, usage_no
             ],
         ),
         "## Open-source bots",
-        "Ranks come from the season's official leaderboard. 'MiniBench only' means the survey's bot name matched no "
-        "leaderboard username, so check those. Bots without a repository link are left out of the post.",
+        "Ranks come from the season's official leaderboard. 'Not on the seasonal leaderboard' means the survey's bot name matched no "
+        "leaderboard username: a MiniBench-only bot, or one renamed, so check those. Bots without a repository link are left out of the post.",
         _table(
             ["Bot", "Link", "In post as"],
             [

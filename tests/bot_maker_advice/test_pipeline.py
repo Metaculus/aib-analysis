@@ -120,7 +120,7 @@ def test_open_source_bots_get_official_ranks(analysis: AnalysisResult, synthetic
     section = _section(render_writeup(analysis, synthetic_config), "## Open-source bots", "## Responses in full")
     assert "though these are the ones from this survey:" in section
     assert "* [synthetic-bot-0](https://github.com/example/bot-0), rank 3" in section
-    assert "* [synthetic-bot-1](https://github.com/example/bot-1), MiniBench only" in section
+    assert "* [synthetic-bot-1](https://github.com/example/bot-1), not on the seasonal leaderboard" in section
     assert "synthetic-bot-2" not in section and FILL_ME not in section
 
 

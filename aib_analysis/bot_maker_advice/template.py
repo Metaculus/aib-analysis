@@ -148,11 +148,11 @@ def _one_offs_section(result: AnalysisResult) -> str:
 
 
 def leaderboard_note(bot: OpenSourceBot) -> str:
-    """Spring 2026 style: participant rank with Metac Bots removed, or "MiniBench only" for a bot not on the season's board."""
+    """Participant rank with Metac Bots removed; a survey name with no leaderboard match may be a MiniBench-only bot or a renamed one."""
     if bot.leaderboard_status == "ranked":
         return f", rank {bot.rank}"
     if bot.leaderboard_status == "not_found":
-        return ", MiniBench only"
+        return ", not on the seasonal leaderboard"
     if bot.leaderboard_status == "unranked":
         return ", unranked extra bot"
     return ""
@@ -170,7 +170,7 @@ def _open_source_section(result: AnalysisResult) -> str:
         "\n".join(f"* [{bot.bot_name}]({bot.url}){leaderboard_note(bot)}" for bot in linked),
     ]
     if any(bot.leaderboard_status == "unknown" for bot in linked):
-        blocks.append(fill_me('add each bot\'s rank (participant rank with Metac Bots removed) or "MiniBench only"'))
+        blocks.append(fill_me("add each bot's rank (participant rank with Metac Bots removed), or say it was not on the seasonal leaderboard"))
     return "\n\n".join(blocks)
 
 
