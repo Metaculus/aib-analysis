@@ -1,7 +1,7 @@
 """Generate the "Advice from Bot Makers to Bot Makers" post for one season.
 
-Usage (the OpenRouter key comes from envh):
-    envh run --with OPENROUTER_API_KEY=<secret> --reason "..." -- \
+Usage (the OpenRouter key and a Metaculus token for bot ranks come from envh):
+    envh run --with OPENROUTER_API_KEY=<secret>,METACULUS_TOKEN=<secret> --reason "..." -- \
         poetry run python -m aib_analysis.bot_maker_advice.run --season summer_2026 [--smoke-test] [--max-cost 10]
 
 Writes, under local/<season>_bot_maker_advice/: writeup.md (the post, with [===Fill me===] reminders),
@@ -24,9 +24,13 @@ from forecasting_tools import MonetaryCostManager
 
 from aib_analysis.bot_maker_advice import method
 from aib_analysis.bot_maker_advice.answers import load_answers
+from aib_analysis.bot_maker_advice.leaderboard import (
+    attach_ranks,
+    load_leaderboard_entries,
+)
 from aib_analysis.bot_maker_advice.llm import CachedOpenRouterLlm, StructuredLlm
 from aib_analysis.bot_maker_advice.results import AnalysisResult
-from aib_analysis.bot_maker_advice.review import render_qa_review
+from aib_analysis.bot_maker_advice.review import CodeVersion, render_qa_review
 from aib_analysis.bot_maker_advice.season_config import (
     AdviceSeasonConfig,
     get_season_config,
@@ -35,7 +39,7 @@ from aib_analysis.bot_maker_advice.survey_evidence import (
     SurveyEvidence,
     parse_survey_evidence,
 )
-from aib_analysis.bot_maker_advice.template import CodeVersion, render_writeup
+from aib_analysis.bot_maker_advice.template import render_writeup
 from aib_analysis.bot_maker_advice.thematic_analysis import run_thematic_analysis
 from aib_analysis.pro_vs_bot_writeup.phrasing import FILL_ME
 
@@ -97,8 +101,13 @@ def write_data_files(result: AnalysisResult, output_folder: Path) -> None:
         writer.writerows((answer.answer_id, answer.bot_name) for answer in result.survey.answers)
 
 
-async def analyze(llm: StructuredLlm, models: method.ModelRoster, config: AdviceSeasonConfig, smoke_test: bool) -> AnalysisResult:
+async def analyze(
+    llm: StructuredLlm, models: method.ModelRoster, config: AdviceSeasonConfig, output_folder: Path, smoke_test: bool
+) -> AnalysisResult:
     survey = load_answers(REPO_ROOT / config.survey_csv, id_seed=f"{config.key}-answer-ids")
+    if config.bot_tournament_project_id is not None:
+        entries = load_leaderboard_entries(config.bot_tournament_project_id, output_folder / "data" / "bot_leaderboard.json")
+        survey = replace(survey, open_source_bots=attach_ranks(survey.open_source_bots, entries))
     if smoke_test:
         survey = replace(survey, answers=survey.answers[: method.SMOKE_TEST_ANSWER_COUNT])
         logger.info(f"Smoke test: using the first {len(survey.answers)} answers by ID")
@@ -108,8 +117,8 @@ async def analyze(llm: StructuredLlm, models: method.ModelRoster, config: Advice
 def write_outputs(result: AnalysisResult, config: AdviceSeasonConfig, output_folder: Path, usage_note: str) -> None:
     code_version = current_code_version()
     if code_version.method_has_uncommitted_changes:
-        logger.warning("The method files have uncommitted changes, so the write-up can't cite a precommitted version")
-    writeup = render_writeup(result, config, code_version)
+        logger.warning("The method files have uncommitted changes, so this run isn't precommitted (noted in qa_review.md)")
+    writeup = render_writeup(result, config)
     (output_folder / "writeup.md").write_text(writeup)
     (output_folder / "qa_review.md").write_text(render_qa_review(result, code_version, usage_note))
     write_data_files(result, output_folder)
@@ -126,7 +135,7 @@ def main(season_key: str, output_folder: Path | None, smoke_test: bool, max_cost
     logger.info(f"Analyzing {config.label} bot maker advice into {output_folder} (cost cap ${max_cost:.2f})")
     with MonetaryCostManager(max_cost) as cost_manager:
         llm = CachedOpenRouterLlm(output_folder / "llm_calls", cost_manager)
-        result = asyncio.run(analyze(llm, models, config, smoke_test))
+        result = asyncio.run(analyze(llm, models, config, output_folder, smoke_test))
         usage_note = llm.usage_note()
     write_outputs(result, config, output_folder, usage_note)
     logger.info(f"Done ({usage_note}). Review qa_review.md before publishing.")

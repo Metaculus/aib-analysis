@@ -7,10 +7,13 @@ the bot maker's own words. Anything the data can't provide is left as [===Fill m
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 
 from aib_analysis.bot_maker_advice import method
-from aib_analysis.bot_maker_advice.answers import ABANDONED_QUESTION, LESSONS_QUESTION
+from aib_analysis.bot_maker_advice.answers import (
+    ABANDONED_QUESTION,
+    LESSONS_QUESTION,
+    OpenSourceBot,
+)
 from aib_analysis.bot_maker_advice.results import (
     AnalysisResult,
     DataCheck,
@@ -35,12 +38,6 @@ METHOD_REFERENCES = (
 )
 
 
-@dataclass(frozen=True)
-class CodeVersion:
-    commit: str | None
-    method_has_uncommitted_changes: bool
-
-
 def _link(text: str, url: str | None, reminder: str) -> str:
     return f"[{text}]({url})" if url else f"{text} {fill_me(reminder)}"
 
@@ -62,50 +59,48 @@ def format_q(q_text: str) -> str:
     return f"q {q_text[0]} {q_text[1:]}" if q_text[:1] in "<>" else f"q = {q_text}"
 
 
-def render_writeup(result: AnalysisResult, config: AdviceSeasonConfig, code_version: CodeVersion) -> str:
+def shows_data_checks(result: AnalysisResult, config: AdviceSeasonConfig) -> bool:
+    """Data-check notes link to the season's survey analysis post, so they appear only once it is published."""
+    return result.survey_evidence_available and config.survey_post_url is not None
+
+
+def render_writeup(result: AnalysisResult, config: AdviceSeasonConfig) -> str:
     sections = [
         f"# Advice from Bot Makers to Bot Makers ({config.label})",
-        _introduction(result, config, code_version),
+        _introduction(result, config),
         _themes_section(result, config),
         _one_offs_section(result),
         _open_source_section(result),
         _responses_section(result),
-        _appendix(result, code_version),
+        _appendix(result, config),
     ]
     return "\n\n".join(sections) + "\n"
 
 
-def _is_precommitted(code_version: CodeVersion) -> bool:
-    return code_version.commit is not None and not code_version.method_has_uncommitted_changes
-
-
-def _introduction(result: AnalysisResult, config: AdviceSeasonConfig, code_version: CodeVersion) -> str:
+def _introduction(result: AnalysisResult, config: AdviceSeasonConfig) -> str:
     theme_count = len(result.published_themes)
     example_id = result.published_themes[0].exemplars[0].answer_id if theme_count and result.published_themes[0].exemplars else result.survey.answers[0].answer_id
-    rules = "following rules we fixed before running them" if _is_precommitted(code_version) else "following fixed rules"
     tournament = _link(f"{config.label} FutureEval tournament", config.tournament_url, "link the tournament page")
-    pro_vs_bot = _link(f"{config.label} Pros vs bots analysis", config.pro_vs_bot_post_url, "link the season's Pros vs bots post")
-    survey = _link(f"{config.label} bot survey analysis", config.survey_post_url, "link the season's bot survey analysis post")
     return "\n\n".join(
         [
             f'As part of the {tournament}, we surveyed bot makers. Among other things, the survey asked, "{LESSONS_QUESTION}" '
             f"{result.answer_count} bot makers answered. This post groups their advice into {count_word(theme_count)} "
-            f"{plural(theme_count, 'theme')}, then lists notable one-off ideas and every answer in full.",
+            f"{plural(theme_count, 'theme')}, notable one-off ideas, and the full list of quoted bot maker responses.",
             f"Each bot maker has a random ID (like #{example_id}) that stays the same throughout the post, and all quotes are "
-            "verbatim. Many bot makers can't run extensive A/B tests, so some of this advice reflects experience more than "
-            f"measured results. AI models found the themes and checked every citation, {rules}; Appendix A explains how.",
-            f"This post complements the {pro_vs_bot} and the {survey}, which compares what bots did with how they scored.",
+            "verbatim. Many bot makers can't run extensive A/B tests, so some of this advice reflects patterns from anecdotes "
+            "more than measured results. AI models ran and wrote the thematic analysis. The methodology is detailed in the "
+            "appendix.",
         ]
     )
 
 
-def data_check_sentence(check: DataCheck, survey_post_url: str | None) -> str:
+def data_check_sentence(check: DataCheck, survey_post_url: str) -> str:
     evidence = check.evidence
-    survey = _link("survey analysis", survey_post_url, "link the season's bot survey analysis post")
     return (
-        f'Data check: in the {survey}, "{evidence.label}" went with {"higher" if evidence.correlation > 0 else "lower"} '
-        f"average scores (r = {evidence.correlation:+.2f}, {format_q(evidence.q_text)}). That "
-        f"{'supports' if check.relation == 'agrees' else 'cuts against'} this advice, though it is a correlation and may be confounded."
+        f'Data check: in the [survey analysis]({survey_post_url}), "{evidence.label}" went with '
+        f"{'higher' if evidence.correlation > 0 else 'lower'} average scores (r = {evidence.correlation:+.2f}, "
+        f"{format_q(evidence.q_text)}). That {'supports' if check.relation == 'agrees' else 'cuts against'} this advice, "
+        "though it is a correlation and may be confounded."
     )
 
 
@@ -122,13 +117,15 @@ def theme_block(theme: PublishedTheme, answer_count: int, survey_post_url: str |
         bullets.append(f'* Counterpoint, #{theme.counterpoint.answer_id}: "{one_line(theme.counterpoint.excerpt)}"{others}')
     elif theme.other_opposers:
         bullets.append(f"* Argued against it: {_ids(theme.other_opposers)}.")
-    bullets.extend(f"* {data_check_sentence(check, survey_post_url)}" for check in theme.data_checks)
-    return "\n\n".join([f"### {theme.rank}. {stats.theme.label}", f"{count_sentence}.", "\n".join(bullets)])
+    if survey_post_url is not None:
+        bullets.extend(f"* {data_check_sentence(check, survey_post_url)}" for check in theme.data_checks)
+    return "\n\n".join([f"### {theme.rank}. {stats.theme.label}", f"{count_sentence}.", "\n\n".join(bullets)])
 
 
 def _themes_section(result: AnalysisResult, config: AdviceSeasonConfig) -> str:
+    survey_post_url = config.survey_post_url if shows_data_checks(result, config) else None
     blocks = ["## Main themes"]
-    blocks.extend(theme_block(theme, result.answer_count, config.survey_post_url) for theme in result.published_themes)
+    blocks.extend(theme_block(theme, result.answer_count, survey_post_url) for theme in result.published_themes)
     for stats in result.stats_with_status("held_low_agreement"):
         blocks.append(
             fill_me(
@@ -147,24 +144,33 @@ def _one_offs_section(result: AnalysisResult) -> str:
     if not result.one_offs:
         return "## Notable one-offs\n\n" + fill_me("no one-off idea passed the checks; pick one from qa_review.md or delete this section")
     lines = [f'* **{item.label}** (#{item.answer_id}): "{one_line(item.excerpt or "")}"' for item in result.one_offs]
-    return "\n\n".join(["## Notable one-offs", "Ideas that one bot maker raised and the themes above don't cover:", "\n".join(lines)])
+    return "\n\n".join(["## Notable one-offs", "Ideas that one bot maker raised and the themes above don't cover:", "\n\n".join(lines)])
+
+
+def leaderboard_note(bot: OpenSourceBot) -> str:
+    """Spring 2026 style: participant rank with Metac Bots removed, or "MiniBench only" for a bot not on the season's board."""
+    if bot.leaderboard_status == "ranked":
+        return f", rank {bot.rank}"
+    if bot.leaderboard_status == "not_found":
+        return ", MiniBench only"
+    if bot.leaderboard_status == "unranked":
+        return ", unranked extra bot"
+    return ""
 
 
 def _open_source_section(result: AnalysisResult) -> str:
     linked = [bot for bot in result.survey.open_source_bots if bot.url]
-    unlinked = [bot.bot_name for bot in result.survey.open_source_bots if not bot.url]
-    blocks = ["## Open-source bots"]
-    if linked:
-        blocks += [
-            "These bot makers told us their bot is open source and its repository is public:",
-            "\n".join(f"* [{bot.bot_name}]({bot.url})" for bot in linked),
-            fill_me('add each bot\'s rank (participant rank with Metac Bots removed) or "MiniBench only", and check every link'),
-        ]
-    else:
-        blocks.append(fill_me("no respondent gave a link to an open-source bot; delete this section or list bots another way"))
-    if unlinked:
-        blocks.append(fill_me(f"{join_names(unlinked)} said their bot is open source but gave no repository link; add links or leave them out"))
-    blocks.append(f"The [FutureEval resources page]({FUTUREEVAL_RESOURCES_OPEN_SOURCE_URL}) keeps a longer list of open-source bots.")
+    if not linked:
+        return "## Open-source bots\n\n" + fill_me("no respondent gave a link to an open-source bot; delete this section")
+    blocks = [
+        "## Open-source bots",
+        "The bot makers listed below told us their bot is open source, and its repository is public. The "
+        f"[FutureEval resources page]({FUTUREEVAL_RESOURCES_OPEN_SOURCE_URL}) keeps a longer list of open-source bots, "
+        "though these are the ones from this survey:",
+        "\n".join(f"* [{bot.bot_name}]({bot.url}){leaderboard_note(bot)}" for bot in linked),
+    ]
+    if any(bot.leaderboard_status == "unknown" for bot in linked):
+        blocks.append(fill_me('add each bot\'s rank (participant rank with Metac Bots removed) or "MiniBench only"'))
     return "\n\n".join(blocks)
 
 
@@ -198,13 +204,7 @@ def _theme_quality_table(result: AnalysisResult) -> str:
     return "\n".join(lines)
 
 
-def _version_sentence(code_version: CodeVersion) -> str:
-    if not _is_precommitted(code_version):
-        return fill_me("the analysis ran with uncommitted changes to the method; commit them, rerun, and cite the commit here")
-    return f"The rules were fixed in [the analysis code]({ANALYSIS_CODE_URL}) at commit {code_version.commit} before this analysis ran."
-
-
-def _appendix(result: AnalysisResult, code_version: CodeVersion) -> str:
+def _appendix(result: AnalysisResult, config: AdviceSeasonConfig) -> str:
     models = result.models
     label = method.model_label
     answer_count = result.answer_count
@@ -215,44 +215,41 @@ def _appendix(result: AnalysisResult, code_version: CodeVersion) -> str:
     disputed = sum(stats.disputed_count for stats in result.theme_stats)
     checked = sum(stats.checked_count for stats in result.theme_stats)
     rejected = sum(stats.rejected_count for stats in result.theme_stats)
-    if result.survey_evidence_available:
-        data_check_step = (
-            f"7. **Data check.** {label(models.data_check)} matched each published theme to results in the survey analysis "
-            f"that directly measure the advice, and {label(models.data_check_confirmer)} confirmed each match. A theme gets a "
-            "data-check note only for a confirmed match that the survey analysis found statistically significant; other "
-            "matches can be noise, so we leave them out."
-        )
-    else:
-        data_check_step = "7. **Data check.** Skipped: the season's survey analysis wasn't available when this ran."
     steps = [
-        f"1. **Themes.** Two models from different companies ({label(models.theme_generators[0])} and "
+        f"1. **Themes:** Two models from different companies ({label(models.theme_generators[0])} and "
         f"{label(models.theme_generators[1])}) each read all {answer_count} answers, in different random orders, and proposed "
         f"{method.MIN_CODEBOOK_THEMES} to {method.MAX_CODEBOOK_THEMES} themes, with definitions and rules for what does and "
         f"doesn't count. A third model ({label(models.codebook)}) merged them into a codebook of {codebook_size} themes; "
         f"{proposed_by_both} of them were proposed by both models.",
-        f"2. **Coding.** Two coders ({label(models.coders[0])} and {label(models.coders[1])}) separately read every answer and "
+        f"2. **Coding:** Two coders ({label(models.coders[0])} and {label(models.coders[1])}) separately read every answer and "
         "marked, for each theme, whether it gives that advice, argues against it, or neither, with a supporting quote. Code "
         "confirmed that every quote appears word for word in the answer.",
-        f"3. **Tie-breaks.** Where the coders disagreed ({disputed} of {answer_count * codebook_size} answer-theme pairs), a "
+        f"3. **Tie-breaks:** Where the coders disagreed ({disputed} of {answer_count * codebook_size} answer-theme pairs), a "
         f"fourth model ({label(models.tie_breaker)}) coded the pair without seeing their calls, and the majority decided.",
-        f"4. **Citation checks.** A separate model ({label(models.verifier)}) skeptically checked each of the {checked} "
+        f"4. **Citation checks:** A separate model ({label(models.verifier)}) skeptically checked each of the {checked} "
         f"remaining citations against the full answer and rejected {rejected}. Only citations it confirmed are counted or quoted.",
-        f"5. **Selection.** A theme is published if at least {method.min_supporters(answer_count)} bot makers "
+        f"5. **Selection:** A theme is published if at least {method.min_supporters(answer_count)} bot makers "
         f"({method.MIN_SUPPORTER_SHARE:.0%} of answers, and at least {method.MIN_SUPPORTERS_FLOOR}) give the advice and the "
         f"two coders' agreement (Krippendorff's alpha) is at least {method.MIN_CODER_ALPHA}. We publish at most "
         f"{method.MAX_PUBLISHED_THEMES} themes, ranked by how many bot makers gave the advice. Each theme quotes up to "
         f"{method.EXEMPLARS_PER_THEME} answers, the most concrete first, and no bot maker is quoted in two themes unless a "
         "theme runs out of other quotes.",
-        f"6. **One-offs.** {label(models.one_offs)} proposed specific ideas that the themes don't cover, and "
+        f"6. **One-offs:** {label(models.one_offs)} proposed specific ideas that the themes don't cover, and "
         f"{label(models.verifier)} checked each one. We show up to {method.MAX_ONE_OFFS}, one per bot maker.",
-        data_check_step,
     ]
+    if shows_data_checks(result, config):
+        steps.append(
+            f"7. **Data check:** {label(models.data_check)} matched each published theme to results in the survey analysis "
+            f"that directly measure the advice, and {label(models.data_check_confirmer)} confirmed each match. A theme gets a "
+            "data-check note only for a confirmed match that the survey analysis found statistically significant; other "
+            "matches can be noise, so we leave them out."
+        )
     return "\n\n".join(
         [
-            "## Appendix A: How we found the themes",
-            "We used codebook thematic analysis (" + "; ".join(METHOD_REFERENCES) + "): build a codebook of themes with "
-            "rules for what counts, apply it to every answer with independent coders, and measure how well they agree. "
-            f"{_version_sentence(code_version)}",
+            "## Appendix: How themes were found",
+            "This analysis used codebook thematic analysis (" + "; ".join(METHOD_REFERENCES) + "). This involves building a "
+            "codebook of themes with rules for what counts, applying it to every answer with independent coders, and "
+            f"measuring how well they agree. [The code]({ANALYSIS_CODE_URL}) for the analysis is open source.",
             "\n".join(steps),
             _theme_quality_table(result),
             "Counts are floors: the survey didn't ask about each theme, so a bot maker who didn't mention one may still agree "

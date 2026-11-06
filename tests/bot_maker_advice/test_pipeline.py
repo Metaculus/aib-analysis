@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import hashlib
 import json
 import re
@@ -9,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from aib_analysis.bot_maker_advice import run
+from aib_analysis.bot_maker_advice.leaderboard import load_leaderboard_entries
 from aib_analysis.bot_maker_advice.llm import CachedOpenRouterLlm, ReplyType
 from aib_analysis.bot_maker_advice.method import MAX_FORMAT_RETRIES
 from aib_analysis.bot_maker_advice.prompts import (
@@ -17,8 +19,9 @@ from aib_analysis.bot_maker_advice.prompts import (
     CitationCheckReply,
 )
 from aib_analysis.bot_maker_advice.results import AnalysisResult
+from aib_analysis.bot_maker_advice.review import CodeVersion
 from aib_analysis.bot_maker_advice.season_config import AdviceSeasonConfig
-from aib_analysis.bot_maker_advice.template import CodeVersion, render_writeup
+from aib_analysis.bot_maker_advice.template import render_writeup
 from aib_analysis.pro_vs_bot_writeup.phrasing import FILL_ME
 from tests.bot_maker_advice.conftest import (
     ABANDONED_TEXT,
@@ -37,20 +40,35 @@ EXPECTED_SECTIONS = [
     "## Notable one-offs",
     "## Open-source bots",
     "## Responses in full",
-    "## Appendix A: How we found the themes",
+    "## Appendix: How themes were found",
 ]
 THEME_BULLET = re.compile(r'^\* (#\d+: ".+"|Also raised by .+\.|Counterpoint, #\d+: ".+"( \(also .+\))?|Argued against it: .+\.|Data check: .+)$')
 COUNT_SENTENCE = re.compile(r"^\d+ of the \d+ bot makers gave this advice(, and \d+ argued against it)?\.$")
 COMMITTED = CodeVersion(commit="abc1234", method_has_uncommitted_changes=False)
+CACHED_LEADERBOARD = [
+    {"user": {"username": "Synthetic Bot 0"}, "rank": 3, "exclusion_status": 0},
+    {"user": {"username": "metac-synthetic"}, "rank": 2, "exclusion_status": 2},
+]
+
+
+def _analyze(llm: ScriptedLlm, config: AdviceSeasonConfig, output_folder: Path) -> AnalysisResult:
+    leaderboard = output_folder / "data" / "bot_leaderboard.json"
+    leaderboard.parent.mkdir(parents=True, exist_ok=True)
+    leaderboard.write_text(json.dumps(CACHED_LEADERBOARD))
+    return asyncio.run(run.analyze(llm, FAKE_MODELS, config, output_folder, smoke_test=False))
 
 
 @pytest.fixture
-def analysis(synthetic_config: AdviceSeasonConfig, scripted_llm: ScriptedLlm) -> AnalysisResult:
-    return asyncio.run(run.analyze(scripted_llm, FAKE_MODELS, synthetic_config, smoke_test=False))
+def analysis(synthetic_config: AdviceSeasonConfig, scripted_llm: ScriptedLlm, tmp_path: Path) -> AnalysisResult:
+    return _analyze(scripted_llm, synthetic_config, tmp_path / "output")
+
+
+def _section(writeup: str, start: str, end: str) -> str:
+    return writeup.split(start, 1)[1].split(end, 1)[0]
 
 
 def _theme_blocks(writeup: str) -> list[str]:
-    themes_section = writeup.split("## Main themes", 1)[1].split("## Notable one-offs", 1)[0]
+    themes_section = _section(writeup, "## Main themes", "## Notable one-offs")
     return [block for block in re.split(r"\n(?=### )", themes_section) if block.startswith("### ")]
 
 
@@ -70,8 +88,8 @@ def test_selection_follows_the_precommitted_rules(analysis: AnalysisResult) -> N
     assert [review.excerpt for review in analysis.one_offs] == [ONE_OFF_SENTENCE.rstrip(".")]
 
 
-def test_writeup_is_uniform_and_quotes_are_verbatim(analysis: AnalysisResult, synthetic_config: AdviceSeasonConfig) -> None:
-    writeup = render_writeup(analysis, synthetic_config, COMMITTED)
+def test_writeup_is_uniform_spaced_and_quotes_are_verbatim(analysis: AnalysisResult, synthetic_config: AdviceSeasonConfig) -> None:
+    writeup = render_writeup(analysis, synthetic_config)
     positions = [writeup.index(section) for section in EXPECTED_SECTIONS]
     assert positions == sorted(positions)
     blocks = _theme_blocks(writeup)
@@ -81,40 +99,62 @@ def test_writeup_is_uniform_and_quotes_are_verbatim(analysis: AnalysisResult, sy
         "### 3. Keep the pipeline simple",
     ]
     for block in blocks:
-        _heading, count_sentence, bullets, *trailing = block.strip().split("\n\n")
-        assert all(part.startswith(FILL_ME) for part in trailing)
+        _heading, count_sentence, *bullets = block.strip().split("\n\n")
         assert COUNT_SENTENCE.match(count_sentence), count_sentence
-        assert all(THEME_BULLET.match(bullet) for bullet in bullets.splitlines()), bullets
+        bullets = [bullet for bullet in bullets if not bullet.startswith(FILL_ME)]
+        assert all(THEME_BULLET.match(bullet) for bullet in bullets), bullets
     responses = writeup.split("## Responses in full", 1)[1]
     for quote in re.findall(r'#\d+: "([^"]+)"', writeup.split("## Responses in full", 1)[0]):
         assert quote in responses
     assert "BACKTEST" not in writeup
     assert "cuts against this advice" in writeup and "Uses explicit base rates" not in writeup
     assert writeup.count(f"*Tried and abandoned:* {ABANDONED_TEXT}") == 1
-    assert "Avoid overconfident forecasts" in writeup.split("## Main themes", 1)[1].split("## Notable one-offs", 1)[0]
-    assert "at commit abc1234" in writeup
+    assert "Avoid overconfident forecasts" in _section(writeup, "## Main themes", "## Notable one-offs")
+    assert "into three themes, notable one-off ideas, and the full list of quoted bot maker responses." in writeup
+    assert "AI models ran and wrote the thematic analysis. The methodology is detailed in the appendix." in writeup
+    assert "1. **Themes:**" in writeup and "7. **Data check:**" in writeup
     assert all(f"synthetic-bot-{row}" not in writeup for row in range(2, len(THEMES_PER_ANSWER)))
 
 
-def test_fill_mes_cover_what_the_data_cannot(analysis: AnalysisResult, synthetic_config: AdviceSeasonConfig) -> None:
-    writeup = render_writeup(analysis, synthetic_config, CodeVersion(commit="abc1234", method_has_uncommitted_changes=True))
-    reminders = re.findall(re.escape(FILL_ME) + r" _\(Reminder: ([^)]*)", writeup)
-    assert writeup.count(FILL_ME) == len(reminders) == 5
-    assert any("Pros vs bots post" in reminder for reminder in reminders)
-    assert any("Avoid overconfident forecasts" in reminder for reminder in reminders)
-    assert any("repository link" in reminder for reminder in reminders)
-    assert any("rank" in reminder for reminder in reminders)
-    assert any("uncommitted changes" in reminder for reminder in reminders)
+def test_open_source_bots_get_official_ranks(analysis: AnalysisResult, synthetic_config: AdviceSeasonConfig) -> None:
+    section = _section(render_writeup(analysis, synthetic_config), "## Open-source bots", "## Responses in full")
+    assert "though these are the ones from this survey:" in section
+    assert "* [synthetic-bot-0](https://github.com/example/bot-0), rank 3" in section
+    assert "* [synthetic-bot-1](https://github.com/example/bot-1), MiniBench only" in section
+    assert "synthetic-bot-2" not in section and FILL_ME not in section
+
+
+def test_only_the_held_theme_needs_a_fill_me(analysis: AnalysisResult, synthetic_config: AdviceSeasonConfig) -> None:
+    reminders = re.findall(re.escape(FILL_ME) + r" _\(Reminder: ([^)]*)", render_writeup(analysis, synthetic_config))
+    assert len(reminders) == 1 and "Avoid overconfident forecasts" in reminders[0]
+
+
+def test_data_checks_and_ranks_are_conditional(
+    synthetic_config: AdviceSeasonConfig, scripted_llm: ScriptedLlm, tmp_path: Path
+) -> None:
+    config = dataclasses.replace(synthetic_config, survey_post_url=None, bot_tournament_project_id=None)
+    writeup = render_writeup(_analyze(scripted_llm, config, tmp_path / "output"), config)
+    assert "Data check" not in writeup and "**Data check:**" not in writeup
+    assert "* [synthetic-bot-0](https://github.com/example/bot-0)\n" in writeup
+    assert "add each bot's rank" in writeup
+
+
+def test_leaderboard_needs_a_token_unless_cached(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("METACULUS_TOKEN", raising=False)
+    with pytest.raises(RuntimeError, match="METACULUS_TOKEN"):
+        load_leaderboard_entries(1, tmp_path / "leaderboard.json")
+    (tmp_path / "leaderboard.json").write_text(json.dumps(CACHED_LEADERBOARD))
+    assert load_leaderboard_entries(1, tmp_path / "leaderboard.json") == CACHED_LEADERBOARD
 
 
 def test_outputs_and_qa_review(analysis: AnalysisResult, synthetic_config: AdviceSeasonConfig, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(run, "current_code_version", lambda: COMMITTED)
     run.write_outputs(analysis, synthetic_config, tmp_path, "scripted")
     review = (tmp_path / "qa_review.md").read_text()
-    for heading in ("## Disagreements and tie-breaks", "## Citations the checker didn't confirm", "## Data check against the survey analysis", "## Consent answers that need a decision"):
+    for heading in ("## Disagreements and tie-breaks", "## Citations the checker didn't confirm", "## Data check against the survey analysis", "## Open-source bots", "## Consent answers that need a decision"):
         assert heading in review
-    assert "yes, but anonymously" in review
-    assert "Uses explicit base rates" in review
+    assert "yes, but anonymously" in review and "Uses explicit base rates" in review
+    assert "| synthetic-bot-2 | (no link, left out) |" in review and "abc1234 (method files committed before the run)" in review
     codes = (tmp_path / "data" / "codes.csv").read_text().splitlines()
     assert len(codes) == 1 + len(THEMES_PER_ANSWER) * len(THEME_SENTENCES)
     assert (tmp_path / "respondent_key.csv").read_text().startswith("answer_id,bot_name")
@@ -129,9 +169,9 @@ class OverreachingGeneratorLlm(ScriptedLlm):
         return reply
 
 
-def test_candidates_still_invalid_after_retries_are_dropped_and_noted(synthetic_config: AdviceSeasonConfig) -> None:
+def test_candidates_still_invalid_after_retries_are_dropped_and_noted(synthetic_config: AdviceSeasonConfig, tmp_path: Path) -> None:
     llm = OverreachingGeneratorLlm()
-    result = asyncio.run(run.analyze(llm, FAKE_MODELS, synthetic_config, smoke_test=False))
+    result = _analyze(llm, synthetic_config, tmp_path / "output")
     assert [theme.label for theme in result.candidate_themes[1]] == [label for label, _sentence in THEME_SENTENCES.values()]
     assert '"Pray" needs at least 3' in result.run_notes[0]
     assert "A feature that does not exist" in result.run_notes[1]

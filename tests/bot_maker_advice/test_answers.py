@@ -34,7 +34,8 @@ def test_load_answers_applies_the_sharing_rules(synthetic_config: AdviceSeasonCo
     assert [answer.answer_id for answer in survey.answers] == sorted(answer.answer_id for answer in survey.answers)
     assert [(bot.bot_name, bot.url) for bot in survey.open_source_bots] == [
         ("synthetic-bot-0", "https://github.com/example/bot-0"),
-        ("synthetic-bot-1", None),
+        ("synthetic-bot-1", "https://github.com/example/bot-1"),
+        ("synthetic-bot-2", None),
     ]
 
 

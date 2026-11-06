@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from aib_analysis.bot_maker_advice import method
 from aib_analysis.bot_maker_advice.results import AnalysisResult, CoderVote, Theme
-from aib_analysis.bot_maker_advice.template import CodeVersion, format_q, one_line
+from aib_analysis.bot_maker_advice.template import format_q, leaderboard_note, one_line
+
+
+@dataclass(frozen=True)
+class CodeVersion:
+    commit: str | None
+    method_has_uncommitted_changes: bool
 
 
 def _cell(text: object) -> str:
@@ -53,7 +61,11 @@ def render_qa_review(result: AnalysisResult, code_version: CodeVersion, usage_no
                 f"* 'Tried and abandoned' answers shared: {sum(answer.abandoned is not None for answer in survey.answers)}; "
                 f"withheld for lack of public consent: {survey.withheld_abandoned_count}.",
                 f"* Code version: {code_version.commit or 'unknown'}"
-                + (" (method files had uncommitted changes)" if code_version.method_has_uncommitted_changes else ""),
+                + (
+                    " (method files had uncommitted changes, so this run isn't precommitted)"
+                    if code_version.method_has_uncommitted_changes
+                    else " (method files committed before the run)"
+                ),
                 f"* LLM calls: {usage_note}.",
                 "* Models: "
                 + "; ".join(
@@ -150,7 +162,8 @@ def render_qa_review(result: AnalysisResult, code_version: CodeVersion, usage_no
             ],
         ),
         "## Data check against the survey analysis",
-        "A note appears in the post only when the match is confirmed and the survey result is significant. The rest may be "
+        "A note appears in the post only when the match is confirmed, the survey result is significant, and the season's "
+        "survey analysis post is linked in season_config.py (survey_post_url). The rest may be "
         "noise; they are listed so you can judge."
         if result.survey_evidence_available
         else "_Skipped: no survey analysis report was available._",
@@ -159,6 +172,16 @@ def render_qa_review(result: AnalysisResult, code_version: CodeVersion, usage_no
             [
                 [f"{check.theme_number}. {labels[check.theme_number]}", check.evidence.label, f"{check.evidence.correlation:+.2f}", format_q(check.evidence.q_text), "yes" if check.evidence.significant else "no", check.relation, "yes" if check.confirmed else "no", "yes" if check.published else "", check.reason, check.confirmer_reason]
                 for check in result.data_checks
+            ],
+        ),
+        "## Open-source bots",
+        "Ranks come from the season's official leaderboard. 'MiniBench only' means the survey's bot name matched no "
+        "leaderboard username, so check those. Bots without a repository link are left out of the post.",
+        _table(
+            ["Bot", "Link", "In post as"],
+            [
+                [bot.bot_name, bot.url or "(no link, left out)", leaderboard_note(bot).lstrip(", ") or "(rank not looked up)"]
+                for bot in survey.open_source_bots
             ],
         ),
         "## Consent answers that need a decision",

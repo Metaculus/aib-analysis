@@ -108,8 +108,8 @@ def write_survey_csv(path: Path) -> None:
         if row == NONSTANDARD_CONSENT_ROW:
             consent = "yes, but anonymously"
         abandoned = ABANDONED_TEXT if row in (PUBLIC_ABANDONED_ROW, PRIVATE_ABANDONED_ROW, NONSTANDARD_CONSENT_ROW) else ""
-        code_consent = OPEN_SOURCE_CODE_CONSENT if row in (0, 1) else "Don't share anything"
-        code_link = "See https://github.com/example/bot-0." if row == 0 else ""
+        code_consent = OPEN_SOURCE_CODE_CONSENT if row in (0, 1, 2) else "Don't share anything"
+        code_link = f"See https://github.com/example/bot-{row}." if row in (0, 1) else ""
         rows.append([f"10/{row + 1}/2026 10:00:00", f"synthetic-bot-{row}", "GPT", abandoned, consent, code_link, code_consent, _lessons_text(row)])
     rows.append(["10/20/2026 10:00:00", "synthetic-bot-blank", "GPT", "", "No", "", "", "  "])
     rows.append(["10/21/2026 10:00:00", "synthetic-bot-null", "GPT", "", "No", "", "", "N/A"])
@@ -128,7 +128,7 @@ def synthetic_config(tmp_path: Path) -> AdviceSeasonConfig:
         label="Synthetic 2026",
         survey_csv=survey_csv,
         tournament_url="https://example.com/tournament",
-        pro_vs_bot_post_url=None,
+        bot_tournament_project_id=1,
         survey_post_url="https://example.com/survey",
         survey_report_markdown=report,
     )

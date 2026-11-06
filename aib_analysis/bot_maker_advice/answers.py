@@ -13,6 +13,7 @@ import random
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -48,10 +49,15 @@ class Answer:
         return (self.lessons,) if self.abandoned is None else (self.lessons, self.abandoned)
 
 
+LeaderboardStatus = Literal["ranked", "unranked", "not_found", "unknown"]
+
+
 @dataclass(frozen=True)
 class OpenSourceBot:
     bot_name: str
     url: str | None
+    leaderboard_status: LeaderboardStatus = "unknown"
+    rank: int | None = None
 
 
 @dataclass(frozen=True)

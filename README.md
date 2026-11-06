@@ -76,7 +76,7 @@ It reads `local/<season>_simulations/` and writes `local/<season>_pro_vs_bot_wri
 To draft the season's "Advice from Bot Makers to Bot Makers" post from the bot maker survey (a CSV export of the form responses; see `aib_analysis/bot_maker_advice/season_config.py` for the path):
 
 ```
-envh run --with OPENROUTER_API_KEY=<secret name> --reason "bot maker advice thematic analysis" -- \
+envh run --with OPENROUTER_API_KEY=<secret name>,METACULUS_TOKEN=<secret name> --reason "bot maker advice thematic analysis" -- \
     poetry run python -m aib_analysis.bot_maker_advice.run --season summer_2026
 ```
 

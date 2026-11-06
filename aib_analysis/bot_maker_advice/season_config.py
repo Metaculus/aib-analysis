@@ -1,6 +1,7 @@
 """Facts about each season that the survey answers cannot provide.
 
-A None URL renders as a [===Fill me===] block in the write-up. Paths are relative to the repo root.
+A None tournament URL renders as a [===Fill me===] block in the write-up. Data-check notes appear in the
+post only once survey_post_url is set, since they link to that post. Paths are relative to the repo root.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ class AdviceSeasonConfig:
     label: str
     survey_csv: Path
     tournament_url: str | None
-    pro_vs_bot_post_url: str | None
+    bot_tournament_project_id: int | None
     survey_post_url: str | None
     survey_report_markdown: Path | None
 
@@ -29,7 +30,7 @@ SEASONS: dict[str, AdviceSeasonConfig] = {
             "Spring 2026 FutureEval Participant Survey (Responses) - Form Responses 1.csv"
         ),
         tournament_url="https://www.metaculus.com/tournament/spring-aib-2026/",
-        pro_vs_bot_post_url="https://www.metaculus.com/notebooks/45373/spring-2026-futureeval-analysis/",
+        bot_tournament_project_id=32916,
         survey_post_url="https://www.metaculus.com/notebooks/45382/bot-survey-spring-2026/",
         survey_report_markdown=Path("local/spring_survey_analysis/spring_survey_analysis.md"),
     ),
@@ -41,7 +42,7 @@ SEASONS: dict[str, AdviceSeasonConfig] = {
             "Summer 2026 FutureEval Bot Maker Survey (Responses) - Form Responses 1.csv"
         ),
         tournament_url="https://www.metaculus.com/tournament/summer-futureeval-2026/",
-        pro_vs_bot_post_url=None,
+        bot_tournament_project_id=33022,
         survey_post_url=None,
         survey_report_markdown=Path("local/summer_survey_analysis/summer_survey_analysis.md"),
     ),
