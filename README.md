@@ -81,6 +81,17 @@ poetry run python -m aib_analysis.survey_analysis.run [--refresh] [--blind]
 
 `--refresh` rebuilds the leaderboard cache from the season's `2_bot_tournament.json`. `--blind` withholds every result for the hypotheses in `precommitted.py` (and the alternatives listed there) until the picks have been reviewed. Outputs go to `local/summer_survey_analysis/`; `aib_analysis/survey_analysis/render_html.sh` renders them to HTML.
 
+## Bot maker advice post
+
+To draft the season's "Advice from Bot Makers to Bot Makers" post from the bot maker survey (a CSV export of the form responses; see `aib_analysis/bot_maker_advice/season_config.py` for the path):
+
+```
+envh run --with OPENROUTER_API_KEY=<secret name>,METACULUS_TOKEN=<secret name> --reason "bot maker advice thematic analysis" -- \
+    poetry run python -m aib_analysis.bot_maker_advice.run --season summer_2026
+```
+
+It runs a precommitted, LLM-assisted codebook thematic analysis (models, thresholds and selection rules are in `method.py`) and writes `local/<season>_bot_maker_advice/`: `writeup.md` (at most 5 themes in a fixed format with verbatim quotes, one-offs, open-source bots, every answer in full, and `[===Fill me===]` reminders), `qa_review.md` (every disagreement, tie-break, rejected citation and data-check match, to review before publishing), `data/codes.csv`, `respondent_key.csv` (maps answer IDs to bot names; keep it local), and `llm_calls/` (every prompt and reply; reruns reuse them for free). Run `--smoke-test` first to check the plumbing with cheap models. If the season's survey analysis report exists (`local/<season>_survey_analysis/`), each theme is also checked against its significant results.
+
 ## Structure
 
 The project is built around `SimulatedTournament` (see `data_models.py` / `simulated_tournament.py`). It is initialized from `Forecast` objects and derives users, scores, etc. Most analyses are filtered, aggregated, or combined tournaments built from those forecasts.
