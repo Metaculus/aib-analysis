@@ -10,7 +10,12 @@ from pathlib import Path
 import pytest
 
 from aib_analysis.bot_maker_advice import run
-from aib_analysis.bot_maker_advice.leaderboard import load_leaderboard_entries
+from aib_analysis.bot_maker_advice.answers import OpenSourceBot
+from aib_analysis.bot_maker_advice.leaderboard import (
+    attach_ranks,
+    leaderboard_cache_path,
+    load_leaderboard_entries,
+)
 from aib_analysis.bot_maker_advice.llm import CachedOpenRouterLlm, ReplyType
 from aib_analysis.bot_maker_advice.method import MAX_FORMAT_RETRIES
 from aib_analysis.bot_maker_advice.prompts import (
@@ -52,7 +57,7 @@ CACHED_LEADERBOARD = [
 
 
 def _analyze(llm: ScriptedLlm, config: AdviceSeasonConfig, output_folder: Path) -> AnalysisResult:
-    leaderboard = output_folder / "data" / "bot_leaderboard.json"
+    leaderboard = leaderboard_cache_path(output_folder / "data", config.bot_tournament_project_id or 0)
     leaderboard.parent.mkdir(parents=True, exist_ok=True)
     leaderboard.write_text(json.dumps(CACHED_LEADERBOARD))
     return asyncio.run(run.analyze(llm, FAKE_MODELS, config, output_folder, smoke_test=False))
@@ -189,3 +194,15 @@ def test_cached_llm_reuses_replies_without_a_key(tmp_path: Path, monkeypatch: py
     (tmp_path / "citation_check" / f"{digest}.json").write_text(json.dumps({"reply": reply}))
     assert asyncio.run(llm.ask("citation_check", "openrouter/fake/model", "prompt", CitationCheckReply)).reason == "cached"
     assert (llm.new_calls, llm.cached_calls) == (0, 1)
+
+
+def test_attach_ranks_handles_excluded_and_ambiguous_names() -> None:
+    entries = [
+        {"user": {"username": "extra_bot"}, "rank": 9, "exclusion_status": 1},
+        {"user": {"username": "twin-bot"}, "rank": 4, "exclusion_status": 0},
+        {"user": {"username": "twin_bot"}, "rank": 5, "exclusion_status": 0},
+    ]
+    (extra,) = attach_ranks((OpenSourceBot("Extra Bot", "https://github.com/example/extra"),), entries)
+    assert (extra.leaderboard_status, extra.rank) == ("unranked", None)
+    with pytest.raises(ValueError, match="several leaderboard usernames"):
+        attach_ranks((OpenSourceBot("twin bot", None),), entries)

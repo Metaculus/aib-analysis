@@ -26,8 +26,13 @@ def name_key(name: str) -> str:
     return re.sub(r"[^a-z0-9]", "", name.lower())
 
 
+def leaderboard_cache_path(data_folder: Path, project_id: int) -> Path:
+    return data_folder / f"bot_leaderboard_{project_id}.json"
+
+
 def load_leaderboard_entries(project_id: int, cache_path: Path) -> list[dict]:
     if cache_path.exists():
+        logger.info(f"Using the cached leaderboard in {cache_path}; delete it to fetch current ranks")
         return json.loads(cache_path.read_text())
     if "METACULUS_TOKEN" not in os.environ:
         raise RuntimeError("METACULUS_TOKEN is not set; run this through envh to fetch the leaderboard for bot ranks (see README)")
@@ -49,10 +54,15 @@ def load_leaderboard_entries(project_id: int, cache_path: Path) -> list[dict]:
 
 def attach_ranks(bots: tuple[OpenSourceBot, ...], entries: list[dict]) -> tuple[OpenSourceBot, ...]:
     """Match survey bot names to leaderboard usernames, ignoring case and punctuation."""
-    by_name = {name_key(entry["user"]["username"]): entry for entry in entries}
+    by_name: dict[str, list[dict]] = {}
+    for entry in entries:
+        by_name.setdefault(name_key(entry["user"]["username"]), []).append(entry)
     ranked_bots = []
     for bot in bots:
-        entry = by_name.get(name_key(bot.bot_name))
+        matches = by_name.get(name_key(bot.bot_name), [])
+        if len(matches) > 1:
+            raise ValueError(f"Survey bot {bot.bot_name!r} matches several leaderboard usernames: {[match['user']['username'] for match in matches]}")
+        entry = matches[0] if matches else None
         if entry is None:
             ranked_bots.append(replace(bot, leaderboard_status="not_found"))
         elif entry["exclusion_status"] != 0:

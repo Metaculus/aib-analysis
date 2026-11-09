@@ -44,7 +44,7 @@ def _theme_definition(theme: Theme, prefix: str = "") -> str:
     )
 
 
-def render_qa_review(result: AnalysisResult, code_version: CodeVersion, usage_note: str) -> str:
+def render_qa_review(result: AnalysisResult, code_version: CodeVersion, usage_note: str, data_checks_shown: bool) -> str:
     survey = result.survey
     labels = {theme.number: theme.label for theme in result.codebook}
     models = result.models
@@ -170,7 +170,7 @@ def render_qa_review(result: AnalysisResult, code_version: CodeVersion, usage_no
         _table(
             ["Theme", "Survey result", "r", "q", "Significant", "Proposed relation", "Confirmed", "In post", "Proposer's reason", "Confirmer's reason"],
             [
-                [f"{check.theme_number}. {labels[check.theme_number]}", check.evidence.label, f"{check.evidence.correlation:+.2f}", format_q(check.evidence.q_text), "yes" if check.evidence.significant else "no", check.relation, "yes" if check.confirmed else "no", "yes" if check.published else "", check.reason, check.confirmer_reason]
+                [f"{check.theme_number}. {labels[check.theme_number]}", check.evidence.label, f"{check.evidence.correlation:+.2f}", format_q(check.evidence.q_text), "yes" if check.evidence.significant else "no", check.relation, "yes" if check.confirmed else "no", "yes" if check.published and data_checks_shown else "", check.reason, check.confirmer_reason]
                 for check in result.data_checks
             ],
         ),

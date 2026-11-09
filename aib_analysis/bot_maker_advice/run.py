@@ -26,6 +26,7 @@ from aib_analysis.bot_maker_advice import method
 from aib_analysis.bot_maker_advice.answers import load_answers
 from aib_analysis.bot_maker_advice.leaderboard import (
     attach_ranks,
+    leaderboard_cache_path,
     load_leaderboard_entries,
 )
 from aib_analysis.bot_maker_advice.llm import CachedOpenRouterLlm, StructuredLlm
@@ -39,7 +40,7 @@ from aib_analysis.bot_maker_advice.survey_evidence import (
     SurveyEvidence,
     parse_survey_evidence,
 )
-from aib_analysis.bot_maker_advice.template import render_writeup
+from aib_analysis.bot_maker_advice.template import render_writeup, shows_data_checks
 from aib_analysis.bot_maker_advice.thematic_analysis import run_thematic_analysis
 from aib_analysis.pro_vs_bot_writeup.phrasing import FILL_ME
 
@@ -105,8 +106,9 @@ async def analyze(
     llm: StructuredLlm, models: method.ModelRoster, config: AdviceSeasonConfig, output_folder: Path, smoke_test: bool
 ) -> AnalysisResult:
     survey = load_answers(REPO_ROOT / config.survey_csv, id_seed=f"{config.key}-answer-ids")
-    if config.bot_tournament_project_id is not None:
-        entries = load_leaderboard_entries(config.bot_tournament_project_id, output_folder / "data" / "bot_leaderboard.json")
+    if config.bot_tournament_project_id is not None and not smoke_test:
+        cache_path = leaderboard_cache_path(output_folder / "data", config.bot_tournament_project_id)
+        entries = load_leaderboard_entries(config.bot_tournament_project_id, cache_path)
         survey = replace(survey, open_source_bots=attach_ranks(survey.open_source_bots, entries))
     if smoke_test:
         survey = replace(survey, answers=survey.answers[: method.SMOKE_TEST_ANSWER_COUNT])
@@ -120,7 +122,7 @@ def write_outputs(result: AnalysisResult, config: AdviceSeasonConfig, output_fol
         logger.warning("The method files have uncommitted changes, so this run isn't precommitted (noted in qa_review.md)")
     writeup = render_writeup(result, config)
     (output_folder / "writeup.md").write_text(writeup)
-    (output_folder / "qa_review.md").write_text(render_qa_review(result, code_version, usage_note))
+    (output_folder / "qa_review.md").write_text(render_qa_review(result, code_version, usage_note, shows_data_checks(result, config)))
     write_data_files(result, output_folder)
     logger.info(f"Wrote writeup.md ({writeup.count(FILL_ME)} Fill me blocks), qa_review.md, data/codes.csv, and respondent_key.csv")
 
