@@ -582,10 +582,11 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
         "adds a pricier tier above it (for example Claude Opus below Claude Fable, or GPT-6 Sol below "
         "GPT-6 Astra), while mid tiers such as Claude Sonnet do not.",
         "",
-        "The number of research sources counts each option a bot maker ticked, plus each source they "
-        "named in a write-in that is on our list of known extra sources (for example RSS feeds or "
-        "OpenRouter web search). We add new write-in sources to that list each season, before looking "
-        "at any scores.",
+        "The number of research sources counts each option a bot maker ticked, plus each category on "
+        "our list of write-in sources that their \"Other\" answer names (for example RSS feeds, public "
+        "data APIs, or prediction-market data). Write-ins are matched only by these keywords and are "
+        "never re-coded by hand; the full list is in the parsing decisions document. We add categories "
+        "to the list each season from that season's write-ins.",
         "",
         "One feature does not come from the survey: questions missed, the number of scored questions "
         "still open after a bot's first forecast that the bot did not forecast. It is a rough measure "

@@ -191,13 +191,11 @@ def _single_select_audit(features: list[RespondentFeatures]) -> list[str]:
 
 
 def _manual_adjustments_section(features: list[RespondentFeatures]) -> list[str]:
-    lines = ["## Manual adjustments", ""]
+    lines = ["## Manual join decisions", ""]
     lines.append(
-        "Human-reviewed adjustments loaded from the private input directory (see "
-        "`manual_adjustments.py`). `map` counts a write-in as a canonical option, `ignore` drops a "
-        "parsing fragment whose meaning is covered elsewhere, and `leave` records that a write-in "
-        "was reviewed and deliberately stays as \"Other\". `Applied` reflects this run; \"no "
-        "(stale)\" means the row no longer matches the data and needs review."
+        "Human-reviewed winner overrides loaded from the private input directory (see "
+        "`manual_adjustments.py`). `Applied` reflects this run; \"no (stale)\" means the row no "
+        "longer matches the data and needs review. Survey answers are never edited by hand."
     )
     lines.append("")
 
@@ -220,33 +218,6 @@ def _manual_adjustments_section(features: list[RespondentFeatures]) -> list[str]
         lines.append("- none")
     lines.append("")
 
-    lines.append("### Answer adjustments")
-    lines.append("")
-    adjustments = manual_adjustments.load_answer_adjustments()
-    if adjustments:
-        applied_keys = {
-            (normalize_name(f.respondent.bot_name), a.column_slug, a.write_in.strip().lower())
-            for f in features
-            for a in f.adjustments_applied
-        }
-        lines.append("| Bot name | Column | Action | Write-in | Mapped to | Applied | Reason |")
-        lines.append("| --- | --- | --- | --- | --- | --- | --- |")
-        for adjustment in adjustments:
-            key = (
-                normalize_name(adjustment.bot_name),
-                adjustment.column_slug,
-                adjustment.write_in.strip().lower(),
-            )
-            applied = key in applied_keys
-            lines.append(
-                f"| {_md_escape(adjustment.bot_name)} | `{adjustment.column_slug}` "
-                f"| {adjustment.action} | {_md_escape(adjustment.write_in)} "
-                f"| {_md_escape(adjustment.canonical_option) or 'n/a'} "
-                f"| {'yes' if applied else 'no (stale)'} | {_md_escape(adjustment.reason)} |"
-            )
-    else:
-        lines.append("- none")
-    lines.append("")
     return lines
 
 

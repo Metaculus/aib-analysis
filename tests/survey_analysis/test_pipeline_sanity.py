@@ -3,8 +3,8 @@
 Unlike the pure unit tests, these load the actual season's survey + cached
 leaderboard and assert invariants on the joined result: no two respondents share
 a leaderboard row, every score is finite and matches sum/questions, the
-correlation pool respects the question floor, and every final-model token the
-registry sees is classified (nothing silently unmatched). They SKIP cleanly when
+correlation pool respects the question floor, and every final-model token that
+names a model family and version is classified. They SKIP cleanly when
 the private data or leaderboard cache is absent, so they never break a data-less
 CI run. No network and no 327MB JSON (uses the cached CSV only).
 """
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 
 import pytest
 
@@ -78,11 +79,18 @@ def test_group_sizes_are_sane(in_scope):
     assert 0 <= top10 <= config.TOP_N_FOR_TOP_GROUP
 
 
-def test_every_final_model_token_is_classified(features):
-    # The registry must recognize (or explicitly ignore) every final-model token
-    # in the real data. A non-empty unmatched list means the registry drifted.
-    unmatched = sorted({t for f in features for t in f.final_unmatched})
-    assert unmatched == [], f"unmatched final-model tokens: {unmatched}"
+_MODEL_LIKE_TOKEN = re.compile(
+    r"\b(gpt|claude|opus|sonnet|haiku|fable|gemini|gemma|grok|llama|qwen|deepseek|kimi|glm|minimax|mimo|mistral)\b[\s-]*v?\d",
+    re.IGNORECASE,
+)
+
+
+def test_every_model_like_final_token_is_classified(features):
+    # Write-ins are never corrected by hand, so non-model text stays unmatched, but a
+    # token naming a model family and version must match the registry. A hit here
+    # means the registry drifted behind what bot makers used.
+    unmatched = sorted({t for f in features for t in f.final_unmatched if _MODEL_LIKE_TOKEN.search(t)})
+    assert unmatched == [], f"unmatched model-like final-model tokens: {unmatched}"
 
 
 def test_frontier_flag_only_true_with_a_frontier_model(features):

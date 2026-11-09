@@ -22,8 +22,10 @@ SEASON_START_DATE = date(2026, 5, 18)
 PRECOMMIT_LATE_DEFINITION_NOTE = (
     "Two definitions were settled after the responses were downloaded but before anyone looked at a "
     "hypothesis result: the research-source count also counts sources named in write-ins (see "
-    "below), and checking similar questions or markets counts only the strategy checkbox. The manual "
-    "answer corrections were also reviewed after the download."
+    "below), and checking similar questions or markets counts only the strategy checkbox. After the "
+    "results had been seen, hand corrections of write-ins were dropped in favor of the keyword list "
+    "alone, and the list was extended. This changed the research-source result slightly; it is not "
+    "significant either way."
 )
 # Caveat bullets for definitions changed or features added after the download,
 # rendered verbatim in Appendix B.

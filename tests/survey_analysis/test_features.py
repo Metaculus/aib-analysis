@@ -8,17 +8,9 @@ the documented treatment of blank answers. Runs without env vars or local data.
 
 from __future__ import annotations
 
-import pytest
-
 from aib_analysis.survey_analysis import config
 from aib_analysis.survey_analysis.features import build_features
 from aib_analysis.survey_analysis.loading import Respondent
-
-
-@pytest.fixture(autouse=True)
-def _no_local_adjustments(tmp_path, monkeypatch):
-    # Synthetic bots must not pick up the season's reviewed adjustments from local/.
-    monkeypatch.setattr(config, "MANUAL_ANSWER_ADJUSTMENTS_CSV", str(tmp_path / "none.csv"))
 
 
 def _respondent(**answers: str) -> Respondent:

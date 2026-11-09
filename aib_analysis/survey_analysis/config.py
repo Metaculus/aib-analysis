@@ -28,11 +28,10 @@ SURVEY_CSV = os.path.join(
     "Summer 2026 FutureEval Bot Maker Survey (Responses) - Form Responses 1.csv",
 )
 PRIZE_STATS_CSV = os.path.join(INPUT_DIR, "Summer 2026 FutureEval Payouts - Summer 2026.csv")
-# Human-reviewed adjustment files (see manual_adjustments.py). They live in the
+# Human-reviewed join files (see manual_adjustments.py). They live in the
 # non-committed private input directory because they reference individual bots;
 # keeping them beside the raw survey data preserves them for reruns.
 MANUAL_WINNER_OVERRIDES_CSV = os.path.join(INPUT_DIR, "manual_winner_overrides.csv")
-MANUAL_ANSWER_ADJUSTMENTS_CSV = os.path.join(INPUT_DIR, "manual_answer_adjustments.csv")
 MANUAL_BOT_NAME_ALIASES_CSV = os.path.join(INPUT_DIR, "manual_bot_name_aliases.csv")
 BOT_TOURNAMENT_JSON = os.path.join(
     REPO_ROOT, "local/summer_2026_simulations/2_bot_tournament.json"
@@ -130,11 +129,17 @@ class ModelInfo:
         return self.release_date.isoformat() if self.release_date else "unknown"
 
 
+# Claude model names are often written without "Claude" (e.g. "opus 4.6").
+_CLAUDE_FAMILIES = ("opus", "sonnet", "haiku", "fable")
+
+
 def _norm_model(raw: str) -> str:
-    """Normalize a model string for matching: lowercase, drop spaces/hyphens/dots-noise."""
+    """Normalize a model string for matching: lowercase, drop spaces/hyphens/underscores/slashes."""
     lowered = raw.strip().lower()
-    for ch in (" ", "-", "_"):
+    for ch in (" ", "-", "_", "/"):
         lowered = lowered.replace(ch, "")
+    if lowered.startswith(_CLAUDE_FAMILIES):
+        lowered = "claude" + lowered
     return lowered
 
 
@@ -321,16 +326,17 @@ MULTISELECT_VOCAB: dict[str, list[str]] = {
         "Exa",
         "Tavily",
         "Perplexity",
-        "Gemini web search",
-        "OpenAI web search",
+        "Parallel.ai",
         "Anthropic web search",
         "XAI web search",
+        "Gemini web search",
+        "OpenAI web search",
+        "A Deep Research Tool",
         "Google/Bing/DuckDuckGo Search API (or equivalent like Serp API)",
         "Computer Use Model + Web Browser",
         "Static web scraping (Only HTML, possibly converted to markdown)",
         "Interactive web scraping w/o computer use (Rendering, screenshots, playwright MCP, etc)",
-        "A Deep Research Tool",
-        "Dedicated tools, such as metaculus/manifold specific search",
+        "Social Media scraping",
     ],
     "strategies": [
         "Capping predictions at a max/min",
@@ -356,7 +362,6 @@ MULTISELECT_VOCAB: dict[str, list[str]] = {
         "Use MCP servers",
         "Used a specialized fine-tuned LLM for research",
         "Used a specialized fine-tuned LLM for prediction",
-        "Custom smoothing math for numeric predictions",
         "Let AI construct its numeric forecasts with code",
     ],
     "development": [
@@ -379,21 +384,21 @@ MULTISELECT_VOCAB: dict[str, list[str]] = {
         "Yes, the entire development loop",
     ],
     "aggregate": [
+        "I did not aggregate final forecast",
         "Same prompt run multiple times, same model (self-consistency)",
         "Same prompt, varied models",
         "Varied prompts, same model",
         "Varied prompts AND varied models",
         "Varied research/retrieval pipelines feeding the same predictor",
         "Varied tooling (e.g. code execution vs. no code execution)",
-        "Single model, no ensemble",
-        "I did not aggregate final forecast",
     ],
 }
 
-# Research sources that bot makers named in "Other" write-ins instead of a listed
-# option. Each source a respondent's research write-ins match (case-insensitive
-# regex) adds one to their research-source count. Each season, extend this list
-# from the new research write-ins before looking at any scores.
+# Categories of research source that bot makers named in "Other" write-ins
+# instead of a listed option. Each category a respondent's research write-ins
+# match (case-insensitive regex) adds one to their research-source count; nothing
+# else in a write-in counts. Each season, extend this list from the new research
+# write-ins.
 RESEARCH_WRITE_IN_SOURCES: dict[str, str] = {
     "RSS feeds": r"\brss\b",
     "OpenRouter web search": r"openrouter\b.*(web[- ]?search|:online)",
@@ -401,8 +406,12 @@ RESEARCH_WRITE_IN_SOURCES: dict[str, str] = {
     "FutureSearch": r"futuresearch",
     "News-corpus search": r"news[- ]corpus",
     "Other news sources": r"news sources",
-    "Data APIs and time series": r"data apis?\b|time[- ]series",
-    "Prediction-market prices": r"polymarket|kalshi|prediction[- ]markets?\b",
+    "Public data APIs": r"data apis?\b|\bfred\b|yfinance|yahoo finance|coingecko|time[- ]series",
+    "Prediction-market data": r"polymarket|kalshi|manifold|prediction[- ]markets?\b",
+    "Other search APIs": r"serp ?api|\bnimble\b|you\.com|brave search|\bkagi\b",
+    "Web-scraping services": r"firecrawl|scrapingbee|\bapify\b|browserless",
+    "Web archives": r"wayback machine|archive\.org",
+    "Coding-agent web search": r"\b(codex|claude code)\b.*search",
 }
 
 # Inclusive bounds of the binary "moderate number of research sources" feature.
@@ -557,7 +566,7 @@ BOOLEAN_FEATURES: list[BooleanFeature] = [
                    "the bot's research used Perplexity"),
     BooleanFeature("uses_openai_search", "Uses OpenAI web search", "research", "openai web search",
                    "the bot's research used OpenAI web search"),
-    BooleanFeature("uses_scraping", "Uses web scraping", "research", "scraping",
+    BooleanFeature("uses_scraping", "Uses web scraping", "research", "web scraping",
                    "the bot's research used static or interactive web scraping"),
     BooleanFeature("uses_aggregation", "Aggregates multiple forecasts", "strategies", "median/mean/aggregate",
                    "the bot took the median, mean, or aggregate of multiple forecasts"),

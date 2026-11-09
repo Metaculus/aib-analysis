@@ -103,8 +103,8 @@ def generate_parsing_decisions() -> str:
     lines.append(
         "**Research write-in sources.** Each of these that a respondent's research write-ins mention "
         "(case-insensitive regex) adds one to their number of research sources, on top of the ticked "
-        "options. The list is extended each season from the new write-ins, before any scores are "
-        "looked at."
+        "options. The list is extended each season from that season's write-ins. Write-ins are never "
+        "re-coded by hand: anything these patterns do not match stays 'Other' and counts nowhere."
     )
     lines.append("")
     lines.append("| Source | Pattern |")
