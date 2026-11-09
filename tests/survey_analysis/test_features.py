@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from aib_analysis.survey_analysis import config, season_notes
+from aib_analysis.survey_analysis import config
 from aib_analysis.survey_analysis.features import build_features
 from aib_analysis.survey_analysis.loading import Respondent
 
@@ -109,11 +109,6 @@ def test_moderate_research_sources_includes_both_bounds():
         assert feature.variables["moderate_research_sources"] == expected
 
 
-def test_spotlight_model_features_follow_season_notes():
-    feature = build_features([_respondent(final_model=season_notes.SPOTLIGHT_OPUS_MODEL)])[0]
-    assert feature.variables["spotlight_opus_model"] == 1.0
-    assert feature.variables["spotlight_openai_model"] == 0.0
-
 
 def test_unrecognized_ordinal_value_is_none_not_zero():
     # A free-text hours answer that isn't a canonical bucket -> no midpoint.
@@ -134,8 +129,6 @@ def test_mini_variant_final_is_not_frontier():
 def test_final_model_text_naming_no_known_model_is_unknown_not_no():
     feature = build_features([_respondent(final_model="Our own forecasting system")])[0]
     assert feature.variables["frontier"] is None
-    assert feature.variables["gpt_5x_high"] is None
-    assert feature.variables["opus"] is None
 
 
 def test_questions_missed_comes_from_the_leaderboard_join():

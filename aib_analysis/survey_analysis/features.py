@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from aib_analysis.survey_analysis import config, manual_adjustments, parsing, season_notes
+from aib_analysis.survey_analysis import config, manual_adjustments, parsing
 from aib_analysis.survey_analysis.config import ModelInfo
 from aib_analysis.survey_analysis.loading import Respondent, normalize_name
 from aib_analysis.survey_analysis.manual_adjustments import AnswerAdjustment
@@ -26,15 +26,6 @@ _MODEL_BY_DISPLAY: dict[str, ModelInfo] = {
 }
 
 
-def _registry_model(display: str) -> ModelInfo:
-    model = _MODEL_BY_DISPLAY.get(display)
-    if model is None:
-        raise ValueError(f"season_notes names {display!r}, which is not a MODEL_REGISTRY display name")
-    return model
-
-
-_SPOTLIGHT_OPENAI_MODEL = _registry_model(season_notes.SPOTLIGHT_OPENAI_MODEL)
-_SPOTLIGHT_OPUS_MODEL = _registry_model(season_notes.SPOTLIGHT_OPUS_MODEL)
 _MODERATE_SOURCES_MIN, _MODERATE_SOURCES_MAX = config.MODERATE_RESEARCH_SOURCE_RANGE
 
 
@@ -84,14 +75,6 @@ class VariableSpec:
 NUMERIC_VARIABLE_SPECS: list[VariableSpec] = [
     VariableSpec("frontier", "Frontier final model", "binary"),
     VariableSpec("frontier_support", "Frontier supporting-role model", "binary"),
-    VariableSpec(
-        "spotlight_openai_model", f"Used {_SPOTLIGHT_OPENAI_MODEL.display} for its final model", "binary"
-    ),
-    VariableSpec("gpt_5x_high", "Used a flagship GPT-5.x for its final model", "binary"),
-    VariableSpec("opus", "Used a Claude Opus model for its final model", "binary"),
-    VariableSpec(
-        "spotlight_opus_model", f"Used {_SPOTLIGHT_OPUS_MODEL.display} for its final model", "binary"
-    ),
     VariableSpec("final_model_release", "Final model release date (flagship models only)", "continuous"),
     VariableSpec("n_research_sources", "Number of research sources", "count"),
     VariableSpec(
@@ -311,20 +294,6 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         variables["frontier_support"] = (
             (1.0 if frontier_support else 0.0) if support_answered else None
         )
-        variables["spotlight_openai_model"] = (
-            (1.0 if _uses_model(final_models, _SPOTLIGHT_OPENAI_MODEL) else 0.0)
-            if final_answered
-            else None
-        )
-        variables["gpt_5x_high"] = (
-            (1.0 if _uses_high_power_gpt_5x(final_models) else 0.0) if final_answered else None
-        )
-        variables["opus"] = (1.0 if _uses_opus(final_models) else 0.0) if final_answered else None
-        variables["spotlight_opus_model"] = (
-            (1.0 if _uses_model(final_models, _SPOTLIGHT_OPUS_MODEL) else 0.0)
-            if final_answered
-            else None
-        )
         variables["final_model_release"] = _high_power_release_ordinal(final_models)
         research_write_in_sources = parsing.match_write_in_sources(
             cells["research"].other, config.RESEARCH_WRITE_IN_SOURCES
@@ -380,27 +349,6 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
             )
     logger.info("Built features for %d respondents", len(features))
     return features
-
-
-def _uses_model(models: list[ModelInfo], target: ModelInfo) -> bool:
-    """True if exactly this registry model is present (a mini variant does not count)."""
-    return any(model.display == target.display for model in models)
-
-
-def _uses_high_power_gpt_5x(models: list[ModelInfo]) -> bool:
-    """True if any full-size GPT-5 series model is present (GPT-5 through GPT-5.6 Sol).
-
-    The mini/nano variants normalize to keys starting 'gpt5' too, but carry
-    high_power=False and so are excluded.
-    """
-    return any(
-        model.high_power and model.normalized_key.startswith("gpt5") for model in models
-    )
-
-
-def _uses_opus(models: list[ModelInfo]) -> bool:
-    """True if any Claude Opus model is present."""
-    return any("opus" in model.display.lower() for model in models)
 
 
 def _high_power_release_ordinal(models: list[ModelInfo]) -> float | None:

@@ -73,7 +73,7 @@ It reads `local/<season>_simulations/` and writes `local/<season>_pro_vs_bot_wri
 
 ## Bot-maker survey analysis
 
-`aib_analysis/survey_analysis/` joins the season's bot-maker survey to the bot leaderboard and writes a report with charts. Its inputs live in the folder named in `config.py` (`local/private_input_data/summer_2026_survey_data/` for Summer 2026): the form responses (the response sheet downloaded as CSV), the payouts sheet's season tab as CSV (only the username, bot, `in_aib` and prize columns are read), and the reviewed `manual_bot_name_aliases.csv`, `manual_winner_overrides.csv` and `manual_answer_adjustments.csv`. Anything that names individual bots stays in that folder, out of git. For a new season, also update `season_notes.py` (season start date, spotlight models) and add new research write-in sources to `RESEARCH_WRITE_IN_SOURCES` in `config.py` before looking at scores.
+`aib_analysis/survey_analysis/` joins the season's bot-maker survey to the bot leaderboard and writes a report with charts. Its inputs live in the folder named in `config.py` (`local/private_input_data/summer_2026_survey_data/` for Summer 2026): the form responses (the response sheet downloaded as CSV), the payouts sheet's season tab as CSV (only the username, bot, `in_aib` and prize columns are read), and the reviewed `manual_bot_name_aliases.csv`, `manual_winner_overrides.csv` and `manual_answer_adjustments.csv`. Anything that names individual bots stays in that folder, out of git. For a new season, also update `season_notes.py` (season start date) and add new research write-in sources to `RESEARCH_WRITE_IN_SOURCES` in `config.py` before looking at scores.
 
 ```
 poetry run python -m aib_analysis.survey_analysis.run [--refresh] [--blind]

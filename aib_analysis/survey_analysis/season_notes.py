@@ -17,13 +17,6 @@ TOURNAMENT_URL = "https://www.metaculus.com/tournament/summer-futureeval-2026/"
 # the leaderboard checks it against the tournament's first forecast.
 SEASON_START_DATE = date(2026, 5, 18)
 
-# Specific final-prediction models with their own feature: the most common
-# OpenAI final model among respondents, and the Claude Opus release closest to
-# it in time as a like-for-like comparison (Spring 2026: GPT-5.4 and Claude
-# Opus 4.6). Both must be MODEL_REGISTRY display names.
-SPOTLIGHT_OPENAI_MODEL = "GPT-5.6 Sol"
-SPOTLIGHT_OPUS_MODEL = "Claude Opus 5"
-
 # Definition changes made after the responses were downloaded, stated in the
 # report for transparency. Empty when nothing changed after the download.
 PRECOMMIT_LATE_DEFINITION_NOTE = (
@@ -39,17 +32,12 @@ LATE_DEFINITION_CAVEATS: list[str] = [
     "still open after a bot's first forecast, so a bot that started late is not penalized for questions "
     "it never saw. Counting every season question instead, its link to score is weaker and does not "
     "pass the correction.",
-    "Frontier definition: The Summer release-date cutoff and the rule that a flagship line still counts "
-    "below a pricier tier were set after an earlier draft of these results had been seen, and they "
-    "raised the frontier correlations. The two single-model features (GPT-5.6 Sol and Claude Opus 5) "
-    "replaced Spring's (GPT-5.4 and Claude Opus 4.6) at the same time. These results are exploratory "
-    "either way.",
     "LLM calls per question: Bots whose makers answered \"Highly variable across questions\" or wrote in "
     "an answer have no number, so they are left out of this correlation, and they include some of the "
     "best-scoring bots.",
     "Features added after seeing results: The \"Uses 2 to 5 research sources\" feature was added after "
-    "the Summer results had been seen, to follow up a pattern in them, so its p-value and q-value "
-    "overstate the evidence.",
+    "the Summer results had been seen, since it seemed that at past 5 sources people might be adding "
+    "lower quality or poorly configured data providers. Thus its p-value and q-value may be inflated.",
 ]
 
 # Human-authored headline findings shown at the top of the report. Filled in

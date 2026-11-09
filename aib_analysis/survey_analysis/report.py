@@ -17,6 +17,7 @@ import os
 import string
 from dataclasses import replace
 from datetime import date
+from statistics import mean, median
 
 from aib_analysis.survey_analysis import (
     config,
@@ -398,9 +399,6 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
     feature_results, q_by_key = _feature_stats(corr_pool)
     leaderboard_rows = get_leaderboard_rows()
     leaderboard_size = len(leaderboard_rows)
-    outside_bot_count = sum(
-        1 for row in leaderboard_rows if not row.bot_name.lower().startswith(config.METACULUS_HOUSE_BOT_PREFIX)
-    )
 
     lines: list[str] = []
     lines.append(f"# {season_notes.SEASON_LABEL} FutureEval bot-maker survey")
@@ -464,7 +462,7 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
 
     lines.append(_methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_size))
     lines.append("")
-    lines.append(_caveats_section(in_scope, corr_pool, counts, outside_bot_count))
+    lines.append(_caveats_section(in_scope, corr_pool, counts, leaderboard_rows))
     lines.append("")
     return "\n".join(lines)
 
@@ -608,7 +606,26 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
     return "\n".join(parts)
 
 
-def _caveats_section(features, corr_pool, counts, outside_bot_count) -> str:
+def _response_bias_caveat(features, outside_rows) -> str:
+    responded = {feature.respondent.matched_leaderboard_name for feature in features}
+    eligible = [row for row in outside_rows if row.question_count >= config.MIN_QUESTIONS_FOR_CORRELATION]
+    respondent_scores = [row.sum_spot_peer / row.question_count for row in eligible if row.bot_name in responded]
+    other_scores = [row.sum_spot_peer / row.question_count for row in eligible if row.bot_name not in responded]
+    return (
+        f"- Measured response bias: Respondents had a median score of {median(respondent_scores):+.1f}, "
+        f"against {median(other_scores):+.1f} for non-respondents. Additionally, respondents had an average "
+        f"score of {mean(respondent_scores):+.1f}, and non-respondents had an average score of "
+        f"{mean(other_scores):+.1f}. Both compare average spot peer scores among the bots not run by "
+        f"Metaculus that forecast at least {config.MIN_QUESTIONS_FOR_CORRELATION} scored questions "
+        f"({len(respondent_scores)} respondents and {len(other_scores)} non-respondents)."
+    )
+
+
+def _caveats_section(features, corr_pool, counts, leaderboard_rows) -> str:
+    outside_rows = [
+        row for row in leaderboard_rows if not row.bot_name.lower().startswith(config.METACULUS_HOUSE_BOT_PREFIX)
+    ]
+    outside_bot_count = len(outside_rows)
     owners = [owner for owner in loading.load_prize_owners() if owner.in_futureeval]
     winning_owners = sum(1 for owner in owners if owner.won_any)
     respondent_winner_pct = round(100 * counts["winner"] / len(features)) if features else 0
@@ -624,6 +641,7 @@ def _caveats_section(features, corr_pool, counts, outside_bot_count) -> str:
         "popularity among all bots, and correlations can be distorted if the makers who responded "
         "differ systematically from those who did not."
     )
+    lines.append(_response_bias_caveat(features, outside_rows))
     lines.append(
         f"- Small samples: At {len(features)} survey responses, this analysis is generally "
         "underpowered, so results should be treated as suggestive. With the "
