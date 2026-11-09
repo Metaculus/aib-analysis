@@ -252,7 +252,8 @@ def _appendix(result: AnalysisResult, config: AdviceSeasonConfig) -> str:
             f"measuring how well they agree. [The code]({ANALYSIS_CODE_URL}) for the analysis is open source.",
             "\n".join(steps),
             _theme_quality_table(result),
-            "Counts are floors: the survey didn't ask about each theme, so a bot maker who didn't mention one may still agree "
-            "with it. Theme and one-off labels were written by the models; the quotes are the bot makers' own words.",
+            "Note: Observed theme counts are floors since the survey didn't ask about each theme. Consequently, a bot maker who "
+            "didn't mention a theme may still agree with it. Themes and one-off labels were written by the models, though the "
+            "quotes are the bot makers' own words.",
         ]
     )
