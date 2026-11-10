@@ -19,7 +19,6 @@ EXPECTED_SECTION_ORDER = [
     "## Main takeaways",
     "## Introduction",
     "## Are bots better than human Pros?",
-    "## How accurate are the forecasts?",
     "## Which bots did best?",
     "## How do LLMs compare?",
     "## Links to code and data",
@@ -49,6 +48,13 @@ def test_writeup_sections_charts_and_fill_mes(pros_ahead_folder: Path, synthetic
     assert "with questions closing between May 2 and May 2, 2026" in writeup
     assert "linkpost" not in writeup
     assert "**Pro forecasters" in writeup
+    team_size_positions = [
+        writeup.index("average head-to-head score against the Pro team"),
+        writeup.index("](charts/team_size.png)"),
+        writeup.index("average head-to-head score against the top-3 team"),
+        writeup.index("](charts/team_size_vs_main.png)"),
+    ]
+    assert team_size_positions == sorted(team_size_positions)
     assert re.search(r"\bNone\b(?! of)|\bnan\b", writeup) is None
     assert "—" not in writeup
     for real_pro_name in PRO_NAMES:
@@ -88,12 +94,28 @@ def test_writeup_describes_a_mid_season_window_change(pros_ahead_folder: Path, s
     assert "Each question stayed open for 1.5 hours (through June 4) or 3 hours (from June 5 on)." in writeup
     assert "Bots would forecast in the last 1.5 hours (through June 4) or 3 hours (from June 5 on) of the time" in writeup
     assert "Metac Bots were not updated during the season" in writeup
-    assert "One of the bot makers' bots was an extra bot marked non-primary, which the official leaderboard doesn't rank" in writeup
+    assert (
+        "One of the bot makers' bots was an extra bot marked non-primary, which the official leaderboard doesn't rank "
+        "(or give prize money to). We include these bots in this analysis." in writeup
+    )
+    assert "In the end, the Pro team beat the bot team" in writeup
+    assert "[Summer 2026 Metac Bot code](https://github.com/Metaculus/forecasting-tools/" in writeup
+    assert "The full leaderboard can be found [here](https://www.metaculus.com/tournament/summer-futureeval-2026/)." in writeup
+    assert "#research-reports-and-overview-of-the-field" in writeup
+    assert "simulated" not in writeup.lower()
     assert "Some bot tournament questions were given weights" in writeup
     assert "Pro questions all have a weight of 1. The Pro vs bot comparison uses the Pro questions' weights." in writeup
     appendix = _appendix_c(writeup)
+    assert "Notes on data collection" not in writeup
+    assert appendix.index("our API rejects predictions that put no or very little probability mass in bounds") < appendix.index(
+        "metac-autocast was named"
+    )
     assert "metac-autocast was named metac-agent until October 15, 2026" in appendix
-    assert "The bot question window changed during the season" in appendix
+    assert (
+        "Due to reliability issues in GitHub Actions, where most bot makers run their bots, the bot question window "
+        "changed during the season. Questions stayed open for 1.5 hours through June 4 and 3 hours from June 5 on."
+        in appendix
+    )
     assert "human account" not in appendix
     assert appendix.index("metac-autocast was named") < appendix.index(FILL_ME)
 
@@ -104,10 +126,24 @@ def test_writeup_with_one_window_and_no_season_notes(pros_ahead_folder: Path, sy
         bot_question_interval_hours=2,
         bot_question_windows=(BotQuestionWindow(first_open_date=None, open_hours=1.5),),
         data_notes=(),
+        bot_question_launch_text=None,
     )
     writeup = _render(pros_ahead_folder, config, tmp_path / "writeup")
     assert "launched a new set of questions one at a time, every 2 hours. Each question stayed open for 1.5 hours, so it closed before the next one launched." in writeup
     assert "window changed" not in writeup
+
+
+def test_openrouter_pinning_is_described_only_for_pinned_seasons(
+    pros_ahead_folder: Path, synthetic_config: SeasonConfig, tmp_path: Path
+) -> None:
+    unpinned = _render(pros_ahead_folder, synthetic_config, tmp_path / "unpinned")
+    assert "OpenRouter" not in unpinned
+    pinned = _render(
+        pros_ahead_folder, dataclasses.replace(synthetic_config, metac_bots_pinned_openrouter_hosts=True), tmp_path / "pinned"
+    )
+    methodology = pinned[pinned.index("## Appendix A: Methodology") : pinned.index("## Appendix B")]
+    assert "research source. Some Metac Bots use open-weight models through OpenRouter" in methodology
+    assert "Metac Bots that were moved to a different OpenRouter host during the season" in _appendix_c(pinned)
 
 
 def _edit_bot_question(folder: Path, question_id: int, changes: dict[str, object]) -> None:
@@ -124,11 +160,26 @@ def test_appendix_c_discloses_shared_weights_and_close_time_differences(
 ) -> None:
     _edit_bot_question(pros_ahead_folder, 1, {"weight": 0.7, "spot_scoring_time": "2026-05-02T01:30:00Z"})
     writeup = _render(pros_ahead_folder, synthetic_config, tmp_path / "writeup")
-    assert "1 of them also asked of the Pros" in writeup
-    assert "Appendix C lists shared questions where the two closed at different times." in writeup
     appendix = _appendix_c(writeup)
-    assert "1 of the shared questions had weights below 1 in the bot tournament (0.7), but the Pro vs bot comparison uses the Pro questions' weights of 1." in appendix
-    assert "the bot question closed 90 minutes after the Pro question, so bots had extra time to forecast" in appendix
+    assert (
+        "1 of the questions shared between bots and Pros had weights below 1 in the bot tournament (0.7), but the Pro "
+        "vs bot comparison uses the Pro questions' weights of 1, since the Pro tournament didn't include" in appendix
+    )
+    assert (
+        "the bot question closed 90 minutes after the Pro question, because we spread out questions that bots had to "
+        "forecast in parallel. This gave bots 90 minutes when news on this question could have changed. We expect "
+        "this difference to be negligible." in appendix
+    )
+
+
+def test_appendix_c_asks_for_reasons_the_season_config_leaves_out(
+    pros_ahead_folder: Path, synthetic_config: SeasonConfig, tmp_path: Path
+) -> None:
+    _edit_bot_question(pros_ahead_folder, 1, {"spot_scoring_time": "2026-05-02T01:30:00Z"})
+    config = dataclasses.replace(synthetic_config, window_change_reason=None, close_time_difference_reason=None)
+    appendix = _appendix_c(_render(pros_ahead_folder, config, tmp_path / "writeup"))
+    assert f"The bot question window changed during the season. {FILL_ME} _(Reminder: say why the window changed)_" in appendix
+    assert f"the bot question closed 90 minutes after the Pro question {FILL_ME} _(Reminder: say why the close times differed)_." in appendix
 
 
 def test_season_config_rejects_unordered_windows(synthetic_config: SeasonConfig) -> None:

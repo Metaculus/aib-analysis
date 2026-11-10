@@ -55,6 +55,11 @@ class SeasonConfig:
     main_bot_team_size: int = 10
     data_notes: tuple[str, ...] = ()
     human_accounts_in_bot_teams_allowed: bool = False
+    has_bot_team_vs_main_simulations: bool = True
+    bot_question_launch_text: str | None = None
+    window_change_reason: str | None = None
+    close_time_difference_reason: str | None = None
+    metac_bots_pinned_openrouter_hosts: bool = True
 
     def __post_init__(self) -> None:
         if not self.bot_question_windows or self.bot_question_windows[0].first_open_date is not None:
@@ -85,6 +90,14 @@ PUBLISHED_PRO_VS_BOT_RESULTS: tuple[PublishedTeamResult, ...] = (
     PublishedTeamResult("Spring 2026", -1.25, -4.87, 2.37, 99),
 )
 
+# Seasons with no clear winner whose 95% CI only just crossed zero; the trend paragraph says so.
+NEAR_MISS_SEASONS: tuple[str, ...] = ("Q4 2024",)
+
+# How many of the top 10 spots Pros took on the leaderboard ranking bots and Pros individually.
+PUBLISHED_PROS_IN_INDIVIDUAL_TOP_10: dict[str, int] = {
+    "Spring 2026": 9,
+}
+
 PUBLISHED_BASELINE_BOT_RANKS: tuple[PublishedBaselineBotRank, ...] = (
     PublishedBaselineBotRank("Q3 2024", 4, 55),
     PublishedBaselineBotRank("Q4 2024", 6, 44),
@@ -110,30 +123,55 @@ SEASONS: dict[str, SeasonConfig] = {
         # Spring's simulations predate removing human accounts after the bot leaderboard, so
         # its largest team-size teams include a few. Kept so this season reproduces the published post.
         human_accounts_in_bot_teams_allowed=True,
+        # Spring's simulations predate the bot team vs top-10 bot team files, so its results still compute
+        # but its team-size section can't be rendered.
+        has_bot_team_vs_main_simulations=False,
+        metac_bots_pinned_openrouter_hosts=False,
     ),
     "summer_2026": SeasonConfig(
         key="summer_2026",
         label="Summer 2026",
         prize_pool="$50,000",
-        bot_tournament_url=None,
+        bot_tournament_url="https://www.metaculus.com/tournament/summer-futureeval-2026/",
         bot_question_interval_hours=None,
         bot_question_windows=(
             BotQuestionWindow(first_open_date=None, open_hours=1.5),
             BotQuestionWindow(first_open_date=date(2026, 6, 5), open_hours=3),
         ),
         pro_forecast_window_days=3,
-        metac_bot_code_url=None,
-        data_notes=(
-            "metac-autocast was named metac-agent until October 15, 2026, so earlier posts and pages may use that name.",
+        metac_bot_code_url=(
+            "https://github.com/Metaculus/forecasting-tools/blob/7c288e921b66d040c07c84a211428378d7a58111/"
+            "forecasting_tools/forecast_bots/official_bots/template_bot_2026_summer.py"
         ),
+        data_notes=(
+            "metac-autocast was named metac-agent until October 15, 2026, so posts and pages earlier than this may "
+            "still use the \"metac-agent\" name. In Fall 2026, metac-agent switched from a simple agentic harness to "
+            "the harness used in autocast.",
+            "Some questions were mistakenly launched as numeric and then converted to discrete after launch.",
+            "Bots (including Metac Bots) missed some questions because of provider outages, GitHub Actions issues, or "
+            "formatting errors. Many bot makers have mentioned that some of their biggest point losses were from bugs "
+            "in code rather than their bot making a bad forecast.",
+        ),
+        bot_question_launch_text="at random times spread throughout the week",
+        window_change_reason="Due to reliability issues in GitHub Actions, where most bot makers run their bots",
+        close_time_difference_reason="because we spread out questions that bots had to forecast in parallel",
+        # forecasting-tools started pinning OpenRouter hosts on Sept 25, 2026 (PR #351), after this season.
+        metac_bots_pinned_openrouter_hosts=False,
     ),
 }
 
 FUTUREEVAL_URL = "https://www.metaculus.com/futureeval/"
 SCORING_FAQ_URL = "https://www.metaculus.com/help/scores-faq/"
 RESOURCES_URL = "https://www.metaculus.com/notebooks/38928/ai-benchmark-resources/"
+RESEARCH_SECTION_URL = f"{RESOURCES_URL}#research-reports-and-overview-of-the-field"
+OPEN_SOURCE_BOTS_URL = f"{RESOURCES_URL}#open-source-bots"
+DATA_ACCESS_URL = f"{RESOURCES_URL}#what-data-do-i-have-access-to-via-api-how-can-i-get-access-to-more"
+CUSTOM_EVALS_URL = "https://www.metaculus.com/futureeval/partner/"
+MULTIPLE_COMPARISONS_URL = "https://en.wikipedia.org/wiki/Multiple_comparisons_problem"
+SERIES_METHODOLOGY_URL = (
+    "https://www.metaculus.com/notebooks/28552/comparing-forecasting-track-records-for-ai-benchmarking-and-beyond/"
+)
 ANALYSIS_CODE_URL = "https://github.com/Metaculus/aib-analysis"
-FORECASTING_TOOLS_URL = "https://github.com/Metaculus/forecasting-tools"
 DATA_REQUEST_FORM_URL = (
     "https://docs.google.com/forms/d/e/1FAIpQLSeJhtZzHl5qMvBjbXbatyaqoS4IU7RE0GGw_vlhs6I9syqn1g/"
     "viewform?usp=pp_url&entry.192763438=https://www.metaculus.com/api/"
