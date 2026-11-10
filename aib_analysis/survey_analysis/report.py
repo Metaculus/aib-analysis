@@ -522,8 +522,8 @@ def _frontier_exceptions_sentence() -> str:
         return ""
     names = " and ".join(season_notes.FRONTIER_EXCEPTIONS)
     return (
-        f" We also count {names} as frontier this season: it was released before the cutoff but was "
-        "still its vendor's newest flagship for most of the season."
+        f" We also count {names} as frontier this season: released before the cutoff, but still its "
+        "vendor's newest flagship for most of the season."
     )
 
 

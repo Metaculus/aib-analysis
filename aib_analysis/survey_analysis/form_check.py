@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import shutil
 import subprocess
 import unicodedata
 
@@ -31,6 +32,8 @@ def read_form_text(pdf_path: str) -> str:
             f"No survey form PDF at {pdf_path}. Print the season's Google Form (the blank form "
             "preview) to PDF and save it there; the run checks the option lists against it."
         )
+    if shutil.which("pdftotext") is None:
+        raise FileNotFoundError("pdftotext is not installed; install poppler-utils to read the survey form PDF")
     result = subprocess.run(["pdftotext", "-layout", pdf_path, "-"], capture_output=True, text=True, check=True)
     return result.stdout
 

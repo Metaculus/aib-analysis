@@ -241,6 +241,7 @@ def _apply_research_write_ins(cell: ParsedCell) -> tuple[list[str], list[str]]:
     """
     vocab = config.MULTISELECT_VOCAB["research"]
     named_options: set[str] = set()
+    named_sources: set[str] = set()
     still_other: list[str] = []
     uncovered: list[str] = []
     for write_in in cell.other:
@@ -248,13 +249,14 @@ def _apply_research_write_ins(cell: ParsedCell) -> tuple[list[str], list[str]]:
         sources = parsing.match_write_in_sources([write_in], config.RESEARCH_WRITE_IN_SOURCES)
         not_counted = parsing.match_write_in_sources([write_in], config.RESEARCH_WRITE_INS_NOT_COUNTED)
         named_options.update(options)
+        named_sources.update(sources)
         if sources or not options:
             still_other.append(write_in)
         if not (options or sources or not_counted):
             uncovered.append(write_in)
     cell.matched = [option for option in vocab if option in cell.matched or option in named_options]
     cell.other = still_other
-    return parsing.match_write_in_sources(still_other, config.RESEARCH_WRITE_IN_SOURCES), uncovered
+    return [source for source in config.RESEARCH_WRITE_IN_SOURCES if source in named_sources], uncovered
 
 
 def _frontier_variable(models: list[ModelInfo]) -> float | None:

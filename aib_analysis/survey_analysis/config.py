@@ -28,7 +28,7 @@ SURVEY_CSV = os.path.join(
     "Summer 2026 FutureEval Bot Maker Survey (Responses) - Form Responses 1.csv",
 )
 PRIZE_STATS_CSV = os.path.join(INPUT_DIR, "Summer 2026 FutureEval Payouts - Summer 2026.csv")
-# The blank form printed to PDF; form_check.py checks the option lists against it.
+# The blank survey form, printed to PDF.
 SURVEY_FORM_PDF = os.path.join(INPUT_DIR, "Summer 2026 FutureEval Bot Maker Survey.pdf")
 BOT_TOURNAMENT_JSON = os.path.join(
     REPO_ROOT, "local/summer_2026_simulations/2_bot_tournament.json"
@@ -46,7 +46,7 @@ PARSING_REVIEW_MD = os.path.join(OUTPUT_DIR, "parsing_review.md")
 # --------------------------------------------------------------------------- #
 # Group definitions (confirmed with user)
 # --------------------------------------------------------------------------- #
-# winner       = see loading.winner_sources (prize winners, plus bots that scored above one)
+# winner       = a prize winner, or a bot that scored above one
 # top_10       = top 10 bots by sum of spot peer score on the FULL leaderboard
 # non_winner   = every responding bot that is not a winner
 TOP_N_FOR_TOP_GROUP = 10
