@@ -20,13 +20,12 @@ from aib_analysis.survey_analysis.loading import (
     _alnum_key,
     _match_leaderboard,
     _match_prize,
-    _resolve_winner,
     _split_bot_list,
     _to_float,
     load_survey,
     normalize_name,
+    winner_sources,
 )
-from aib_analysis.survey_analysis.manual_adjustments import WinnerOverride
 
 
 # --------------------------------------------------------------------------- #
@@ -99,7 +98,6 @@ def _owner(bots: list[str], **kw) -> PrizeOwner:
         owner_username=kw.get("owner", "someone"),
         bot_usernames=bots,
         aib_prize=kw.get("aib_prize", 100.0),
-        total_prize=kw.get("total_prize", 100.0),
         in_futureeval=True,
     )
 
@@ -169,41 +167,51 @@ def test_groups_include_top10_only_when_flagged():
 
 
 # --------------------------------------------------------------------------- #
-# Bot-level winner resolution (the prize sheet is owner-level)
+# Bot-level winners (the prize sheet is owner-level)
 # --------------------------------------------------------------------------- #
-def test_single_bot_owner_status_transfers_to_bot():
-    won = _owner(["solo-bot"], aib_prize=50.0)
-    assert _resolve_winner("solo-bot", won, None) == (True, "owner_single_bot")
-    lost = _owner(["solo-bot"], aib_prize=0.0)
-    assert _resolve_winner("solo-bot", lost, None) == (False, "owner_single_bot")
+def _scored_row(rank: int, name: str, score: float) -> LeaderboardRow:
+    return LeaderboardRow(rank, name, score, 100, 100)
 
 
-def test_multi_bot_owner_with_no_wins_means_no_winner():
-    owner = _owner(["bot-1", "bot-2"], aib_prize=0.0)
-    assert _resolve_winner("bot-1", owner, None) == (False, "owner_multi_bot_no_wins")
+def _owner_named(owner: str, bots: list[str], prize: float) -> PrizeOwner:
+    return _owner(bots, owner=owner, aib_prize=prize)
 
 
-def test_multi_bot_owner_with_wins_requires_override():
-    owner = _owner(["bot-1", "bot-2"], aib_prize=100.0)
-    with pytest.raises(ValueError, match="owner-level"):
-        _resolve_winner("bot-1", owner, None)
+def test_single_bot_prize_winner_is_a_winner_and_sets_the_bar():
+    rows = [_scored_row(1, "solo-a", 50.0), _scored_row(2, "solo-b", 20.0), _scored_row(3, "loser", 10.0)]
+    owners = [
+        _owner_named("a", ["solo-a"], 100.0),
+        _owner_named("b", ["solo-b"], 50.0),
+        _owner_named("c", ["loser"], 0.0),
+    ]
+    assert winner_sources(owners, rows) == {
+        "soloa": "single-bot prize winner",
+        "solob": "single-bot prize winner",
+    }
 
 
-def test_override_resolves_ambiguous_multi_bot_owner():
-    owner = _owner(["bot-1", "bot-2"], aib_prize=100.0)
-    override = WinnerOverride(bot_name="bot-1", is_winner=True, reason="best ranked")
-    assert _resolve_winner("bot-1", owner, override) == (True, "manual_override")
-    loser_override = WinnerOverride(bot_name="bot-2", is_winner=False, reason="worse ranked")
-    assert _resolve_winner("bot-2", owner, loser_override) == (False, "manual_override")
+def test_any_bot_above_the_lowest_single_bot_winner_is_a_winner():
+    rows = [
+        _scored_row(1, "multi-main", 60.0),
+        _scored_row(2, "solo", 30.0),
+        _scored_row(3, "multi-secondary", 25.0),
+        _scored_row(4, "metac-house", 70.0),
+    ]
+    owners = [_owner_named("m", ["multi-main", "multi-secondary"], 200.0), _owner_named("s", ["solo"], 10.0)]
+    sources = winner_sources(owners, rows)
+    assert sources == {"solo": "single-bot prize winner", "multimain": "scored above a prize winner"}
 
 
-def test_override_applies_even_without_prize_match():
-    override = WinnerOverride(bot_name="bot-x", is_winner=True, reason="known winner")
-    assert _resolve_winner("bot-x", None, override) == (True, "manual_override")
+def test_prize_owner_with_no_identifiable_winning_bot_raises():
+    rows = [_scored_row(1, "solo", 30.0), _scored_row(2, "multi-1", 20.0), _scored_row(3, "multi-2", 10.0)]
+    owners = [_owner_named("s", ["solo"], 100.0), _owner_named("m", ["multi-1", "multi-2"], 5.0)]
+    with pytest.raises(ValueError, match="cannot be identified"):
+        winner_sources(owners, rows)
 
 
-def test_no_prize_match_defaults_to_non_winner():
-    assert _resolve_winner("bot-x", None, None) == (False, "no_prize_match")
+def test_single_bot_winner_missing_from_leaderboard_raises():
+    with pytest.raises(ValueError, match="not on the leaderboard"):
+        winner_sources([_owner_named("s", ["ghost"], 100.0)], [_scored_row(1, "other", 1.0)])
 
 
 # --------------------------------------------------------------------------- #

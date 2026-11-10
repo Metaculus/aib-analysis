@@ -8,6 +8,8 @@ the documented treatment of blank answers. Runs without env vars or local data.
 
 from __future__ import annotations
 
+import pytest
+
 from aib_analysis.survey_analysis import config
 from aib_analysis.survey_analysis.features import build_features
 from aib_analysis.survey_analysis.loading import Respondent
@@ -70,14 +72,35 @@ def test_not_in_a_team_becomes_solo_one():
     assert feature.variables["team_size"] == 1.0
 
 
-def test_unlisted_write_in_research_captured_as_other_and_not_counted():
+def test_research_write_in_no_rule_covers_stops_the_run():
+    with pytest.raises(ValueError, match="my custom homemade scraper"):
+        build_features([_respondent(research="Exa, my custom homemade scraper")])
+
+
+def test_not_counted_research_write_in_stays_other_and_adds_nothing():
+    feature = build_features([_respondent(research="Exa, my own weird system")])[0]
+    assert feature.cells["research"].matched == ["Exa"]
+    assert feature.cells["research"].other == ["my own weird system"]
+    assert feature.variables["n_research_sources"] == 1.0
+
+
+def test_write_in_naming_a_form_option_ticks_it_once():
+    static = "Static web scraping (Only HTML, possibly converted to markdown)"
     feature = build_features(
-        [_respondent(research="Exa, my custom homemade scraper")]
+        [_respondent(research=f"Exa, Exa (neural news search), {static}, Wayback Machine snapshots, Firecrawl")]
     )[0]
     cell = feature.cells["research"]
-    assert cell.matched == ["Exa"]
-    assert cell.other == ["my custom homemade scraper"]
-    assert feature.variables["n_research_sources"] == 1.0
+    assert cell.matched == ["Exa", static]
+    assert cell.other == []
+    assert feature.variables["n_research_sources"] == 2.0
+    assert feature.variables["uses_scraping"] == 1.0
+
+
+def test_write_in_naming_an_option_and_an_extra_source_counts_both():
+    feature = build_features([_respondent(research="OpenRouter web search. Tavily early on")])[0]
+    assert feature.cells["research"].matched == ["Tavily"]
+    assert feature.cells["research"].other == ["OpenRouter web search. Tavily early on"]
+    assert feature.variables["n_research_sources"] == 2.0
 
 
 def test_listed_write_in_research_source_adds_to_the_count():

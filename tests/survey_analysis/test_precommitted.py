@@ -85,7 +85,7 @@ def test_untestable_hypothesis_counts_as_p_one_in_the_family():
     keys = [hypothesis.key for hypothesis in PRECOMMITTED_HYPOTHESES]
     pool = [make_feature(variables={keys[0]: float(index % 2)}, score=float(index % 2)) for index in range(20)]
     results = precommitted.evaluate_precommitted(pool)
-    assert results[0].correlation.coefficient == pytest.approx(1.0)
+    assert results[0].one_sided_p == pytest.approx(0.0)
     assert all(result.one_sided_p is None for result in results[1:])
     # Only one testable hypothesis, but Holm still multiplies by the full family size.
     assert results[0].holm_p == pytest.approx(min(1.0, 3 * results[0].one_sided_p))

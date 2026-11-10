@@ -54,7 +54,3 @@ def test_hidden_results_cannot_move_a_question_up_the_page():
     only_hidden = QuestionSpec("x", "X", "multiselect", [HIDDEN_KEY])
     assert report._spec_effect_size(only_hidden, _results(), frozenset({HIDDEN_KEY})) == -1.0
 
-
-def test_blinded_keys_cover_primaries_and_alternatives():
-    expected = {h.key for h in precommitted.PRECOMMITTED_HYPOTHESES + precommitted.ALTERNATIVE_HYPOTHESES}
-    assert precommitted.BLINDED_KEYS == expected

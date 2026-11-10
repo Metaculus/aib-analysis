@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import os
 
-from aib_analysis.survey_analysis import config, season_notes
+from aib_analysis.survey_analysis import config, season_notes, stats
 
 logger = logging.getLogger(__name__)
 
@@ -20,15 +20,26 @@ def _model_registry_table() -> list[str]:
         "| --- | --- | --- | --- | --- | --- |",
     ]
     for model in config.MODEL_REGISTRY:
+        exception = season_notes.FRONTIER_EXCEPTIONS.get(model.display)
+        note = "; ".join(part for part in (model.note, exception and f"frontier this season: {exception}") if part)
         lines.append(
             f"| {model.display} | {model.release_date_str} | {_yn(model.high_power)} | "
-            f"{_yn(model.released_after_cutoff)} | {_yn(model.is_frontier)} | {model.note} |"
+            f"{_yn(model.released_after_cutoff)} | {_yn(model.is_frontier)} | {note} |"
         )
     return lines
 
 
 def _yn(value: bool) -> str:
     return "yes" if value else "no"
+
+
+def _pattern_table(label_header: str, rows: list[tuple[str, str]]) -> list[str]:
+    lines = [f"| {label_header} | Pattern |", "| --- | --- |"]
+    for label, pattern in rows:
+        escaped_pattern = pattern.replace("|", "\\|")
+        lines.append(f"| {label} | `{escaped_pattern}` |")
+    lines.append("")
+    return lines
 
 
 def _midpoint_table(title: str, mapping: dict[str, float]) -> list[str]:
@@ -52,7 +63,12 @@ def generate_parsing_decisions() -> str:
 
     lines.append("## Groups")
     lines.append("")
-    lines.append("- Winner: won any AIB prize (prize-stats `aib_prize > 0`).")
+    lines.append(
+        "- Winner: the prize sheet lists prizes per owner, so a prize-winning owner with one bot makes "
+        "that bot a winner. Any other bot that scored above at least one of those winners is also a "
+        "winner (Metaculus's own bots aside), which covers the prize bot of an owner with several bots "
+        "and any secondary bot that scored at a winning level."
+    )
     lines.append(
         f"- Top 10: top {config.TOP_N_FOR_TOP_GROUP} bots by sum of spot peer score on the full "
         "leaderboard, computed from the saved bot tournament."
@@ -70,9 +86,12 @@ def generate_parsing_decisions() -> str:
         "Spring 2026's cutoff (a 2026-01-05 start gave 2025-11-01). Flagship means a vendor's flagship line, which still counts when the "
         "vendor adds a pricier tier above it (Claude Opus under Claude Fable, GPT-6 Sol under GPT-6 "
         "Astra). Mid tiers (Sonnet, Terra, Luna) and mini, nano, flash, fast, haiku, free-tier, and "
-        "other small variants are not flagship. Release dates were looked up online in August 2026, "
-        "and for the Summer 2026 additions in October 2026; `after cutoff` is computed from the date. "
-        "A couple of dates are marked approximate in the note column. Fix any date below and rerun."
+        "other small variants are not flagship. A model released before the cutoff that was still its "
+        "vendor's newest flagship for most of the season is listed as a frontier exception in "
+        "season_notes.py and counts as frontier. Release dates were looked up online; `after cutoff` "
+        "is computed from the date, and approximate dates are marked in the note column. A bot's "
+        "frontier status is unknown (left out of the correlation) when none of its models is frontier "
+        "and one has no release date, such as an unspecified fine-tune."
     )
     lines.append("")
     lines.extend(_model_registry_table())
@@ -101,18 +120,21 @@ def generate_parsing_decisions() -> str:
             lines.append(f"- {option}")
         lines.append("")
     lines.append(
-        "**Research write-in sources.** Each of these that a respondent's research write-ins mention "
-        "(case-insensitive regex) adds one to their number of research sources, on top of the ticked "
-        "options. The list is extended each season from that season's write-ins. Write-ins are never "
-        "re-coded by hand: anything these patterns do not match stays 'Other' and counts nowhere."
+        "**Research write-ins.** Write-ins are never re-coded by hand; only these committed rules "
+        "(case-insensitive regexes) apply, and the run stops on any research write-in none of them "
+        "covers. The rules are extended each season from that season's write-ins. A write-in that "
+        "contains a form option's full name counts as ticking that option, and so does one matching a "
+        "pattern in the first table. A form option counts once per bot even if it was also ticked. Each "
+        "source in the second table that a bot's write-ins name adds one to its number of research "
+        "sources. Write-ins matching the third table count nowhere."
     )
     lines.append("")
-    lines.append("| Source | Pattern |")
-    lines.append("| --- | --- |")
-    for name, pattern in config.RESEARCH_WRITE_IN_SOURCES.items():
-        escaped_pattern = pattern.replace("|", "\\|")
-        lines.append(f"| {name} | `{escaped_pattern}` |")
-    lines.append("")
+    lines.extend(_pattern_table(
+        "Counts as the form option",
+        [(option, pattern) for pattern, option in config.RESEARCH_WRITE_IN_OPTIONS.items()],
+    ))
+    lines.extend(_pattern_table("Extra source", list(config.RESEARCH_WRITE_IN_SOURCES.items())))
+    lines.extend(_pattern_table("Not counted because", list(config.RESEARCH_WRITE_INS_NOT_COUNTED.items())))
 
     lines.append("## Single-select parsing")
     lines.append("")
@@ -203,8 +225,8 @@ def generate_parsing_decisions() -> str:
     )
     lines.append("- Ranked or counted traits vs peer score: Spearman rank correlation.")
     lines.append(
-        "- Correlations need at least 8 paired, varying observations; otherwise they are reported as "
-        "insufficient data."
+        f"- Correlations need at least {stats.MIN_N_FOR_CORRELATION} paired, varying observations; "
+        "otherwise they are reported as insufficient data."
     )
     return "\n".join(lines)
 

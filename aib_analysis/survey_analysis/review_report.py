@@ -11,10 +11,9 @@ import csv
 import logging
 import os
 
-from aib_analysis.survey_analysis import config, manual_adjustments, season_notes
+from aib_analysis.survey_analysis import config, season_notes
 from aib_analysis.survey_analysis.features import RespondentFeatures
 from aib_analysis.survey_analysis.leaderboard import get_leaderboard_rows
-from aib_analysis.survey_analysis.loading import normalize_name
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ def _md_escape(text: str) -> str:
     return text.replace("|", "\\|").replace("\n", " ").strip()
 
 
-def _column_inventory(features: list[RespondentFeatures]) -> list[str]:
+def _column_inventory() -> list[str]:
     charted = {spec.slug: spec for spec in config.QUESTION_SPECS}
     lines = [
         "## Column inventory",
@@ -39,10 +38,8 @@ def _column_inventory(features: list[RespondentFeatures]) -> list[str]:
     for slug, header in config.COLUMNS.items():
         if slug in charted:
             handling = f"charted ({charted[slug].kind})"
-        elif slug in config.EXCLUDED_COLUMNS:
-            handling = f"excluded: {config.EXCLUDED_COLUMNS[slug]}"
         else:
-            handling = "used for joining / features only"
+            handling = f"excluded: {config.EXCLUDED_COLUMNS[slug]}"
         lines.append(f"| {_md_escape(header)} | `{slug}` | {handling} |")
     lines.append("")
     return lines
@@ -190,37 +187,6 @@ def _single_select_audit(features: list[RespondentFeatures]) -> list[str]:
     return lines
 
 
-def _manual_adjustments_section(features: list[RespondentFeatures]) -> list[str]:
-    lines = ["## Manual join decisions", ""]
-    lines.append(
-        "Human-reviewed winner overrides loaded from the private input directory (see "
-        "`manual_adjustments.py`). `Applied` reflects this run; \"no (stale)\" means the row no "
-        "longer matches the data and needs review. Survey answers are never edited by hand."
-    )
-    lines.append("")
-
-    lines.append("### Winner overrides")
-    lines.append("")
-    overrides = manual_adjustments.load_winner_overrides()
-    if overrides:
-        winner_source_by_bot = {
-            normalize_name(f.respondent.bot_name): f.respondent.winner_source for f in features
-        }
-        lines.append("| Bot name | is_winner | Applied | Reason |")
-        lines.append("| --- | --- | --- | --- |")
-        for override in overrides:
-            applied = winner_source_by_bot.get(normalize_name(override.bot_name)) == "manual_override"
-            lines.append(
-                f"| {_md_escape(override.bot_name)} | {override.is_winner} "
-                f"| {'yes' if applied else 'no (stale)'} | {_md_escape(override.reason)} |"
-            )
-    else:
-        lines.append("- none")
-    lines.append("")
-
-    return lines
-
-
 def _excluded_columns_section() -> list[str]:
     lines = ["## Excluded columns", "", "These columns are intentionally not charted.", ""]
     for slug, reason in config.EXCLUDED_COLUMNS.items():
@@ -250,9 +216,8 @@ def generate_review_report(features: list[RespondentFeatures]) -> str:
         "moves with the code. A full row-by-row dump is in `data/respondent_audit.csv`."
     )
     lines.append("")
-    lines.extend(_column_inventory(features))
+    lines.extend(_column_inventory())
     lines.extend(_join_audit(features))
-    lines.extend(_manual_adjustments_section(features))
     lines.extend(_model_audit(features))
     lines.extend(_multiselect_audit(features))
     lines.extend(_single_select_audit(features))

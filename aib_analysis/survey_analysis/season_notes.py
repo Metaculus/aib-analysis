@@ -1,4 +1,4 @@
-"""Season-specific facts that cannot be derived from the input data.
+"""Season-specific facts and judgment calls that cannot be derived from the input data.
 
 The rest of the pipeline must not hardcode claims about the data: anything
 that would go stale when the inputs change is either computed at run time or
@@ -17,6 +17,40 @@ TOURNAMENT_URL = "https://www.metaculus.com/tournament/summer-futureeval-2026/"
 # the leaderboard checks it against the tournament's first forecast.
 SEASON_START_DATE = date(2026, 5, 18)
 
+# The season start every item below was last reviewed for. The run stops while it
+# differs from SEASON_START_DATE, so a new season cannot run until each item has
+# been checked and this date updated.
+REVIEWED_FOR_SEASON_START = date(2026, 5, 18)
+SEASON_REVIEW_CHECKLIST: list[str] = [
+    "config.py input paths: survey CSV, prize sheet, blank form PDF and bot tournament JSON for the new season.",
+    "This file: label, tournament name and URL, start date, RANK_VS_OFFICIAL_NOTE and EXCLUDED_MINIBENCH_LABEL.",
+    "precommitted.py: hypotheses chosen and committed before the responses are downloaded, then a --blind run.",
+    "config.py option lists: the run checks them against the form PDF; midpoints for new buckets and the "
+    "BOOLEAN_FEATURES substrings are choices to review.",
+    "config.MODEL_REGISTRY: release date and flagship tier for every new model (the form check forces an "
+    "entry for each), and FRONTIER_EXCEPTIONS below, reviewed together each season.",
+    "config.RESEARCH_WRITE_IN_*: the run stops on any research write-in no rule covers; decide for each new "
+    "one whether it names a form option, counts as an extra source, or is not counted.",
+    "BOT_NAME_ALIASES below: survey names the matcher cannot join (see the join warnings in the log).",
+    "PRECOMMIT_LATE_DEFINITION_NOTE and LATE_DEFINITION_CAVEATS below: replace with this season's changes.",
+    "MAIN_TAKEAWAYS below: write after reading the results.",
+    "Comments and docstrings in aib_analysis/survey_analysis that name the previous season or its dates.",
+]
+
+# Models counted as frontier even though they were released before the cutoff,
+# because they were still their vendor's newest flagship for most of the season.
+# Model -> reason.
+FRONTIER_EXCEPTIONS: dict[str, str] = {
+    "Gemini 3.1 Pro": "Google's newest Pro model all season; Gemini 3.5 Pro was announced but not released",
+}
+
+# Survey bot name -> tournament bot name, for names the automatic matcher cannot
+# safely join (the leaderboard and prize sheet use the tournament name).
+BOT_NAME_ALIASES: dict[str, str] = {
+    "FJMForecastBot2026": "FJMForecastBot2026-bot",
+    "neme": "Chineme",
+}
+
 # Definition changes made after the responses were downloaded, stated in the
 # report for transparency. Empty when nothing changed after the download.
 PRECOMMIT_LATE_DEFINITION_NOTE = (
@@ -24,8 +58,9 @@ PRECOMMIT_LATE_DEFINITION_NOTE = (
     "hypothesis result: the research-source count also counts sources named in write-ins (see "
     "below), and checking similar questions or markets counts only the strategy checkbox. After the "
     "results had been seen, hand corrections of write-ins were dropped in favor of the keyword list "
-    "alone, and the list was extended. This changed the research-source result slightly; it is not "
-    "significant either way."
+    "alone, the list was extended, and a write-in naming a listed option was counted as ticking it. "
+    "Across these versions the research-source correlation ranged from +0.10 to +0.16 and was never "
+    "significant."
 )
 # Caveat bullets for definitions changed or features added after the download,
 # rendered verbatim in Appendix B.
@@ -37,6 +72,10 @@ LATE_DEFINITION_CAVEATS: list[str] = [
     "LLM calls per question: Bots whose makers answered \"Highly variable across questions\" or wrote in "
     "an answer have no number, so they are left out of this correlation, and they include some of the "
     "best-scoring bots.",
+    "Rules revised after seeing results: After the Summer results had been seen, we revised the "
+    "write-in rules (Appendix A) and counted Gemini 3.1 Pro as frontier, since it was Google's newest Pro "
+    "model all season. Web scraping passes the correction only under the revised write-in rules "
+    "(r = +0.40, vs +0.33 when only ticked boxes count).",
     "Features added after seeing results: The \"Uses 2 to 5 research sources\" feature was added after "
     "the Summer results had been seen, since it seemed that at past 5 sources people might be adding "
     "lower quality or poorly configured data providers. Thus its p-value and q-value may be inflated.",

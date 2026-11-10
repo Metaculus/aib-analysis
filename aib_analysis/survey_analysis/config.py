@@ -28,11 +28,8 @@ SURVEY_CSV = os.path.join(
     "Summer 2026 FutureEval Bot Maker Survey (Responses) - Form Responses 1.csv",
 )
 PRIZE_STATS_CSV = os.path.join(INPUT_DIR, "Summer 2026 FutureEval Payouts - Summer 2026.csv")
-# Human-reviewed join files (see manual_adjustments.py). They live in the
-# non-committed private input directory because they reference individual bots;
-# keeping them beside the raw survey data preserves them for reruns.
-MANUAL_WINNER_OVERRIDES_CSV = os.path.join(INPUT_DIR, "manual_winner_overrides.csv")
-MANUAL_BOT_NAME_ALIASES_CSV = os.path.join(INPUT_DIR, "manual_bot_name_aliases.csv")
+# The blank form printed to PDF; form_check.py checks the option lists against it.
+SURVEY_FORM_PDF = os.path.join(INPUT_DIR, "Summer 2026 FutureEval Bot Maker Survey.pdf")
 BOT_TOURNAMENT_JSON = os.path.join(
     REPO_ROOT, "local/summer_2026_simulations/2_bot_tournament.json"
 )
@@ -49,7 +46,7 @@ PARSING_REVIEW_MD = os.path.join(OUTPUT_DIR, "parsing_review.md")
 # --------------------------------------------------------------------------- #
 # Group definitions (confirmed with user)
 # --------------------------------------------------------------------------- #
-# winner       = won any AIB prize (prize-stats aib_prize > 0)
+# winner       = see loading.winner_sources (prize winners, plus bots that scored above one)
 # top_10       = top 10 bots by sum of spot peer score on the FULL leaderboard
 # non_winner   = every responding bot that is not a winner
 TOP_N_FOR_TOP_GROUP = 10
@@ -78,14 +75,14 @@ EVIDENCE_SIGNIFICANT_Q = 0.05
 # high-powered AND released after the cutoff below. The cutoff is a fixed number
 # of days before the season's first question, the offset that gives Spring
 # 2026's 2025-11-01 from its 2026-01-05 start, so a new season only needs
-# season_notes.SEASON_START_DATE. Release dates were looked up online (Aug 2026,
-# plus the Summer 2026 additions in Oct 2026); released_after_cutoff is computed
-# from the stored date, so correcting a date is enough.
+# season_notes.SEASON_START_DATE. released_after_cutoff is computed from the
+# stored release date, so correcting a date is enough.
 #
 # high_power marks a vendor's flagship line. A flagship line still counts when
 # the vendor adds a pricier tier above it (Claude Opus under Claude Fable, GPT-6
 # Sol under GPT-6 Astra); mid and small tiers (Sonnet, Terra, Luna, Flash,
-# mini, ...) never do.
+# mini, ...) never do. season_notes.FRONTIER_EXCEPTIONS adds models that miss
+# the cutoff but were still their vendor's newest flagship for most of the season.
 FRONTIER_CUTOFF_DAYS_BEFORE_SEASON_START = 65
 
 
@@ -122,6 +119,8 @@ class ModelInfo:
 
     @property
     def is_frontier(self) -> bool:
+        if self.display in season_notes.FRONTIER_EXCEPTIONS:
+            return True
         return self.high_power and self.released_after_cutoff
 
     @property
@@ -158,9 +157,8 @@ def _m(
     )
 
 
-# Registry. Release dates were looked up online in Aug 2026 (Summer 2026
-# additions in Oct 2026). Order matters only for readability; matching sorts by
-# key length. high_power is False whenever the name carries a small-tier marker
+# Registry. Release dates were looked up online. Order matters only for
+# readability; matching sorts by key length. high_power is False whenever the name carries a small-tier marker
 # (mini/nano/flash/fast/haiku/free/small/lite) and for mid tiers (Sonnet, Terra,
 # Luna).
 MODEL_REGISTRY: list[ModelInfo] = [
@@ -175,8 +173,11 @@ MODEL_REGISTRY: list[ModelInfo] = [
     _m("GPT-5.6 Terra", high_power=False, release_date=date(2026, 7, 9)),
     _m("GPT-5.6 Luna", high_power=False, release_date=date(2026, 7, 9)),
     # OpenAI GPT-5 family
+    _m("GPT-5.5 Instant", high_power=False, release_date=date(2026, 5, 5),
+       note="fast non-reasoning ChatGPT default"),
     _m("GPT-5.5", high_power=True, release_date=date(2026, 4, 23)),
-    _m("GPT-5.4 mini", high_power=False, release_date=date(2026, 3, 5)),
+    _m("GPT-5.4 mini", high_power=False, release_date=date(2026, 3, 17)),
+    _m("GPT-5.4 nano", high_power=False, release_date=date(2026, 3, 17)),
     _m("GPT-5.4", high_power=True, release_date=date(2026, 3, 5)),
     _m("GPT-5.2", high_power=True, release_date=date(2025, 12, 11)),
     _m("GPT-5.1", high_power=True, release_date=date(2025, 11, 13)),
@@ -213,8 +214,11 @@ MODEL_REGISTRY: list[ModelInfo] = [
     _m("Gemini 3.8 Flash", high_power=False, release_date=date(2026, 9, 2)),
     _m("Gemini 3.7 Flash", high_power=False, release_date=date(2026, 8, 13)),
     _m("Gemini 3.6 Flash", high_power=False, release_date=date(2026, 7, 21)),
+    _m("Gemini 3.5 Flash Lite", high_power=False, release_date=date(2026, 7, 21)),
     _m("Gemini 3.5 Flash", high_power=False, release_date=date(2026, 5, 19)),
     _m("Gemini 3.1 Pro", high_power=True, release_date=date(2026, 2, 19)),
+    _m("Gemini 3.1 Flash Lite", high_power=False, release_date=date(2026, 3, 3),
+       note="preview; general availability 2026-05-07"),
     _m("Gemini 3.1 Flash", high_power=False, release_date=date(2026, 2, 19),
        note="date approximate (shipped with the 3.1 line)"),
     _m("Gemini 3 Pro", high_power=True, release_date=date(2025, 11, 18)),
@@ -222,21 +226,26 @@ MODEL_REGISTRY: list[ModelInfo] = [
     _m("Gemini 2.5 Pro", high_power=True, release_date=date(2025, 3, 25)),
     _m("Gemini 2.5 Flash", high_power=False, release_date=date(2025, 4, 17)),
     _m("gemini-1.5-flash", high_power=False, release_date=date(2024, 5, 14)),
+    _m("Gemma 4", high_power=False, release_date=date(2026, 4, 2),
+       note="Google's small open-weight line, separate from Gemini"),
     # xAI Grok
     _m("Grok 4.6", high_power=True, release_date=date(2026, 8, 12)),
     _m("Grok 4.5", high_power=True, release_date=date(2026, 7, 16)),
-    _m("Grok 4.3", high_power=True, release_date=date(2026, 4, 17)),
-    _m("Grok 4.20", high_power=True, release_date=date(2026, 1, 15),
-       note="date approximate (early Jan 2026)"),
+    _m("Grok 4.3", high_power=True, release_date=date(2026, 4, 17),
+       note="paid in-app beta; API about 2026-04-30"),
+    _m("Grok 4.20", high_power=True, release_date=date(2026, 2, 17),
+       note="beta; API 2026-03-09"),
     _m("Grok 4.1 Fast", high_power=False, release_date=date(2025, 11, 19)),
     # DeepSeek / others
-    _m("Deepseek V4 Pro", high_power=True, release_date=date(2026, 4, 24)),
-    _m("Deepseek- v4 flash", high_power=False, release_date=date(2026, 4, 24)),
+    _m("DeepSeek V4 Pro", high_power=True, release_date=date(2026, 4, 24)),
+    _m("DeepSeek V4 Flash", high_power=False, release_date=date(2026, 4, 24)),
     _m("DeepSeek V3.2", high_power=True, release_date=date(2025, 12, 1)),
     _m("DeepSeek R1", high_power=True, release_date=date(2025, 1, 20)),
     _m("DeepSeek-R1-Distill-Llama-70B", high_power=False, release_date=date(2025, 1, 20)),
     _m("Qwen 3.8 Max", high_power=True, release_date=date(2026, 8, 2)),
     _m("Qwen 3.7 Max", high_power=True, release_date=date(2026, 5, 21)),
+    _m("Qwen 3.7 Plus", high_power=False, release_date=date(2026, 6, 1),
+       note="date approximate; Plus is the tier below Max"),
     _m("Qwen2.5-32B", high_power=False, release_date=date(2024, 9, 19)),
     _m("MiniMax M3", high_power=True, release_date=date(2026, 6, 1)),
     _m("GLM 5.2", high_power=True, release_date=date(2026, 6, 13),
@@ -252,21 +261,24 @@ MODEL_REGISTRY: list[ModelInfo] = [
        note="open-weight model at about o4-mini level, well below OpenAI's flagship"),
     _m("Llama 3.3 70B", high_power=False, release_date=date(2024, 12, 6),
        note="Llama 3.1 405B was still Meta's largest model"),
+    _m("Llama 4 Maverick", high_power=True, release_date=date(2025, 4, 5),
+       note="Meta's largest released Llama 4"),
+    _m("Meta Muse Spark", high_power=True, release_date=date(2026, 4, 8),
+       note="Meta's top released model; app and private API 2026-04-08, public API preview 2026-07-09"),
     _m("Perplexity sonar-reasoning-pro", high_power=False, release_date=date(2025, 2, 1),
        note="specialized search/reasoning model, not a frontier flagship; date approximate"),
     _m("Perplexity Sonar Pro", high_power=False, release_date=date(2025, 2, 1),
        note="specialized search model; date approximate"),
     _m("Perplexity Sonar", high_power=False, release_date=date(2025, 1, 21),
        note="specialized search model"),
-    _m("Kimi", high_power=True, release_date=None,
-       note="generic 'Kimi', version unspecified: K2 was Jul 2025 (pre-cutoff), "
-            "K2.5 Jan 2026 / K2.6 Apr 2026 (post-cutoff). Left unknown, so not counted as frontier."),
-    _m("Cohere", high_power=False, release_date=None),
-    # Generic / unspecified buckets (never counted as frontier; flagged instead)
-    _m("Finetuned Proprietary Model", high_power=False, release_date=None,
-       note="unspecified; excluded from frontier"),
-    _m("Open Source Model", high_power=False, release_date=None,
-       note="unspecified; excluded from frontier"),
+    _m("Kimi K3", high_power=True, release_date=date(2026, 7, 16)),
+    _m("Kimi K2.6", high_power=True, release_date=date(2026, 4, 20)),
+    _m("Kimi", high_power=True, release_date=None, note="version unspecified"),
+    _m("Cohere", high_power=False, release_date=None, note="version unspecified"),
+    # Unspecified models: no release date, so frontier status is unknown.
+    _m("Finetuned Proprietary Model", high_power=False, release_date=None, note="unspecified model"),
+    _m("Finetuned Open Source Model", high_power=False, release_date=None, note="unspecified model"),
+    _m("Open Source Model", high_power=False, release_date=None, note="unspecified model"),
 ]
 
 # Raw tokens that are parsing artifacts or too vague to map to a model. They are
@@ -345,6 +357,8 @@ MULTISELECT_VOCAB: dict[str, list[str]] = {
         "Taking the median/mean/aggregate of multiple forecasts in probability space",
         "Taking the median/mean/aggregate of multiple forecasts in logit space",
         "Other mathematical adjustments",
+        "Used a specialized fine-tuned LLM for research",
+        "Used a specialized fine-tuned LLM for prediction",
         "Check for forecasts on similar Metaculus questions or prediction markets",
         "Explicitly calculate/estimate base rates in a rigorous way",
         "Explicitly run Fermi estimates in a rigorous way",
@@ -360,8 +374,7 @@ MULTISELECT_VOCAB: dict[str, list[str]] = {
         "Use tool calling",
         "Use subagents",
         "Use MCP servers",
-        "Used a specialized fine-tuned LLM for research",
-        "Used a specialized fine-tuned LLM for prediction",
+        "Automated prompt optimization",
         "Let AI construct its numeric forecasts with code",
     ],
     "development": [
@@ -394,24 +407,45 @@ MULTISELECT_VOCAB: dict[str, list[str]] = {
     ],
 }
 
-# Categories of research source that bot makers named in "Other" write-ins
-# instead of a listed option. Each category a respondent's research write-ins
-# match (case-insensitive regex) adds one to their research-source count; nothing
-# else in a write-in counts. Each season, extend this list from the new research
-# write-ins.
+# Research write-ins ("Other" answers) are handled only by the three rule lists
+# below, all case-insensitive regexes. Extend them each season from that season's
+# write-ins; the run stops on any research write-in that no rule covers.
+#
+# A write-in containing a form option's full name (e.g. "Exa (neural news
+# search)") counts as ticking that option. This list maps other names to the form
+# option they are equivalent to. Either way the option counts once per bot, even
+# if the bot also ticked it. Pattern -> form option.
+RESEARCH_WRITE_IN_OPTIONS: dict[str, str] = {
+    r"wayback machine|archive\.org": "Static web scraping (Only HTML, possibly converted to markdown)",
+    r"firecrawl": "Static web scraping (Only HTML, possibly converted to markdown)",
+    r"serp ?api|\bnimble\b|you\.com": "Google/Bing/DuckDuckGo Search API (or equivalent like Serp API)",
+}
+
+# Sources with no form option. Each one a bot's write-ins name adds one to its
+# research-source count. Source -> pattern.
 RESEARCH_WRITE_IN_SOURCES: dict[str, str] = {
     "RSS feeds": r"\brss\b",
-    "OpenRouter web search": r"openrouter\b.*(web[- ]?search|:online)",
-    "OpenRouter Fusion research": r"openrouter fusion",
-    "FutureSearch": r"futuresearch",
+    "OpenRouter web search": r"openrouter\b.*(web[- ]?search|:online)|openrouter fusion",
     "News-corpus search": r"news[- ]corpus",
     "Other news sources": r"news sources",
-    "Public data APIs": r"data apis?\b|\bfred\b|yfinance|yahoo finance|coingecko|time[- ]series",
-    "Prediction-market data": r"polymarket|kalshi|manifold|prediction[- ]markets?\b",
-    "Other search APIs": r"serp ?api|\bnimble\b|you\.com|brave search|\bkagi\b",
-    "Web-scraping services": r"firecrawl|scrapingbee|\bapify\b|browserless",
-    "Web archives": r"wayback machine|archive\.org",
+    "Public data APIs": (
+        r"data apis?\b|\bfred\b|yfinance|yahoo finance|coingecko|time[- ]series|\bucdp\b|courtlistener"
+        r"|congress\.gov|\bnvd\b|odds api|\bbls\b|\beia\b|binance|government registers"
+    ),
+    "Prediction-market data": r"polymarket|kalshi|manifol|prediction[- ]markets?\b",
     "Coding-agent web search": r"\b(codex|claude code)\b.*search",
+}
+
+# Write-ins that are not a research source. They stay "Other" and count nowhere.
+# Reason -> pattern.
+RESEARCH_WRITE_INS_NOT_COUNTED: dict[str, str] = {
+    "Says it used some of the listed sources without naming them": r"some of the above",
+    "Says the bot did no research": r"\bno (external )?research\b",
+    "Usage limits of a source named in the same answer": r"snippets per question|calls in total|used up in",
+    "An unnamed in-house system": r"\bown\b.*\bsystem\b",
+    "Describes a different bot": r"baseline bot",
+    "Continues a source named earlier in the same answer": r"added to the context",
+    "Filler": r"^etc\.?$",
 }
 
 # Inclusive bounds of the binary "moderate number of research sources" feature.
@@ -435,13 +469,11 @@ SINGLE_SELECT_VOCAB: dict[str, list[str]] = {
     "role": [
         "Hobbyist(s) with professional software experience",
         "Hobbyist(s) without professional software experience",
-        "Student(s)",
-        "Academic Researcher(s)",
         "Commercial Entity",
+        "Non-Profit Entity",
+        "Academic Researcher(s)",
+        "Student(s)",
     ],
-    # Exactly the buckets the Spring and Summer 2026 forms offered: they jump from
-    # 41-80hrs to the full-time-month options (no 81-160hrs / 161-320hrs, which
-    # were Fall buckets).
     "hours": [
         "0-8hrs",
         "9-15hrs",
@@ -459,7 +491,8 @@ SINGLE_SELECT_VOCAB: dict[str, list[str]] = {
         "$3-4.99",
         "$5-9.99",
         "$10-19.99",
-        "$20+",
+        "$20-49.99",
+        "$50+",
     ],
     "research_vs_reasoning": [
         "Strong research lean",
@@ -528,7 +561,8 @@ COST_MIDPOINT: dict[str, float] = {
     "$3-4.99": 4.0,
     "$5-9.99": 7.5,
     "$10-19.99": 15.0,
-    "$20+": 25.0,
+    "$20-49.99": 35.0,
+    "$50+": 75.0,
 }
 ITERATIONS_MIDPOINT: dict[str, float] = {
     "0 (I made it and let it loose)": 0,

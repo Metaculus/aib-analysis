@@ -23,63 +23,24 @@ from aib_analysis.survey_analysis.features import RespondentFeatures
 @dataclass(frozen=True)
 class PrecommittedHypothesis:
     key: str
-    statement: str
     predicted_sign: int
 
 
 PRECOMMITTED_HYPOTHESES: list[PrecommittedHypothesis] = [
-    PrecommittedHypothesis(
-        key="uses_similar_qs",
-        statement="Bots that check forecasts on similar Metaculus questions or prediction markets score higher.",
-        predicted_sign=1,
-    ),
-    PrecommittedHypothesis(
-        key="n_research_sources",
-        statement="Bots that use more distinct research sources score higher.",
-        predicted_sign=1,
-    ),
-    PrecommittedHypothesis(
-        key="uses_extremizing",
-        statement="Bots that mathematically extremize their predictions score lower.",
-        predicted_sign=-1,
-    ),
-]
-
-# Considered and set aside. They stay in the exploratory list. --blind withholds
-# them too, so the picks can be reviewed before any of them is seen.
-ALTERNATIVE_HYPOTHESES: list[PrecommittedHypothesis] = [
-    PrecommittedHypothesis(
-        key="questions_missed",
-        statement="Bots that miss fewer questions after their first forecast score higher.",
-        predicted_sign=-1,
-    ),
-    PrecommittedHypothesis(
-        key="llm_calls_mid",
-        statement="Bots that make more LLM calls per question score higher.",
-        predicted_sign=1,
-    ),
-    PrecommittedHypothesis(
-        key="hours_mid",
-        statement="Bots with more total development hours score higher.",
-        predicted_sign=1,
-    ),
-    PrecommittedHypothesis(
-        key="uses_scraping",
-        statement="Bots that scrape web pages during research score higher.",
-        predicted_sign=1,
-    ),
+    # Bots that check forecasts on similar Metaculus questions or prediction markets score higher.
+    PrecommittedHypothesis(key="uses_similar_qs", predicted_sign=1),
+    # Bots that use more distinct research sources score higher.
+    PrecommittedHypothesis(key="n_research_sources", predicted_sign=1),
+    # Bots that mathematically extremize their predictions score lower.
+    PrecommittedHypothesis(key="uses_extremizing", predicted_sign=-1),
 ]
 
 PRECOMMITTED_KEYS: frozenset[str] = frozenset(hypothesis.key for hypothesis in PRECOMMITTED_HYPOTHESES)
-BLINDED_KEYS: frozenset[str] = frozenset(
-    hypothesis.key for hypothesis in PRECOMMITTED_HYPOTHESES + ALTERNATIVE_HYPOTHESES
-)
 
 
 @dataclass(frozen=True)
 class HypothesisResult:
     hypothesis: PrecommittedHypothesis
-    correlation: stats.CorrelationResult
     one_sided_p: float | None
     holm_p: float | None
 
@@ -120,11 +81,8 @@ def evaluate_precommitted(pool: list[RespondentFeatures]) -> list[HypothesisResu
     return [
         HypothesisResult(
             hypothesis=hypothesis,
-            correlation=correlation,
             one_sided_p=p_value,
             holm_p=holm_p if p_value is not None else None,
         )
-        for hypothesis, correlation, p_value, holm_p in zip(
-            PRECOMMITTED_HYPOTHESES, correlations, one_sided, holm
-        )
+        for hypothesis, p_value, holm_p in zip(PRECOMMITTED_HYPOTHESES, one_sided, holm)
     ]

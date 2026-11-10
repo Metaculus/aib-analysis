@@ -133,11 +133,20 @@ def test_write_in_sources_ignore_unlisted_and_non_source_text():
     assert parsing.match_write_in_sources(write_ins, config.RESEARCH_WRITE_IN_SOURCES) == []
 
 
-def test_openrouter_fusion_is_not_counted_as_openrouter_web_search():
-    write_ins = ["OpenRouter Fusion research mode"]
+def test_openrouter_fusion_counts_as_openrouter_web_search():
+    write_ins = ["OpenRouter Fusion research mode", "OpenRouter :online plugin"]
     assert parsing.match_write_in_sources(write_ins, config.RESEARCH_WRITE_IN_SOURCES) == [
-        "OpenRouter Fusion research"
+        "OpenRouter web search"
     ]
+
+
+def test_option_names_match_only_as_whole_words():
+    options = ["Exa", "Static web scraping (Only HTML, possibly converted to markdown)"]
+    assert parsing.options_named_in_write_in("an example tool", options, {}) == []
+    assert parsing.options_named_in_write_in("EXA search", options, {}) == ["Exa"]
+    assert parsing.options_named_in_write_in(
+        "uses Static web scraping (Only HTML, possibly converted to markdown).", options, {}
+    ) == [options[1]]
 
 
 # --------------------------------------------------------------------------- #

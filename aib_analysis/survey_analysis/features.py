@@ -39,8 +39,6 @@ class RespondentFeatures:
     final_models: list[ModelInfo]
     final_ignored: list[str]
     final_unmatched: list[str]
-    support_models: list[ModelInfo]
-    support_ignored: list[str]
     support_unmatched: list[str]
     frontier: bool
 
@@ -105,6 +103,7 @@ def _ordinal_index(value: str | None, order: list[str]) -> float | None:
 
 def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
     features: list[RespondentFeatures] = []
+    uncovered_research_write_ins: list[str] = []
     for respondent in respondents:
         answers = respondent.answers
         cells: dict[str, ParsedCell] = {}
@@ -113,6 +112,8 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         for slug, vocab in config.MULTISELECT_VOCAB.items():
             matched, other = parsing.parse_multiselect(answers.get(slug, ""), vocab)
             cells[slug] = ParsedCell(raw=answers.get(slug, ""), matched=matched, other=other)
+        research_write_in_sources, uncovered = _apply_research_write_ins(cells["research"])
+        uncovered_research_write_ins.extend(uncovered)
 
         # Single-select columns
         for slug, vocab in config.SINGLE_SELECT_VOCAB.items():
@@ -165,7 +166,6 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         )
 
         frontier = any(model.is_frontier for model in final_models)
-        frontier_support = any(model.is_frontier for model in support_models)
 
         # Boolean habit features, matched against parsed options (not raw text)
         # so a write-in cannot spuriously trip a flag.
@@ -182,18 +182,9 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         for feature in config.BOOLEAN_FEATURES:
             answered = bool(cells[feature.column_slug].raw.strip())
             variables[feature.key] = (1.0 if booleans[feature.key] else 0.0) if answered else None
-        # Text that names no recognizable model (e.g. "our own system") says
-        # nothing about which model was used, so it is coded unknown, not "no".
-        final_answered = bool(final_models)
-        support_answered = bool(support_models)
-        variables["frontier"] = (1.0 if frontier else 0.0) if final_answered else None
-        variables["frontier_support"] = (
-            (1.0 if frontier_support else 0.0) if support_answered else None
-        )
+        variables["frontier"] = _frontier_variable(final_models)
+        variables["frontier_support"] = _frontier_variable(support_models)
         variables["final_model_release"] = _high_power_release_ordinal(final_models)
-        research_write_in_sources = parsing.match_write_in_sources(
-            cells["research"].other, config.RESEARCH_WRITE_IN_SOURCES
-        )
         variables["n_research_sources"] = (
             float(len(cells["research"].matched) + len(research_write_in_sources))
             if answers.get("research")
@@ -227,15 +218,57 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
                 final_models=final_models,
                 final_ignored=final_ignored,
                 final_unmatched=final_unmatched,
-                support_models=support_models,
-                support_ignored=support_ignored,
                 support_unmatched=support_unmatched,
                 frontier=frontier,
             )
         )
 
+    if uncovered_research_write_ins:
+        raise ValueError(
+            "Research write-ins that no rule in config.RESEARCH_WRITE_IN_OPTIONS, RESEARCH_WRITE_IN_SOURCES "
+            f"or RESEARCH_WRITE_INS_NOT_COUNTED covers: {uncovered_research_write_ins}. Add each to one of them."
+        )
     logger.info("Built features for %d respondents", len(features))
     return features
+
+
+def _apply_research_write_ins(cell: ParsedCell) -> tuple[list[str], list[str]]:
+    """Apply the research write-in rules to a parsed research cell.
+
+    Form options the write-ins name join the cell's matched options, and write-ins
+    that only name form options leave its "Other" list. Returns the extra sources
+    the write-ins name and the write-ins no rule covers.
+    """
+    vocab = config.MULTISELECT_VOCAB["research"]
+    named_options: set[str] = set()
+    still_other: list[str] = []
+    uncovered: list[str] = []
+    for write_in in cell.other:
+        options = parsing.options_named_in_write_in(write_in, vocab, config.RESEARCH_WRITE_IN_OPTIONS)
+        sources = parsing.match_write_in_sources([write_in], config.RESEARCH_WRITE_IN_SOURCES)
+        not_counted = parsing.match_write_in_sources([write_in], config.RESEARCH_WRITE_INS_NOT_COUNTED)
+        named_options.update(options)
+        if sources or not options:
+            still_other.append(write_in)
+        if not (options or sources or not_counted):
+            uncovered.append(write_in)
+    cell.matched = [option for option in vocab if option in cell.matched or option in named_options]
+    cell.other = still_other
+    return parsing.match_write_in_sources(still_other, config.RESEARCH_WRITE_IN_SOURCES), uncovered
+
+
+def _frontier_variable(models: list[ModelInfo]) -> float | None:
+    """1 if any model is frontier, 0 if every model is known not to be, else unknown.
+
+    Text that names no recognizable model, or a model with no release date (an
+    unspecified fine-tune, a family without a version), could be frontier, so it
+    leaves the answer unknown unless another listed model is frontier.
+    """
+    if any(model.is_frontier for model in models):
+        return 1.0
+    if not models or any(model.release_date is None for model in models):
+        return None
+    return 0.0
 
 
 def _high_power_release_ordinal(models: list[ModelInfo]) -> float | None:

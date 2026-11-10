@@ -45,7 +45,7 @@ def test_correlation_sentence_shows_q_and_significance_from_q():
     assert "q = 0.300" in sentence_ns
     assert "significant" not in sentence_ns
 
-    none = CorrelationResult("k", "Trait", "(insufficient data)", None, None, 3, note="too few")
+    none = CorrelationResult("k", "Trait", "(insufficient data)", None, None, 3)
     assert "too few observations" in report._correlation_sentence(none, q_value=None)
 
 

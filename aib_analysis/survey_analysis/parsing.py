@@ -87,6 +87,19 @@ def match_write_in_sources(write_ins: list[str], sources: dict[str, str]) -> lis
     ]
 
 
+def options_named_in_write_in(write_in: str, options: list[str], option_rules: dict[str, str]) -> list[str]:
+    """Form options a write-in names: by an option's full text, or through a rule (regex -> option)."""
+    named = {
+        option
+        for option in options
+        if re.search(rf"(?<!\w){re.escape(option)}(?!\w)", write_in, re.IGNORECASE)
+    }
+    named.update(
+        option for pattern, option in option_rules.items() if re.search(pattern, write_in, re.IGNORECASE)
+    )
+    return [option for option in options if option in named]
+
+
 def parse_single_select(
     raw: str, options: list[str]
 ) -> tuple[str | None, str | None]:
@@ -199,8 +212,3 @@ def classify_models(
             unmatched.append(token)
     return matched, ignored, unmatched
 
-
-def is_frontier_final(raw: str) -> bool:
-    """A final-model cell is frontier if any recognized model in it is frontier."""
-    matched, _ignored, _unmatched = classify_models(raw)
-    return any(model.is_frontier for model in matched)

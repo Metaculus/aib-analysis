@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from aib_analysis.survey_analysis import config, parsing
 from aib_analysis.survey_analysis.loading import _alnum_key, _match_prize, PrizeOwner
+from tests.survey_analysis.conftest import is_frontier_final
 
 
 def test_multiselect_matches_options_with_embedded_commas():
@@ -91,22 +92,22 @@ def _newest_flagship_display() -> str:
 
 
 def test_frontier_high_power_recent_is_frontier():
-    assert parsing.is_frontier_final(_newest_flagship_display()) is True
-    assert parsing.is_frontier_final(f"GPT-4o mini, {_newest_flagship_display()}") is True
+    assert is_frontier_final(_newest_flagship_display()) is True
+    assert is_frontier_final(f"GPT-4o mini, {_newest_flagship_display()}") is True
 
 
 def test_frontier_mini_variant_not_frontier():
-    assert parsing.is_frontier_final("GPT-5.4 mini") is False
+    assert is_frontier_final("GPT-5.4 mini") is False
 
 
 def test_frontier_old_model_not_frontier():
-    assert parsing.is_frontier_final("GPT-4o") is False
-    assert parsing.is_frontier_final("Claude Sonnet 4.5") is False
+    assert is_frontier_final("GPT-4o") is False
+    assert is_frontier_final("Claude Sonnet 4.5") is False
 
 
 def test_frontier_mixed_final_counts_if_any_frontier():
     # A frontier model anywhere in the final cell flips it to frontier.
-    assert parsing.is_frontier_final(f"GPT-4o, {_newest_flagship_display()}") is True
+    assert is_frontier_final(f"GPT-4o, {_newest_flagship_display()}") is True
 
 
 def test_classify_models_mini_token_not_matched_to_base():
@@ -136,7 +137,6 @@ def test_prize_tokenized_match_against_bot_list():
             owner_username="someone",
             bot_usernames=["5cast-v1", "5cast-v2"],
             aib_prize=100.0,
-            total_prize=100.0,
             in_futureeval=True,
         )
     ]

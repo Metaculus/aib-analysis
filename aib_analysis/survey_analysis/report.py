@@ -5,7 +5,7 @@ winners, and top-10 bots, plus one or two correlations against sum of spot peer
 score described in plain language. Prose follows the project writing style: direct,
 specific, sentence-case headers, no hype vocabulary.
 
-With blind=True, every result for a precommitted or alternative hypothesis is
+With blind=True, every result for a precommitted hypothesis is
 withheld (its correlations, score charts, and the group split of its question's
 distribution chart), so the picks can be reviewed before anyone sees how they did.
 """
@@ -384,7 +384,7 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
     for stale in os.listdir(config.CHARTS_DIR):
         if stale.endswith(".png"):
             os.remove(os.path.join(config.CHARTS_DIR, stale))
-    hidden_keys = precommitted.BLINDED_KEYS if blind else frozenset()
+    hidden_keys = precommitted.PRECOMMITTED_KEYS if blind else frozenset()
     # Analysis scope: only bots that actually competed in the scored FutureEval
     # tournament. MiniBench-only participants (0 FutureEval forecasts) and any
     # unjoinable bot are excluded from distributions and correlations alike; they
@@ -395,7 +395,6 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
     # for a stable per-question average. Distributions and groups use all of in_scope.
     corr_pool = [f for f in in_scope if f.respondent.meets_correlation_minimum]
     counts = _group_counts(in_scope)
-    scored = corr_pool
     feature_results, q_by_key = _feature_stats(corr_pool)
     leaderboard_rows = get_leaderboard_rows()
     leaderboard_size = len(leaderboard_rows)
@@ -447,7 +446,7 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
                     lines.append("")
                     continue
                 result = feature_results[key]
-                chart, reason = _correlation_chart(scored, key, f"q{index:02d}")
+                chart, reason = _correlation_chart(corr_pool, key, f"q{index:02d}")
                 sentence = _correlation_sentence(result, q_by_key.get(key))
                 if key in precommitted.PRECOMMITTED_KEYS:
                     sentence += " Precommitted: p is one-sided and q is Holm-adjusted."
@@ -518,6 +517,16 @@ def _intro(in_scope, excluded, corr_pool) -> str:
     )
 
 
+def _frontier_exceptions_sentence() -> str:
+    if not season_notes.FRONTIER_EXCEPTIONS:
+        return ""
+    names = " and ".join(season_notes.FRONTIER_EXCEPTIONS)
+    return (
+        f" We also count {names} as frontier this season: it was released before the cutoff but was "
+        "still its vendor's newest flagship for most of the season."
+    )
+
+
 def _precommitted_methodology() -> str:
     names = [
         f"\"{variable_spec(hypothesis.key).label}\" ({'higher' if hypothesis.predicted_sign > 0 else 'lower'} score)"
@@ -572,7 +581,7 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
         "traits and Spearman's rank correlation for ordered or counted ones. Because many features are "
         "tested at once, every p-value also carries a Benjamini-Hochberg q-value (its p adjusted for "
         "the false-discovery rate across all exploratory features), and a result is called \"significant\" "
-        "only when q < 0.05.",
+        f"only when q < {config.EVIDENCE_SIGNIFICANT_Q}.",
         "",
         _precommitted_methodology(),
         "",
@@ -580,13 +589,16 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
         "prediction is a flagship model (not a mini, flash, or fast variant) and was "
         f"{config.FRONTIER_RELEASE_CUTOFF_LABEL}. A vendor's flagship line still counts when the vendor "
         "adds a pricier tier above it (for example Claude Opus below Claude Fable, or GPT-6 Sol below "
-        "GPT-6 Astra), while mid tiers such as Claude Sonnet do not.",
+        "GPT-6 Astra), while mid tiers such as Claude Sonnet do not."
+        + _frontier_exceptions_sentence(),
         "",
         "The number of research sources counts each option a bot maker ticked, plus each category on "
         "our list of write-in sources that their \"Other\" answer names (for example RSS feeds, public "
-        "data APIs, or prediction-market data). Write-ins are matched only by these keywords and are "
-        "never re-coded by hand; the full list is in the parsing decisions document. We add categories "
-        "to the list each season from that season's write-ins.",
+        "data APIs, or prediction-market data). A write-in that names a listed option (for example "
+        "\"Exa (neural news search)\") or an equivalent on our list (for example a Wayback Machine "
+        "snapshot for static web scraping) counts as ticking that option, once. Write-ins are matched "
+        "only by these keywords and are never re-coded by hand; the full list is in the parsing "
+        "decisions document. We add categories to the list each season from that season's write-ins.",
         "",
         "One feature does not come from the survey: questions missed, the number of scored questions "
         "still open after a bot's first forecast that the bot did not forecast. It is a rough measure "

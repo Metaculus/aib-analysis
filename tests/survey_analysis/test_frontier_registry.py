@@ -13,6 +13,7 @@ from datetime import date, timedelta
 
 from aib_analysis.survey_analysis import config, parsing, season_notes
 from aib_analysis.survey_analysis.config import MODEL_REGISTRY, FRONTIER_RELEASE_CUTOFF
+from tests.survey_analysis.conftest import is_frontier_final
 
 
 # --------------------------------------------------------------------------- #
@@ -38,14 +39,21 @@ def test_unknown_release_date_never_frontier():
 
 
 def test_registry_frontier_matches_rule_exactly():
-    # Every registry row's is_frontier must equal (high_power AND date>cutoff).
+    # Every registry row's is_frontier must equal (high_power AND date>cutoff), or be a listed exception.
     for model in MODEL_REGISTRY:
-        expected = (
+        expected = model.display in season_notes.FRONTIER_EXCEPTIONS or (
             model.high_power
             and model.release_date is not None
             and model.release_date > FRONTIER_RELEASE_CUTOFF
         )
         assert model.is_frontier == expected, model.display
+
+
+def test_every_frontier_exception_is_a_registry_model_that_missed_the_cutoff():
+    by_display = {model.display: model for model in MODEL_REGISTRY}
+    for display in season_notes.FRONTIER_EXCEPTIONS:
+        assert display in by_display, display
+        assert not by_display[display].released_after_cutoff, display
 
 
 # --------------------------------------------------------------------------- #
@@ -112,8 +120,8 @@ def _newest_flagship_display() -> str:
 
 def test_frontier_final_any_frontier_flips_true():
     newest = _newest_flagship_display()
-    assert parsing.is_frontier_final(f"GPT-4o, {newest}") is True
-    assert parsing.is_frontier_final(f"Claude Sonnet 4.5, {newest.lower()}") is True
+    assert is_frontier_final(f"GPT-4o, {newest}") is True
+    assert is_frontier_final(f"Claude Sonnet 4.5, {newest.lower()}") is True
 
 
 def test_frontier_cutoff_reproduces_spring_and_tracks_season_start():
@@ -131,24 +139,24 @@ def test_flagship_line_below_a_pricier_tier_is_high_power():
 
 
 def test_frontier_final_all_non_frontier_stays_false():
-    assert parsing.is_frontier_final("GPT-4o") is False
-    assert parsing.is_frontier_final("Claude Sonnet 4.6") is False
-    assert parsing.is_frontier_final("GPT-5") is False  # high power but pre-cutoff
+    assert is_frontier_final("GPT-4o") is False
+    assert is_frontier_final("Claude Sonnet 4.6") is False
+    assert is_frontier_final("GPT-5") is False  # high power but pre-cutoff
 
 
 def test_frontier_final_blank_is_false():
-    assert parsing.is_frontier_final("") is False
-    assert parsing.is_frontier_final("   ") is False
+    assert is_frontier_final("") is False
+    assert is_frontier_final("   ") is False
 
 
 def test_frontier_final_ignored_artifact_is_false():
     # Pure artifact tokens carry no model and cannot be frontier.
-    assert parsing.is_frontier_final("openrouter/free") is False
-    assert parsing.is_frontier_final("Mutiple Models") is False
+    assert is_frontier_final("openrouter/free") is False
+    assert is_frontier_final("Mutiple Models") is False
 
 
 def test_kimi_generic_left_unknown_and_not_frontier():
     # Config note: generic 'Kimi' has an unspecified version -> not counted frontier.
     matched, _ignored, _unmatched = parsing.classify_models("Chinese SOTAs (GLM, Kimi, etc)")
     assert any(m.display == "Kimi" for m in matched)
-    assert parsing.is_frontier_final("Chinese SOTAs (GLM, Kimi, etc)") is False
+    assert is_frontier_final("Chinese SOTAs (GLM, Kimi, etc)") is False
