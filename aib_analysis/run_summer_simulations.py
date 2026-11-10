@@ -227,11 +227,6 @@ def main(
             for user in pro_with_bot_tourn.users
             if user.name in SPRING_2026_TOP_BOT_NAMES
         ]
-        non_commercial_bots_in_combined = [
-            user
-            for user in pro_with_bot_tourn.users
-            if user.type == UserType.BOT and user.name not in COMMERCIAL_BOT_NAMES
-        ]
         if len(pro_team_in_combined) != len(pro_team_names):
             raise ValueError(
                 f"Expected {len(pro_team_names)} pros in combined tournament, "
@@ -253,25 +248,10 @@ def main(
             )
         if len(spring_2026_bots_in_combined) == 0:
             raise ValueError("No Spring 2026 top bots found in combined tournament")
-        missing_commercial_bots = COMMERCIAL_BOT_NAMES - {
-            user.name for user in pro_with_bot_tourn.users if user.type == UserType.BOT
-        }
-        if missing_commercial_bots:
-            logger.warning(
-                "Some listed commercial bots were not found in the combined "
-                f"tournament: {sorted(missing_commercial_bots)}"
-            )
-        if len(non_commercial_bots_in_combined) == 0:
-            raise ValueError("No non-commercial bots found for aggregate")
 
         logger.info(
             f"Spring 2026 Bot Team: aggregating {len(spring_2026_bots_in_combined)} bots "
             f"({sorted(user.name for user in spring_2026_bots_in_combined)})"
-        )
-        logger.info(
-            f"Non-Commercial Bot Team: aggregating "
-            f"{len(non_commercial_bots_in_combined)} bots "
-            f"(excluded commercial bots: {sorted(COMMERCIAL_BOT_NAMES)})"
         )
 
         # Keep teams out of the peer geometric mean so individual scores match group 6
@@ -281,7 +261,6 @@ def main(
             (pro_team_in_combined, "Pro Team"),
             (bot_team_in_combined, "Bot Team"),
             (spring_2026_bots_in_combined, "Spring 2026 Top Bots"),
-            (non_commercial_bots_in_combined, "Non-Commercial Bot Team"),
         ]:
             team_aggregate = create_aggregated_user_at_spot_time(
                 team_users, pro_with_bot_tourn, team_name
@@ -444,21 +423,6 @@ def grab_tournament_data(
 ) -> SimulatedTournament:
     return load_tournament(path, user_type, tournament_name)
 
-
-# Commercial bots excluded from the Non-Commercial Bot Team aggregate.
-COMMERCIAL_BOT_NAMES: set[str] = {
-    "Preseen-Atlas",
-    "Preseen-Chestnut",
-    "preseen",  # Summer 2026 account of the same company as the two Preseen bots above
-    "manticAI",
-    "cassi",
-    "futuresearch",
-    "lightningrod",
-    "Upskillbot",
-    "oraclebot",
-    "GreyIrisAgent",
-    "red_is_dead",
-}
 
 # Top 10 bots from the official Spring 2026 bot leaderboard (used as a fixed team in
 # Summer comparisons). Bots that did not compete in Summer are skipped with a warning.
