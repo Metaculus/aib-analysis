@@ -4,34 +4,23 @@ Produces two views of the same data:
 - per-cell parse results (raw -> matched -> leftover) for the review doc
 - per-respondent numeric/boolean variables for correlation and charts
 
-Human-reviewed manual adjustments (manual_adjustments.py) are applied after
-parsing and before any derived value is computed, so booleans, midpoints, and
-counts all reflect the adjusted answers.
+Write-ins are never corrected by hand; they stay "Other" unless a committed rule
+(such as config.RESEARCH_WRITE_IN_SOURCES) counts them.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 
-from aib_analysis.survey_analysis import config, manual_adjustments, parsing
+from aib_analysis.survey_analysis import config, parsing
 from aib_analysis.survey_analysis.config import ModelInfo
-from aib_analysis.survey_analysis.loading import Respondent, normalize_name
-from aib_analysis.survey_analysis.manual_adjustments import AnswerAdjustment
+from aib_analysis.survey_analysis.loading import Respondent
 
 logger = logging.getLogger(__name__)
 
-_MODEL_BY_DISPLAY: dict[str, ModelInfo] = {
-    model.display: model for model in config.MODEL_REGISTRY
-}
-
-# Claude Opus 4.6 is the Opus release closest in time to GPT-5.4, so it is the
-# like-for-like Opus comparison used in the final-model charts.
-_OPUS_4_6: ModelInfo | None = next(
-    (m for m in config.MODEL_REGISTRY if m.display == "Claude Opus 4.6"), None
-)
-if _OPUS_4_6 is None:  # pragma: no cover - guards a registry rename
-    raise ValueError("Expected 'Claude Opus 4.6' in MODEL_REGISTRY for the Opus comparison")
+_MODERATE_SOURCES_MIN, _MODERATE_SOURCES_MAX = config.MODERATE_RESEARCH_SOURCE_RANGE
 
 
 @dataclass
@@ -40,6 +29,11 @@ class ParsedCell:
     matched: list[str] = field(default_factory=list)
     other: list[str] = field(default_factory=list)
     numeric: float | None = None
+    non_answers: list[str] = field(default_factory=list)
+
+    @property
+    def answered(self) -> bool:
+        return bool(self.matched or self.other)
 
 
 @dataclass
@@ -51,11 +45,8 @@ class RespondentFeatures:
     final_models: list[ModelInfo]
     final_ignored: list[str]
     final_unmatched: list[str]
-    support_models: list[ModelInfo]
-    support_ignored: list[str]
     support_unmatched: list[str]
     frontier: bool
-    adjustments_applied: list[AnswerAdjustment] = field(default_factory=list)
 
     @property
     def bot_name(self) -> str:
@@ -80,18 +71,20 @@ class VariableSpec:
 NUMERIC_VARIABLE_SPECS: list[VariableSpec] = [
     VariableSpec("frontier", "Frontier final model", "binary"),
     VariableSpec("frontier_support", "Frontier supporting-role model", "binary"),
-    VariableSpec("gpt_5_4", "Used GPT-5.4 for its final model", "binary"),
-    VariableSpec("gpt_5x_high", "Used a flagship GPT-5.x for its final model", "binary"),
-    VariableSpec("opus", "Used a Claude Opus model for its final model", "binary"),
-    VariableSpec("opus_4_6", f"Used {_OPUS_4_6.display} for its final model", "binary"),
     VariableSpec("final_model_release", "Final model release date (flagship models only)", "continuous"),
     VariableSpec("n_research_sources", "Number of research sources", "count"),
+    VariableSpec(
+        "moderate_research_sources",
+        f"Uses {_MODERATE_SOURCES_MIN} to {_MODERATE_SOURCES_MAX} research sources (vs fewer or more)",
+        "binary",
+    ),
     VariableSpec("team_size", "Team size", "ordinal"),
     VariableSpec("iterations_mid", "Iterations that went live (midpoint)", "ordinal"),
     VariableSpec("hours_mid", "Total development hours (midpoint)", "ordinal"),
     VariableSpec("llm_calls_mid", "LLM calls per question (midpoint)", "ordinal"),
     VariableSpec("cost_mid", "Cost per question (midpoint)", "ordinal"),
     VariableSpec("research_vs_reasoning_ord", "Research vs reasoning (0=research..4=reasoning)", "ordinal"),
+    VariableSpec("questions_missed", "Questions missed after the bot's first forecast", "count"),
 ]
 
 
@@ -114,80 +107,9 @@ def _ordinal_index(value: str | None, order: list[str]) -> float | None:
         return None
 
 
-def _find_other_index(others: list[str], write_in: str) -> int | None:
-    target = write_in.strip().lower()
-    for index, token in enumerate(others):
-        if token.strip().lower() == target:
-            return index
-    return None
-
-
-def _remove_token(tokens: list[str], removed: str) -> None:
-    for index, token in enumerate(tokens):
-        if token.strip().lower() == removed.strip().lower():
-            tokens.pop(index)
-            return
-
-
-def _apply_answer_adjustment(
-    cell: ParsedCell,
-    adjustment: AnswerAdjustment,
-    models: list[ModelInfo] | None = None,
-    ignored: list[str] | None = None,
-    unmatched: list[str] | None = None,
-) -> bool:
-    """Apply one reviewed adjustment to a parsed cell.
-
-    Returns False when the write-in is no longer present (a stale row), so the
-    caller can flag it. `models`/`ignored`/`unmatched` are only passed for the
-    model columns, where a mapped write-in also joins the classified model list.
-    """
-    index = _find_other_index(cell.other, adjustment.write_in)
-    if index is None:
-        return False
-    if adjustment.action == "leave":
-        return True
-    removed = cell.other.pop(index)
-    if models is not None:
-        _remove_token(ignored or [], removed)
-        _remove_token(unmatched or [], removed)
-    if adjustment.action == "ignore":
-        return True
-    if models is not None:
-        model = _MODEL_BY_DISPLAY[adjustment.canonical_option]
-        if model.display not in cell.matched:
-            models.append(model)
-            cell.matched.append(model.display)
-        return True
-    slug = adjustment.column_slug
-    if slug in config.MULTISELECT_VOCAB:
-        vocab = config.MULTISELECT_VOCAB[slug]
-        if adjustment.canonical_option not in cell.matched:
-            cell.matched.append(adjustment.canonical_option)
-            cell.matched.sort(key=vocab.index)
-    else:
-        cell.matched = [adjustment.canonical_option]
-    return True
-
-
-def _adjustment_key(adjustment: AnswerAdjustment) -> tuple[str, str, str]:
-    return (
-        normalize_name(adjustment.bot_name),
-        adjustment.column_slug,
-        adjustment.write_in.strip().lower(),
-    )
-
-
 def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
-    all_adjustments = manual_adjustments.load_answer_adjustments()
-    adjustments_by_bot: dict[str, list[AnswerAdjustment]] = {}
-    for adjustment in all_adjustments:
-        adjustments_by_bot.setdefault(
-            normalize_name(adjustment.bot_name), []
-        ).append(adjustment)
-    applied_keys: set[tuple[str, str, str]] = set()
-
     features: list[RespondentFeatures] = []
+    uncovered_research_write_ins: list[str] = []
     for respondent in respondents:
         answers = respondent.answers
         cells: dict[str, ParsedCell] = {}
@@ -195,7 +117,15 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         # Multi-select columns
         for slug, vocab in config.MULTISELECT_VOCAB.items():
             matched, other = parsing.parse_multiselect(answers.get(slug, ""), vocab)
-            cells[slug] = ParsedCell(raw=answers.get(slug, ""), matched=matched, other=other)
+            non_answers = [write_in for write_in in other if re.search(config.NON_ANSWER_WRITE_IN, write_in, re.IGNORECASE)]
+            cells[slug] = ParsedCell(
+                raw=answers.get(slug, ""),
+                matched=matched,
+                other=[write_in for write_in in other if write_in not in non_answers],
+                non_answers=non_answers,
+            )
+        research_write_in_sources, uncovered = _apply_research_write_ins(cells["research"])
+        uncovered_research_write_ins.extend(uncovered)
 
         # Single-select columns
         for slug, vocab in config.SINGLE_SELECT_VOCAB.items():
@@ -233,31 +163,7 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
             other=support_unmatched + support_ignored,
         )
 
-        # Manual adjustments, before anything is derived from the cells.
-        models_by_slug = {"final_model": final_models, "support_model": support_models}
-        ignored_by_slug = {"final_model": final_ignored, "support_model": support_ignored}
-        unmatched_by_slug = {"final_model": final_unmatched, "support_model": support_unmatched}
-        applied: list[AnswerAdjustment] = []
-        for adjustment in adjustments_by_bot.get(normalize_name(respondent.bot_name), []):
-            slug = adjustment.column_slug
-            is_model_column = slug in manual_adjustments.MODEL_COLUMN_SLUGS
-            found = _apply_answer_adjustment(
-                cells[slug],
-                adjustment,
-                models=models_by_slug[slug] if is_model_column else None,
-                ignored=ignored_by_slug[slug] if is_model_column else None,
-                unmatched=unmatched_by_slug[slug] if is_model_column else None,
-            )
-            if found:
-                applied.append(adjustment)
-                applied_keys.add(_adjustment_key(adjustment))
-                logger.info(
-                    "Manual adjustment applied for bot %r: %s",
-                    respondent.bot_name,
-                    adjustment.description,
-                )
-
-        # Numeric midpoints attached to their ordinal cells (post-adjustment)
+        # Numeric midpoints attached to their ordinal cells
         cells["iterations"].numeric = parsing.bucket_to_midpoint(
             _canon(cells["iterations"]), config.ITERATIONS_MIDPOINT
         )
@@ -272,7 +178,6 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         )
 
         frontier = any(model.is_frontier for model in final_models)
-        frontier_support = any(model.is_frontier for model in support_models)
 
         # Boolean habit features, matched against parsed options (not raw text)
         # so a write-in cannot spuriously trip a flag.
@@ -283,31 +188,25 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
 
         # Item non-response: a bot that left the source question blank is coded
         # None (missing), not a definitive "no", so it is dropped from that
-        # correlation exactly like a blank numeric answer. A non-blank answer with
-        # only a write-in still counts as "no" for the canonical habit.
+        # correlation exactly like a blank numeric answer. An answer with only a
+        # write-in (other than a non-answer) still counts as "no" for the habit.
         variables: dict[str, float | None] = {}
         for feature in config.BOOLEAN_FEATURES:
-            answered = bool(cells[feature.column_slug].raw.strip())
+            answered = cells[feature.column_slug].answered
             variables[feature.key] = (1.0 if booleans[feature.key] else 0.0) if answered else None
-        final_answered = bool(answers.get("final_model", "").strip())
-        support_answered = bool(answers.get("support_model", "").strip())
-        variables["frontier"] = (1.0 if frontier else 0.0) if final_answered else None
-        variables["frontier_support"] = (
-            (1.0 if frontier_support else 0.0) if support_answered else None
-        )
-        variables["gpt_5_4"] = (
-            (1.0 if _uses_gpt_5_4(final_models) else 0.0) if final_answered else None
-        )
-        variables["gpt_5x_high"] = (
-            (1.0 if _uses_high_power_gpt_5x(final_models) else 0.0) if final_answered else None
-        )
-        variables["opus"] = (1.0 if _uses_opus(final_models) else 0.0) if final_answered else None
-        variables["opus_4_6"] = (
-            (1.0 if _uses_opus_4_6(final_models) else 0.0) if final_answered else None
-        )
+        variables["frontier"] = _frontier_variable(final_models)
+        variables["frontier_support"] = _frontier_variable(support_models)
         variables["final_model_release"] = _high_power_release_ordinal(final_models)
         variables["n_research_sources"] = (
-            float(len(cells["research"].matched)) if answers.get("research") else None
+            float(len(cells["research"].matched) + len(research_write_in_sources))
+            if cells["research"].answered
+            else None
+        )
+        n_research_sources = variables["n_research_sources"]
+        variables["moderate_research_sources"] = (
+            float(_MODERATE_SOURCES_MIN <= n_research_sources <= _MODERATE_SOURCES_MAX)
+            if n_research_sources is not None
+            else None
         )
         variables["team_size"] = cells["team_size"].numeric
         variables["iterations_mid"] = cells["iterations"].numeric
@@ -317,6 +216,9 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         variables["research_vs_reasoning_ord"] = _ordinal_index(
             _canon(cells["research_vs_reasoning"]),
             config.ORDINAL_ORDER["research_vs_reasoning"],
+        )
+        variables["questions_missed"] = (
+            float(respondent.questions_missed) if respondent.questions_missed is not None else None
         )
 
         features.append(
@@ -328,50 +230,59 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
                 final_models=final_models,
                 final_ignored=final_ignored,
                 final_unmatched=final_unmatched,
-                support_models=support_models,
-                support_ignored=support_ignored,
                 support_unmatched=support_unmatched,
                 frontier=frontier,
-                adjustments_applied=applied,
             )
         )
 
-    for adjustment in all_adjustments:
-        if _adjustment_key(adjustment) not in applied_keys:
-            logger.warning(
-                "Manual adjustment did NOT apply (stale write_in or unknown bot): "
-                "bot=%r, %s",
-                adjustment.bot_name,
-                adjustment.description,
-            )
+    if uncovered_research_write_ins:
+        raise ValueError(
+            "Research write-ins that no rule in config.RESEARCH_WRITE_IN_OPTIONS, RESEARCH_WRITE_IN_SOURCES "
+            f"or RESEARCH_WRITE_INS_NOT_COUNTED covers: {uncovered_research_write_ins}. Add each to one of them."
+        )
     logger.info("Built features for %d respondents", len(features))
     return features
 
 
-def _uses_gpt_5_4(models: list[ModelInfo]) -> bool:
-    """True if the exact GPT-5.4 flagship (not GPT-5.4 mini) is present."""
-    return any(model.display == "GPT-5.4" for model in models)
+def _apply_research_write_ins(cell: ParsedCell) -> tuple[list[str], list[str]]:
+    """Apply the research write-in rules to a parsed research cell.
 
-
-def _uses_high_power_gpt_5x(models: list[ModelInfo]) -> bool:
-    """True if any full-size GPT-5 series model is present (GPT-5, 5.1, 5.2, 5.4, 5.5).
-
-    The mini/nano variants normalize to keys starting 'gpt5' too, but carry
-    high_power=False and so are excluded.
+    Form options the write-ins name join the cell's matched options, and write-ins
+    that only name form options leave its "Other" list. Returns the extra sources
+    the write-ins name and the write-ins no rule covers.
     """
-    return any(
-        model.high_power and model.normalized_key.startswith("gpt5") for model in models
-    )
+    vocab = config.MULTISELECT_VOCAB["research"]
+    named_options: set[str] = set()
+    named_sources: set[str] = set()
+    still_other: list[str] = []
+    uncovered: list[str] = []
+    for write_in in cell.other:
+        options = parsing.options_named_in_write_in(write_in, vocab, config.RESEARCH_WRITE_IN_OPTIONS)
+        sources = parsing.match_write_in_sources([write_in], config.RESEARCH_WRITE_IN_SOURCES)
+        not_counted = parsing.match_write_in_sources([write_in], config.RESEARCH_WRITE_INS_NOT_COUNTED)
+        named_options.update(options)
+        named_sources.update(sources)
+        if sources or not options:
+            still_other.append(write_in)
+        if not (options or sources or not_counted):
+            uncovered.append(write_in)
+    cell.matched = [option for option in vocab if option in cell.matched or option in named_options]
+    cell.other = still_other
+    return [source for source in config.RESEARCH_WRITE_IN_SOURCES if source in named_sources], uncovered
 
 
-def _uses_opus(models: list[ModelInfo]) -> bool:
-    """True if any Claude Opus model is present."""
-    return any("opus" in model.display.lower() for model in models)
+def _frontier_variable(models: list[ModelInfo]) -> float | None:
+    """1 if any model is frontier, 0 if every model is known not to be, else unknown.
 
-
-def _uses_opus_4_6(models: list[ModelInfo]) -> bool:
-    """True if Claude Opus 4.6 (the Opus closest in time to GPT-5.4) is present."""
-    return any(model.display == _OPUS_4_6.display for model in models)
+    Text that names no recognizable model, or a model with no release date (an
+    unspecified fine-tune, a family without a version), could be frontier, so it
+    leaves the answer unknown unless another listed model is frontier.
+    """
+    if any(model.is_frontier for model in models):
+        return 1.0
+    if not models or any(model.release_date is None for model in models):
+        return None
+    return 0.0
 
 
 def _high_power_release_ordinal(models: list[ModelInfo]) -> float | None:

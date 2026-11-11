@@ -16,12 +16,11 @@ import logging
 import re
 from dataclasses import dataclass
 
-from aib_analysis.survey_analysis import config, manual_adjustments, season_notes
+from aib_analysis.survey_analysis import config, season_notes
 from aib_analysis.survey_analysis.leaderboard import (
     LeaderboardRow,
     get_leaderboard_rows,
 )
-from aib_analysis.survey_analysis.manual_adjustments import WinnerOverride
 
 logger = logging.getLogger(__name__)
 
@@ -45,13 +44,12 @@ def _split_bot_list(raw: str) -> list[str]:
 class PrizeOwner:
     owner_username: str
     bot_usernames: list[str]
-    winner_count: int
     aib_prize: float
-    total_prize: float
+    in_futureeval: bool
 
     @property
     def won_any(self) -> bool:
-        return self.winner_count > 0 or self.aib_prize > 0
+        return self.aib_prize > 0
 
 
 @dataclass
@@ -62,16 +60,13 @@ class Respondent:
     rank: int | None = None
     sum_spot_peer: float | None = None
     question_count: int | None = None
+    questions_missed: int | None = None
     is_winner: bool = False
-    # Prize amounts are owner-level totals from the prize sheet (an owner with
-    # several bots reports one combined figure); only is_winner is bot-level.
-    aib_prize: float = 0.0
-    total_prize: float = 0.0
     is_top_10: bool = False
     leaderboard_match_kind: str = "none"
     prize_match_kind: str = "none"
     matched_owner: str | None = None
-    winner_source: str = "no_prize_match"
+    winner_source: str = "not on the leaderboard"
 
     @property
     def average_spot_peer(self) -> float | None:
@@ -102,6 +97,7 @@ def load_survey() -> list[dict[str, str]]:
         header = [cell.strip() for cell in next(reader)]
         raw_rows = [row for row in reader]
 
+    _check_survey_header(header)
     header_to_slug = {name: slug for slug, name in config.COLUMNS.items()}
     index_to_slug: dict[int, str] = {}
     for index, name in enumerate(header):
@@ -132,6 +128,22 @@ def load_survey() -> list[dict[str, str]]:
     return records
 
 
+def _check_survey_header(header: list[str]) -> None:
+    """Fail on any column the config and the export disagree about.
+
+    A question added to or reworded on the form would otherwise be dropped (or
+    read as blank for everyone) without a trace.
+    """
+    expected = set(config.COLUMNS.values())
+    missing = sorted(expected - set(header))
+    unexpected = sorted(name for name in set(header) - expected if name)
+    if missing or unexpected:
+        raise ValueError(
+            f"Survey CSV header does not match config.COLUMNS. Missing from the CSV: {missing}. "
+            f"Not in config.COLUMNS: {unexpected}."
+        )
+
+
 def load_prize_owners() -> list[PrizeOwner]:
     with open(config.PRIZE_STATS_CSV, newline="") as handle:
         reader = csv.DictReader(handle)
@@ -140,35 +152,38 @@ def load_prize_owners() -> list[PrizeOwner]:
         ]
         owners: list[PrizeOwner] = []
         for row in reader:
-            username = (row.get("owner_username") or "").strip()
-            bots_raw = (row.get("bot_usernames") or "").strip()
+            username = (row["owner_username"] or "").strip()
+            bots_raw = (row["bot_usernames"] or "").strip()
             if not username and not bots_raw:
                 continue  # aggregate/summary row
             owners.append(
                 PrizeOwner(
                     owner_username=username,
                     bot_usernames=_split_bot_list(bots_raw),
-                    winner_count=_to_int(row.get("winner_count")),
-                    aib_prize=_to_float(row.get("aib_prize")),
-                    total_prize=_to_float(row.get("total_prize")),
+                    aib_prize=_to_float(row["aib_prize"]),
+                    in_futureeval=_to_bool(row["in_aib"]),
                 )
             )
     logger.info("Loaded %d prize-stats owner rows", len(owners))
     return owners
 
 
-def _to_int(value: str | None) -> int:
-    try:
-        return int(float((value or "").strip()))
-    except ValueError:
-        return 0
-
-
 def _to_float(value: str | None) -> float:
-    try:
-        return float((value or "").strip())
-    except ValueError:
+    """Blank is 0; anything else must be a number (thousands separators allowed)."""
+    text = (value or "").strip().replace(",", "")
+    if not text:
         return 0.0
+    try:
+        return float(text)
+    except ValueError:
+        raise ValueError(f"Expected a number in the prize sheet, got {value!r}") from None
+
+
+def _to_bool(value: str) -> bool:
+    text = value.strip().upper()
+    if text not in ("TRUE", "FALSE"):
+        raise ValueError(f"Expected TRUE or FALSE in the prize sheet, got {value!r}")
+    return text == "TRUE"
 
 
 def _match_leaderboard(
@@ -220,45 +235,51 @@ def _match_prize(
     return None, "none"
 
 
-def _resolve_winner(
-    bot_name: str, owner: PrizeOwner | None, override: WinnerOverride | None
-) -> tuple[bool, str]:
-    """Bot-level winner status, with the source of the decision for the audit.
+def winner_sources(owners: list[PrizeOwner], leaderboard_rows: list[LeaderboardRow]) -> dict[str, str]:
+    """Bot name key (_alnum_key) -> why it counts as a winner, for every winning bot.
 
-    The prize sheet is owner-level: for an owner with several bots it records
-    how many bots won, not which ones. A single-bot owner's status transfers to
-    the bot directly; a multi-bot owner with no wins means no bot won; a
-    multi-bot owner WITH wins is ambiguous and requires a manual override row.
+    The prize sheet is per owner, so it says which bot won only for owners with one
+    bot. Those bots are winners, and so is any other bot (Metaculus's own aside)
+    that scored above at least one of them.
     """
-    if override is not None:
-        logger.info(
-            "Winner override applied for bot %r -> %s (%s)",
-            bot_name, override.is_winner, override.reason or "no reason given",
-        )
-        return override.is_winner, "manual_override"
-    if owner is None:
-        return False, "no_prize_match"
-    if len(owner.bot_usernames) <= 1:
-        return owner.won_any, "owner_single_bot"
-    if not owner.won_any:
-        return False, "owner_multi_bot_no_wins"
-    raise ValueError(
-        f"Cannot determine bot-level winner status for {bot_name!r}: owner "
-        f"{owner.owner_username!r} has {len(owner.bot_usernames)} bots and the prize sheet "
-        f"only records owner-level wins (winner_count={owner.winner_count}, "
-        f"aib_prize={owner.aib_prize}). Add a row for this bot to "
-        f"{config.MANUAL_WINNER_OVERRIDES_CSV}."
-    )
+    row_by_key = {_alnum_key(row.bot_name): row for row in leaderboard_rows}
+    single_bot_winners: list[LeaderboardRow] = []
+    for owner in owners:
+        if not owner.won_any or len(owner.bot_usernames) != 1:
+            continue
+        row = row_by_key.get(_alnum_key(owner.bot_usernames[0]))
+        if row is None:
+            raise ValueError(
+                f"Prize winner {owner.bot_usernames[0]!r} (owner {owner.owner_username!r}) is not on the leaderboard"
+            )
+        single_bot_winners.append(row)
+    if not single_bot_winners:
+        raise ValueError("The prize sheet has no prize-winning owner with a single bot to set the winner bar")
+    lowest_winner_score = min(row.sum_spot_peer for row in single_bot_winners)
+    sources = {_alnum_key(row.bot_name): "single-bot prize winner" for row in single_bot_winners}
+    for row in leaderboard_rows:
+        is_house_bot = row.bot_name.lower().startswith(config.METACULUS_HOUSE_BOT_PREFIX)
+        if row.sum_spot_peer > lowest_winner_score and not is_house_bot:
+            sources.setdefault(_alnum_key(row.bot_name), "scored above a prize winner")
+    _check_every_winning_owner_has_a_winner(owners, sources)
+    return sources
+
+
+def _check_every_winning_owner_has_a_winner(owners: list[PrizeOwner], sources: dict[str, str]) -> None:
+    for owner in owners:
+        if owner.won_any and not any(_alnum_key(bot) in sources for bot in owner.bot_usernames):
+            raise ValueError(
+                f"Owner {owner.owner_username!r} won a prize, but none of their bots {owner.bot_usernames} "
+                "is a single-bot winner or scored above one, so the winning bot cannot be identified"
+            )
 
 
 def build_respondents(refresh: bool = False) -> list[Respondent]:
     survey_records = load_survey()
     owners = load_prize_owners()
     leaderboard_rows = get_leaderboard_rows(refresh=refresh)
-    overrides_by_name = {
-        normalize_name(override.bot_name): override
-        for override in manual_adjustments.load_winner_overrides()
-    }
+    winners = winner_sources(owners, leaderboard_rows)
+    aliases = season_notes.BOT_NAME_ALIASES
 
     by_norm = {normalize_name(row.bot_name): row for row in leaderboard_rows}
     by_alnum = {_alnum_key(row.bot_name): row for row in leaderboard_rows}
@@ -268,14 +289,10 @@ def build_respondents(refresh: bool = False) -> list[Respondent]:
     }
 
     respondents: list[Respondent] = []
-    used_overrides: set[str] = set()
     for record in survey_records:
         bot_name = record["bot_name"]
         respondent = Respondent(bot_name=bot_name, answers=record)
-        # A reviewed alias lets a survey name join to its tournament entry when
-        # the automatic matcher cannot safely bridge the two; the respondent's
-        # displayed name stays exactly what they typed.
-        match_name = season_notes.BOT_NAME_ALIASES.get(bot_name, bot_name)
+        match_name = aliases.get(bot_name, bot_name)
 
         lb_row, lb_kind = _match_leaderboard(match_name, by_norm, by_alnum)
         respondent.leaderboard_match_kind = lb_kind
@@ -284,30 +301,22 @@ def build_respondents(refresh: bool = False) -> list[Respondent]:
             respondent.rank = lb_row.rank
             respondent.sum_spot_peer = lb_row.sum_spot_peer
             respondent.question_count = lb_row.question_count
+            respondent.questions_missed = lb_row.questions_missed
             respondent.is_top_10 = normalize_name(lb_row.bot_name) in top_10_names
+            winner_source = winners.get(_alnum_key(lb_row.bot_name))
+            respondent.is_winner = winner_source is not None
+            respondent.winner_source = winner_source or "not a winner"
 
         owner, prize_kind = _match_prize(match_name, owners)
         respondent.prize_match_kind = prize_kind
         if owner is not None:
             respondent.matched_owner = owner.owner_username
-            respondent.aib_prize = owner.aib_prize
-            respondent.total_prize = owner.total_prize
-
-        override = overrides_by_name.get(normalize_name(bot_name))
-        if override is not None:
-            used_overrides.add(normalize_name(bot_name))
-        respondent.is_winner, respondent.winner_source = _resolve_winner(
-            bot_name, owner, override
-        )
 
         respondents.append(respondent)
 
-    for name, override in overrides_by_name.items():
-        if name not in used_overrides:
-            logger.warning(
-                "Winner override for %r matched no survey respondent; stale entry?",
-                override.bot_name,
-            )
+    stale_aliases = sorted(set(aliases) - {record["bot_name"] for record in survey_records})
+    if stale_aliases:
+        raise ValueError(f"season_notes.BOT_NAME_ALIASES entries match no survey respondent: {stale_aliases}")
     _log_join_summary(respondents)
     return respondents
 

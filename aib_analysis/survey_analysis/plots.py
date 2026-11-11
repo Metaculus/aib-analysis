@@ -57,7 +57,7 @@ def _answered(features: list[RespondentFeatures], slug: str, group: str) -> list
         for feature in features
         if (group == "everyone" or group in feature.respondent.groups)
         and feature.cells.get(slug)
-        and feature.cells[slug].raw.strip()
+        and feature.cells[slug].answered
     ]
 
 
@@ -65,7 +65,7 @@ def _has_any_other(features: list[RespondentFeatures], slug: str) -> bool:
     return any(
         feature.cells[slug].other
         for feature in features
-        if feature.cells.get(slug) and feature.cells[slug].raw.strip()
+        if feature.cells.get(slug) and feature.cells[slug].answered
     )
 
 
@@ -98,6 +98,7 @@ def plot_multiselect_distribution(
     options: list[str],
     out_path: str,
     top_n: int = 14,
+    groups: list[str] = config.CHART_GROUP_ORDER,
 ) -> None:
     overall_counts = {option: 0 for option in options}
     for feature in features:
@@ -116,7 +117,7 @@ def plot_multiselect_distribution(
     if _has_any_other(features, slug):
         ranked = [OTHER_LABEL] + ranked  # "Other" pinned to the bottom
 
-    _plot_grouped_horizontal(features, slug, title, ranked, out_path)
+    _plot_grouped_horizontal(features, slug, title, ranked, out_path, groups)
 
 
 def plot_categorical_distribution(
@@ -125,6 +126,7 @@ def plot_categorical_distribution(
     title: str,
     categories: list[str],
     out_path: str,
+    groups: list[str] = config.CHART_GROUP_ORDER,
 ) -> None:
     present = [
         category
@@ -137,7 +139,7 @@ def plot_categorical_distribution(
     ordered = list(reversed(present))
     if _has_any_other(features, slug):
         ordered = [OTHER_LABEL] + ordered  # "Other" pinned to the bottom
-    _plot_grouped_horizontal(features, slug, title, ordered, out_path)
+    _plot_grouped_horizontal(features, slug, title, ordered, out_path, groups)
 
 
 def _plot_grouped_horizontal(
@@ -146,8 +148,8 @@ def _plot_grouped_horizontal(
     title: str,
     options_bottom_to_top: list[str],
     out_path: str,
+    groups: list[str],
 ) -> None:
-    groups = config.CHART_GROUP_ORDER
     group_answered = {group: _answered(features, slug, group) for group in groups}
 
     n_options = len(options_bottom_to_top)

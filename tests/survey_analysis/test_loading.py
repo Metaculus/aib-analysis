@@ -20,14 +20,12 @@ from aib_analysis.survey_analysis.loading import (
     _alnum_key,
     _match_leaderboard,
     _match_prize,
-    _resolve_winner,
     _split_bot_list,
     _to_float,
-    _to_int,
     load_survey,
     normalize_name,
+    winner_sources,
 )
-from aib_analysis.survey_analysis.manual_adjustments import WinnerOverride
 
 
 # --------------------------------------------------------------------------- #
@@ -48,21 +46,26 @@ def test_split_bot_list_on_commas_and_semicolons():
     assert _split_bot_list("") == []
 
 
-def test_to_int_and_to_float_tolerate_junk():
-    assert _to_int("3") == 3
-    assert _to_int("3.0") == 3
-    assert _to_int("") == 0
-    assert _to_int("n/a") == 0
+def test_to_float_parses_numbers_and_blanks():
     assert _to_float("2.5") == 2.5
+    assert _to_float("3,374.02") == pytest.approx(3374.02)
     assert _to_float("") == 0.0
-    assert _to_float("junk") == 0.0
+
+
+@pytest.mark.parametrize("junk", ["junk", "n/a", "$5"])
+def test_to_float_raises_on_junk_instead_of_reading_zero(junk):
+    # A prize read as 0 would silently turn a winner into a non-winner.
+    with pytest.raises(ValueError, match="Expected a number"):
+        _to_float(junk)
 
 
 # --------------------------------------------------------------------------- #
 # Leaderboard match: exact, alnum, none (never loose substring)
 # --------------------------------------------------------------------------- #
 def _row(name: str) -> LeaderboardRow:
-    return LeaderboardRow(rank=1, bot_name=name, sum_spot_peer=1.0, question_count=100)
+    return LeaderboardRow(
+        rank=1, bot_name=name, sum_spot_peer=1.0, question_count=100, questions_open_after_start=120
+    )
 
 
 def test_leaderboard_exact_match():
@@ -94,9 +97,8 @@ def _owner(bots: list[str], **kw) -> PrizeOwner:
     return PrizeOwner(
         owner_username=kw.get("owner", "someone"),
         bot_usernames=bots,
-        winner_count=kw.get("winner_count", 1),
         aib_prize=kw.get("aib_prize", 100.0),
-        total_prize=kw.get("total_prize", 100.0),
+        in_futureeval=True,
     )
 
 
@@ -165,48 +167,61 @@ def test_groups_include_top10_only_when_flagged():
 
 
 # --------------------------------------------------------------------------- #
-# Bot-level winner resolution (the prize sheet is owner-level)
+# Bot-level winners (the prize sheet is owner-level)
 # --------------------------------------------------------------------------- #
-def test_single_bot_owner_status_transfers_to_bot():
-    won = _owner(["solo-bot"], winner_count=1, aib_prize=50.0)
-    assert _resolve_winner("solo-bot", won, None) == (True, "owner_single_bot")
-    lost = _owner(["solo-bot"], winner_count=0, aib_prize=0.0)
-    assert _resolve_winner("solo-bot", lost, None) == (False, "owner_single_bot")
+def _scored_row(rank: int, name: str, score: float) -> LeaderboardRow:
+    return LeaderboardRow(rank, name, score, 100, 100)
 
 
-def test_multi_bot_owner_with_no_wins_means_no_winner():
-    owner = _owner(["bot-1", "bot-2"], winner_count=0, aib_prize=0.0)
-    assert _resolve_winner("bot-1", owner, None) == (False, "owner_multi_bot_no_wins")
+def _owner_named(owner: str, bots: list[str], prize: float) -> PrizeOwner:
+    return _owner(bots, owner=owner, aib_prize=prize)
 
 
-def test_multi_bot_owner_with_wins_requires_override():
-    owner = _owner(["bot-1", "bot-2"], winner_count=1, aib_prize=100.0)
-    with pytest.raises(ValueError, match="owner-level"):
-        _resolve_winner("bot-1", owner, None)
+def test_single_bot_prize_winner_is_a_winner_and_sets_the_bar():
+    rows = [_scored_row(1, "solo-a", 50.0), _scored_row(2, "solo-b", 20.0), _scored_row(3, "loser", 10.0)]
+    owners = [
+        _owner_named("a", ["solo-a"], 100.0),
+        _owner_named("b", ["solo-b"], 50.0),
+        _owner_named("c", ["loser"], 0.0),
+    ]
+    assert winner_sources(owners, rows) == {
+        "soloa": "single-bot prize winner",
+        "solob": "single-bot prize winner",
+    }
 
 
-def test_override_resolves_ambiguous_multi_bot_owner():
-    owner = _owner(["bot-1", "bot-2"], winner_count=1, aib_prize=100.0)
-    override = WinnerOverride(bot_name="bot-1", is_winner=True, reason="best ranked")
-    assert _resolve_winner("bot-1", owner, override) == (True, "manual_override")
-    loser_override = WinnerOverride(bot_name="bot-2", is_winner=False, reason="worse ranked")
-    assert _resolve_winner("bot-2", owner, loser_override) == (False, "manual_override")
+def test_any_bot_above_the_lowest_single_bot_winner_is_a_winner():
+    rows = [
+        _scored_row(1, "multi-main", 60.0),
+        _scored_row(2, "solo", 30.0),
+        _scored_row(3, "multi-secondary", 25.0),
+        _scored_row(4, "metac-house", 70.0),
+    ]
+    owners = [_owner_named("m", ["multi-main", "multi-secondary"], 200.0), _owner_named("s", ["solo"], 10.0)]
+    sources = winner_sources(owners, rows)
+    assert sources == {"solo": "single-bot prize winner", "multimain": "scored above a prize winner"}
 
 
-def test_override_applies_even_without_prize_match():
-    override = WinnerOverride(bot_name="bot-x", is_winner=True, reason="known winner")
-    assert _resolve_winner("bot-x", None, override) == (True, "manual_override")
+def test_prize_owner_with_no_identifiable_winning_bot_raises():
+    rows = [_scored_row(1, "solo", 30.0), _scored_row(2, "multi-1", 20.0), _scored_row(3, "multi-2", 10.0)]
+    owners = [_owner_named("s", ["solo"], 100.0), _owner_named("m", ["multi-1", "multi-2"], 5.0)]
+    with pytest.raises(ValueError, match="cannot be identified"):
+        winner_sources(owners, rows)
 
 
-def test_no_prize_match_defaults_to_non_winner():
-    assert _resolve_winner("bot-x", None, None) == (False, "no_prize_match")
+def test_single_bot_winner_missing_from_leaderboard_raises():
+    with pytest.raises(ValueError, match="not on the leaderboard"):
+        winner_sources([_owner_named("s", ["ghost"], 100.0)], [_scored_row(1, "other", 1.0)])
 
 
 # --------------------------------------------------------------------------- #
 # Survey loading: blank bot names must never be dropped silently
 # --------------------------------------------------------------------------- #
-def _write_survey_csv(path, rows: list[list[str]]) -> None:
-    header = [config.COLUMNS["timestamp"], config.COLUMNS["bot_name"]]
+def _write_survey_csv(path, rows: list[list[str]], header: list[str] | None = None) -> None:
+    # Timestamp and bot name first, so each test row can give just those two cells.
+    header = header or [config.COLUMNS["timestamp"], config.COLUMNS["bot_name"]] + [
+        text for slug, text in config.COLUMNS.items() if slug not in ("timestamp", "bot_name")
+    ]
     with open(path, "w", newline="") as handle:
         writer = csv.writer(handle)
         writer.writerow(header)
@@ -226,4 +241,22 @@ def test_load_survey_raises_on_answers_without_bot_name(tmp_path, monkeypatch):
     _write_survey_csv(path, [["1/1/26", "bot-a"], ["1/2/26", ""]])
     monkeypatch.setattr(config, "SURVEY_CSV", str(path))
     with pytest.raises(ValueError, match="no bot name"):
+        load_survey()
+
+
+def test_load_survey_raises_on_a_column_missing_from_the_export(tmp_path, monkeypatch):
+    path = tmp_path / "survey.csv"
+    header = [text for slug, text in config.COLUMNS.items() if slug != "hours"]
+    _write_survey_csv(path, [["1/1/26", "bot-a"]], header=header)
+    monkeypatch.setattr(config, "SURVEY_CSV", str(path))
+    with pytest.raises(ValueError, match="Missing from the CSV"):
+        load_survey()
+
+
+def test_load_survey_raises_on_a_question_the_config_does_not_know(tmp_path, monkeypatch):
+    path = tmp_path / "survey.csv"
+    header = list(config.COLUMNS.values()) + ["A brand new question?"]
+    _write_survey_csv(path, [["1/1/26", "bot-a"]], header=header)
+    monkeypatch.setattr(config, "SURVEY_CSV", str(path))
+    with pytest.raises(ValueError, match="A brand new question"):
         load_survey()

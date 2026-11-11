@@ -11,10 +11,9 @@ import csv
 import logging
 import os
 
-from aib_analysis.survey_analysis import config, manual_adjustments, season_notes
+from aib_analysis.survey_analysis import config, season_notes
 from aib_analysis.survey_analysis.features import RespondentFeatures
 from aib_analysis.survey_analysis.leaderboard import get_leaderboard_rows
-from aib_analysis.survey_analysis.loading import normalize_name
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ def _md_escape(text: str) -> str:
     return text.replace("|", "\\|").replace("\n", " ").strip()
 
 
-def _column_inventory(features: list[RespondentFeatures]) -> list[str]:
+def _column_inventory() -> list[str]:
     charted = {spec.slug: spec for spec in config.QUESTION_SPECS}
     lines = [
         "## Column inventory",
@@ -39,10 +38,8 @@ def _column_inventory(features: list[RespondentFeatures]) -> list[str]:
     for slug, header in config.COLUMNS.items():
         if slug in charted:
             handling = f"charted ({charted[slug].kind})"
-        elif slug in config.EXCLUDED_COLUMNS:
-            handling = f"excluded: {config.EXCLUDED_COLUMNS[slug]}"
         else:
-            handling = "used for joining / features only"
+            handling = f"excluded: {config.EXCLUDED_COLUMNS[slug]}"
         lines.append(f"| {_md_escape(header)} | `{slug}` | {handling} |")
     lines.append("")
     return lines
@@ -137,12 +134,14 @@ def _multiselect_audit(features: list[RespondentFeatures]) -> list[str]:
         write_ins: list[str] = []
         for feature in features:
             cell = feature.cells[slug]
-            if cell.raw.strip():
+            if cell.answered:
                 answered += 1
             for option in cell.matched:
                 counts[option] += 1
             if cell.other:
                 write_ins.append(f"{feature.bot_name}: " + "; ".join(cell.other))
+            if cell.non_answers:
+                write_ins.append(f"{feature.bot_name} (non-answer, treated as blank): " + "; ".join(cell.non_answers))
         lines.append(f"Answered by {answered} of {len(features)} respondents.")
         lines.append("")
         lines.append("| Option | Times selected |")
@@ -190,66 +189,6 @@ def _single_select_audit(features: list[RespondentFeatures]) -> list[str]:
     return lines
 
 
-def _manual_adjustments_section(features: list[RespondentFeatures]) -> list[str]:
-    lines = ["## Manual adjustments", ""]
-    lines.append(
-        "Human-reviewed adjustments loaded from the private input directory (see "
-        "`manual_adjustments.py`). `map` counts a write-in as a canonical option, `ignore` drops a "
-        "parsing fragment whose meaning is covered elsewhere, and `leave` records that a write-in "
-        "was reviewed and deliberately stays as \"Other\". `Applied` reflects this run; \"no "
-        "(stale)\" means the row no longer matches the data and needs review."
-    )
-    lines.append("")
-
-    lines.append("### Winner overrides")
-    lines.append("")
-    overrides = manual_adjustments.load_winner_overrides()
-    if overrides:
-        winner_source_by_bot = {
-            normalize_name(f.respondent.bot_name): f.respondent.winner_source for f in features
-        }
-        lines.append("| Bot name | is_winner | Applied | Reason |")
-        lines.append("| --- | --- | --- | --- |")
-        for override in overrides:
-            applied = winner_source_by_bot.get(normalize_name(override.bot_name)) == "manual_override"
-            lines.append(
-                f"| {_md_escape(override.bot_name)} | {override.is_winner} "
-                f"| {'yes' if applied else 'no (stale)'} | {_md_escape(override.reason)} |"
-            )
-    else:
-        lines.append("- none")
-    lines.append("")
-
-    lines.append("### Answer adjustments")
-    lines.append("")
-    adjustments = manual_adjustments.load_answer_adjustments()
-    if adjustments:
-        applied_keys = {
-            (normalize_name(f.respondent.bot_name), a.column_slug, a.write_in.strip().lower())
-            for f in features
-            for a in f.adjustments_applied
-        }
-        lines.append("| Bot name | Column | Action | Write-in | Mapped to | Applied | Reason |")
-        lines.append("| --- | --- | --- | --- | --- | --- | --- |")
-        for adjustment in adjustments:
-            key = (
-                normalize_name(adjustment.bot_name),
-                adjustment.column_slug,
-                adjustment.write_in.strip().lower(),
-            )
-            applied = key in applied_keys
-            lines.append(
-                f"| {_md_escape(adjustment.bot_name)} | `{adjustment.column_slug}` "
-                f"| {adjustment.action} | {_md_escape(adjustment.write_in)} "
-                f"| {_md_escape(adjustment.canonical_option) or 'n/a'} "
-                f"| {'yes' if applied else 'no (stale)'} | {_md_escape(adjustment.reason)} |"
-            )
-    else:
-        lines.append("- none")
-    lines.append("")
-    return lines
-
-
 def _excluded_columns_section() -> list[str]:
     lines = ["## Excluded columns", "", "These columns are intentionally not charted.", ""]
     for slug, reason in config.EXCLUDED_COLUMNS.items():
@@ -269,7 +208,7 @@ def generate_review_report(features: list[RespondentFeatures]) -> str:
         "`data/respondent_audit.csv` link each bot name to its exact peer score and its individual "
         "survey answers. Because peer scores are public on the leaderboard, that combination "
         "de-anonymizes respondents. It exists so you can spot-check the parsing; the publishable "
-        "output is `spring_survey_analysis.md`, which reports only aggregates."
+        f"output is `{os.path.basename(config.REPORT_MD)}`, which reports only aggregates."
     )
     lines.append("")
     lines.append(
@@ -279,9 +218,8 @@ def generate_review_report(features: list[RespondentFeatures]) -> str:
         "moves with the code. A full row-by-row dump is in `data/respondent_audit.csv`."
     )
     lines.append("")
-    lines.extend(_column_inventory(features))
+    lines.extend(_column_inventory())
     lines.extend(_join_audit(features))
-    lines.extend(_manual_adjustments_section(features))
     lines.extend(_model_audit(features))
     lines.extend(_multiselect_audit(features))
     lines.extend(_single_select_audit(features))
@@ -303,7 +241,7 @@ def _csv_safe(value: str) -> str:
 def write_respondent_audit_csv(features: list[RespondentFeatures]) -> None:
     os.makedirs(config.DATA_DIR, exist_ok=True)
     all_slugs = list(config.COLUMNS)  # raw for every survey field (full dump)
-    charted_slugs = [spec.slug for spec in config.QUESTION_SPECS]
+    charted_slugs = [spec.slug for spec in config.QUESTION_SPECS if spec.slug in config.COLUMNS]
     with open(RESPONDENT_AUDIT_CSV, "w", newline="") as handle:
         writer = csv.writer(handle)
         header = [

@@ -29,7 +29,6 @@ class CorrelationResult:
     coefficient: float | None
     p_value: float | None
     n: int
-    note: str = ""
 
     def direction_phrase(self) -> str:
         if self.coefficient is None:
@@ -77,7 +76,6 @@ def correlate_with_score(
             coefficient=None,
             p_value=None,
             n=n,
-            note="too few paired, varying observations",
         )
 
     if spec.kind in ("binary", "continuous"):

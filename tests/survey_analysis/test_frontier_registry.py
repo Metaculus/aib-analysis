@@ -9,10 +9,11 @@ internal consistency. Runs without env vars or local data.
 from __future__ import annotations
 
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 
-from aib_analysis.survey_analysis import config, parsing
+from aib_analysis.survey_analysis import config, parsing, season_notes
 from aib_analysis.survey_analysis.config import MODEL_REGISTRY, FRONTIER_RELEASE_CUTOFF
+from tests.survey_analysis.conftest import is_frontier_final
 
 
 # --------------------------------------------------------------------------- #
@@ -38,14 +39,21 @@ def test_unknown_release_date_never_frontier():
 
 
 def test_registry_frontier_matches_rule_exactly():
-    # Every registry row's is_frontier must equal (high_power AND date>cutoff).
+    # Every registry row's is_frontier must equal (high_power AND date>cutoff), or be a listed exception.
     for model in MODEL_REGISTRY:
-        expected = (
+        expected = model.display in season_notes.FRONTIER_EXCEPTIONS or (
             model.high_power
             and model.release_date is not None
             and model.release_date > FRONTIER_RELEASE_CUTOFF
         )
         assert model.is_frontier == expected, model.display
+
+
+def test_every_frontier_exception_is_a_registry_model_that_missed_the_cutoff():
+    by_display = {model.display: model for model in MODEL_REGISTRY}
+    for display in season_notes.FRONTIER_EXCEPTIONS:
+        assert display in by_display, display
+        assert not by_display[display].released_after_cutoff, display
 
 
 # --------------------------------------------------------------------------- #
@@ -60,12 +68,18 @@ def test_no_empty_normalized_keys():
     assert all(m.normalized_key for m in MODEL_REGISTRY)
 
 
-def test_small_tier_markers_are_never_high_power():
+# Small-tier models that were their vendor's best released model at launch and
+# beat its flagship on most published benchmarks.
+_HIGH_POWER_SMALL_TIERS = {"Gemini 3.5 Flash", "Gemini 3.6 Flash", "Gemini 3.7 Flash", "Gemini 3.8 Flash"}
+
+
+def test_small_tier_markers_are_high_power_only_when_listed():
     # Whole-word markers only: "mini" inside "geMINI" must not trip this.
     marker = re.compile(r"\b(mini|nano|flash|fast|haiku|lite|small|free)\b")
     for model in MODEL_REGISTRY:
         if marker.search(model.display.lower()):
-            assert model.high_power is False, f"{model.display} carries a small-tier marker"
+            expected = model.display in _HIGH_POWER_SMALL_TIERS
+            assert model.high_power is expected, f"{model.display} carries a small-tier marker"
 
 
 # --------------------------------------------------------------------------- #
@@ -105,30 +119,50 @@ def test_empty_token_matches_nothing():
 # --------------------------------------------------------------------------- #
 # is_frontier_final on realistic cell text
 # --------------------------------------------------------------------------- #
+def _newest_flagship_display() -> str:
+    flagships = [model for model in MODEL_REGISTRY if model.high_power and model.release_date]
+    return max(flagships, key=lambda model: model.release_date).display
+
+
 def test_frontier_final_any_frontier_flips_true():
-    assert parsing.is_frontier_final("GPT-4o, GPT-5.4") is True
-    assert parsing.is_frontier_final("Claude Sonnet 4.5, gpt-5.1") is True
+    newest = _newest_flagship_display()
+    assert is_frontier_final(f"GPT-4o, {newest}") is True
+    assert is_frontier_final(f"Claude Sonnet 4.5, {newest.lower()}") is True
+
+
+def test_frontier_cutoff_reproduces_spring_and_tracks_season_start():
+    assert config.frontier_release_cutoff(date(2026, 1, 5)) == date(2025, 11, 1)
+    assert config.frontier_release_cutoff(date(2026, 5, 18)) == date(2026, 3, 14)
+    assert FRONTIER_RELEASE_CUTOFF == config.frontier_release_cutoff(season_notes.SEASON_START_DATE)
+
+
+def test_flagship_line_below_a_pricier_tier_is_high_power():
+    by_display = {model.display: model for model in MODEL_REGISTRY}
+    assert by_display["Claude Opus 5"].high_power is True
+    assert by_display["GPT-6 Sol"].high_power is True
+    assert by_display["Claude Sonnet 5"].high_power is False
+    assert by_display["GPT-5.6 Terra"].high_power is False
 
 
 def test_frontier_final_all_non_frontier_stays_false():
-    assert parsing.is_frontier_final("GPT-4o") is False
-    assert parsing.is_frontier_final("Claude Sonnet 4.6") is False
-    assert parsing.is_frontier_final("GPT-5") is False  # high power but pre-cutoff
+    assert is_frontier_final("GPT-4o") is False
+    assert is_frontier_final("Claude Sonnet 4.6") is False
+    assert is_frontier_final("GPT-5") is False  # high power but pre-cutoff
 
 
 def test_frontier_final_blank_is_false():
-    assert parsing.is_frontier_final("") is False
-    assert parsing.is_frontier_final("   ") is False
+    assert is_frontier_final("") is False
+    assert is_frontier_final("   ") is False
 
 
 def test_frontier_final_ignored_artifact_is_false():
     # Pure artifact tokens carry no model and cannot be frontier.
-    assert parsing.is_frontier_final("openrouter/free") is False
-    assert parsing.is_frontier_final("Mutiple Models") is False
+    assert is_frontier_final("openrouter/free") is False
+    assert is_frontier_final("Mutiple Models") is False
 
 
 def test_kimi_generic_left_unknown_and_not_frontier():
     # Config note: generic 'Kimi' has an unspecified version -> not counted frontier.
     matched, _ignored, _unmatched = parsing.classify_models("Chinese SOTAs (GLM, Kimi, etc)")
     assert any(m.display == "Kimi" for m in matched)
-    assert parsing.is_frontier_final("Chinese SOTAs (GLM, Kimi, etc)") is False
+    assert is_frontier_final("Chinese SOTAs (GLM, Kimi, etc)") is False

@@ -8,6 +8,8 @@ the documented treatment of blank answers. Runs without env vars or local data.
 
 from __future__ import annotations
 
+import pytest
+
 from aib_analysis.survey_analysis import config
 from aib_analysis.survey_analysis.features import build_features
 from aib_analysis.survey_analysis.loading import Respondent
@@ -59,6 +61,7 @@ def test_blank_answers_yield_false_booleans_and_none_numerics():
     assert feature.variables["frontier"] is None  # blank final_model -> None (excluded)
     # Numerics from skipped ordinal/count columns are None (dropped pairwise).
     assert feature.variables["n_research_sources"] is None
+    assert feature.variables["moderate_research_sources"] is None
     assert feature.variables["hours_mid"] is None
     assert feature.variables["llm_calls_mid"] is None
     assert feature.variables["team_size"] is None  # blank team_size answer -> None
@@ -69,14 +72,72 @@ def test_not_in_a_team_becomes_solo_one():
     assert feature.variables["team_size"] == 1.0
 
 
-def test_write_in_research_captured_as_other_and_not_counted():
+def test_research_write_in_no_rule_covers_stops_the_run():
+    with pytest.raises(ValueError, match="my custom homemade scraper"):
+        build_features([_respondent(research="Exa, my custom homemade scraper")])
+
+
+def test_not_counted_research_write_in_stays_other_and_adds_nothing():
+    feature = build_features([_respondent(research="Exa, my own weird system")])[0]
+    assert feature.cells["research"].matched == ["Exa"]
+    assert feature.cells["research"].other == ["my own weird system"]
+    assert feature.variables["n_research_sources"] == 1.0
+
+
+def test_answer_made_only_of_non_answers_counts_as_blank():
     feature = build_features(
-        [_respondent(research="Exa, my custom homemade scraper")]
+        [_respondent(research="Our forecaster (which uses some of the above)", strategies="Proprietary")]
+    )[0]
+    assert feature.cells["research"].answered is False
+    assert feature.variables["n_research_sources"] is None
+    assert feature.variables["uses_similar_qs"] is None
+
+
+def test_codex_search_counts_as_openai_web_search():
+    feature = build_features([_respondent(research="Codex native search")])[0]
+    assert feature.cells["research"].matched == ["OpenAI web search"]
+    assert feature.variables["uses_openai_search"] == 1.0
+
+
+def test_write_in_naming_a_form_option_ticks_it_once():
+    static = "Static web scraping (Only HTML, possibly converted to markdown)"
+    feature = build_features(
+        [_respondent(research=f"Exa, Exa (neural news search), {static}, Wayback Machine snapshots, Firecrawl")]
     )[0]
     cell = feature.cells["research"]
-    assert cell.matched == ["Exa"]
-    assert cell.other == ["my custom homemade scraper"]
-    assert feature.variables["n_research_sources"] == 1.0  # write-in not counted
+    assert cell.matched == ["Exa", static]
+    assert cell.other == []
+    assert feature.variables["n_research_sources"] == 2.0
+    assert feature.variables["uses_scraping"] == 1.0
+
+
+def test_write_in_naming_an_option_and_an_extra_source_counts_both():
+    feature = build_features([_respondent(research="OpenRouter web search. Tavily early on")])[0]
+    assert feature.cells["research"].matched == ["Tavily"]
+    assert feature.cells["research"].other == ["OpenRouter web search. Tavily early on"]
+    assert feature.variables["n_research_sources"] == 2.0
+
+
+def test_listed_write_in_research_source_adds_to_the_count():
+    feature = build_features(
+        [_respondent(research="Exa, Other AskNews, AskNews DeepNews, a few RSS feeds")]
+    )[0]
+    assert feature.cells["research"].other == ["a few RSS feeds"]
+    assert feature.variables["n_research_sources"] == 4.0
+
+
+def _research_answer(source_count: int) -> str:
+    return ", ".join(config.MULTISELECT_VOCAB["research"][:source_count])
+
+
+def test_moderate_research_sources_includes_both_bounds():
+    fewest, most = config.MODERATE_RESEARCH_SOURCE_RANGE
+    expected_by_count = {fewest - 1: 0.0, fewest: 1.0, most: 1.0, most + 1: 0.0}
+    for source_count, expected in expected_by_count.items():
+        feature = build_features([_respondent(research=_research_answer(source_count))])[0]
+        assert feature.variables["n_research_sources"] == source_count
+        assert feature.variables["moderate_research_sources"] == expected
+
 
 
 def test_unrecognized_ordinal_value_is_none_not_zero():
@@ -93,3 +154,15 @@ def test_non_frontier_final_model_flags_false():
 def test_mini_variant_final_is_not_frontier():
     feature = build_features([_respondent(final_model="GPT-5.4 mini")])[0]
     assert feature.frontier is False
+
+
+def test_final_model_text_naming_no_known_model_is_unknown_not_no():
+    feature = build_features([_respondent(final_model="Our own forecasting system")])[0]
+    assert feature.variables["frontier"] is None
+
+
+def test_questions_missed_comes_from_the_leaderboard_join():
+    respondent = _respondent()
+    respondent.questions_missed = 12
+    assert build_features([respondent])[0].variables["questions_missed"] == 12.0
+    assert build_features([_respondent()])[0].variables["questions_missed"] is None

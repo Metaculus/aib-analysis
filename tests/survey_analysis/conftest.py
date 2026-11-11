@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from aib_analysis.survey_analysis import parsing
+
 
 def make_feature(
     variables: dict[str, float | None] | None = None,
@@ -21,7 +23,7 @@ def make_feature(
 ) -> SimpleNamespace:
     """A duck-typed RespondentFeatures good enough for stats/report helpers.
 
-    stats.py reads .variables, .score, .booleans, .respondent.is_winner and
+    stats.py reads .variables, .score, .respondent.is_winner and
     .respondent.groups; report.py additionally reads .cells and .frontier.
     """
     respondent = SimpleNamespace(
@@ -41,3 +43,9 @@ def make_feature(
 def make_cell(matched: list[str] | None = None, other: list[str] | None = None) -> SimpleNamespace:
     """Stand-in for features.ParsedCell (report helpers read .matched/.other)."""
     return SimpleNamespace(matched=matched or [], other=other or [], raw="", numeric=None)
+
+
+def is_frontier_final(raw: str) -> bool:
+    """A final-model cell is frontier if any recognized model in it is frontier."""
+    matched, _ignored, _unmatched = parsing.classify_models(raw)
+    return any(model.is_frontier for model in matched)

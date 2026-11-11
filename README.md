@@ -71,6 +71,16 @@ poetry run python -m aib_analysis.pro_vs_bot_writeup.run --season spring_2026 --
 
 It reads `local/<season>_simulations/` and writes `local/<season>_pro_vs_bot_writeup/`: `writeup.md` (precommitted result sentences plus `[===Fill me===]` blocks with reminders), `writeup_preview.md` (the same text with charts embedded, for viewers that won't load local images), PNG charts, CSV leaderboards, and `pro_name_key.csv` (maps Pro aliases to usernames; keep it local). Add a new season, and anything the data can't provide, in `aib_analysis/pro_vs_bot_writeup/season_config.py`.
 
+## Bot-maker survey analysis
+
+`aib_analysis/survey_analysis/` joins the season's bot-maker survey to the bot leaderboard and writes a report with charts. Its inputs live in the folder named in `config.py` (`local/private_input_data/summer_2026_survey_data/` for Summer 2026): the form responses (the response sheet downloaded as CSV), the payouts sheet's season tab as CSV (only the username, bot, `in_aib` and `aib_prize` columns are read), and the blank form printed to PDF (the run checks every option list against it with `pdftotext`). Survey answers are never edited by hand; write-ins count only through the committed rules in `config.py`, and the run stops on any research write-in they don't cover. Per-bot scores and answers stay in that folder, out of git. For a new season, start with `SEASON_REVIEW_CHECKLIST` in `season_notes.py`; the run refuses to start until `REVIEWED_FOR_SEASON_START` matches the season's start date.
+
+```
+poetry run python -m aib_analysis.survey_analysis.run [--refresh] [--blind]
+```
+
+`--refresh` rebuilds the leaderboard cache from the season's `2_bot_tournament.json`. `--blind` withholds every result for the hypotheses in `precommitted.py` (and the alternatives listed there) until the picks have been reviewed. Outputs go to `local/summer_survey_analysis/`; `aib_analysis/survey_analysis/render_html.sh` renders them to HTML.
+
 ## Bot maker advice post
 
 To draft the season's "Advice from Bot Makers to Bot Makers" post from the bot maker survey (a CSV export of the form responses; see `aib_analysis/bot_maker_advice/season_config.py` for the path):
