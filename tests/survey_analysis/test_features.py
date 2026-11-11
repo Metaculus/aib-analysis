@@ -84,6 +84,21 @@ def test_not_counted_research_write_in_stays_other_and_adds_nothing():
     assert feature.variables["n_research_sources"] == 1.0
 
 
+def test_answer_made_only_of_non_answers_counts_as_blank():
+    feature = build_features(
+        [_respondent(research="Our forecaster (which uses some of the above)", strategies="Proprietary")]
+    )[0]
+    assert feature.cells["research"].answered is False
+    assert feature.variables["n_research_sources"] is None
+    assert feature.variables["uses_similar_qs"] is None
+
+
+def test_codex_search_counts_as_openai_web_search():
+    feature = build_features([_respondent(research="Codex native search")])[0]
+    assert feature.cells["research"].matched == ["OpenAI web search"]
+    assert feature.variables["uses_openai_search"] == 1.0
+
+
 def test_write_in_naming_a_form_option_ticks_it_once():
     static = "Static web scraping (Only HTML, possibly converted to markdown)"
     feature = build_features(

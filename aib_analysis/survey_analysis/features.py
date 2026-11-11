@@ -11,6 +11,7 @@ Write-ins are never corrected by hand; they stay "Other" unless a committed rule
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 
 from aib_analysis.survey_analysis import config, parsing
@@ -28,6 +29,10 @@ class ParsedCell:
     matched: list[str] = field(default_factory=list)
     other: list[str] = field(default_factory=list)
     numeric: float | None = None
+
+    @property
+    def answered(self) -> bool:
+        return bool(self.matched or self.other)
 
 
 @dataclass
@@ -111,6 +116,7 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         # Multi-select columns
         for slug, vocab in config.MULTISELECT_VOCAB.items():
             matched, other = parsing.parse_multiselect(answers.get(slug, ""), vocab)
+            other = [write_in for write_in in other if not re.search(config.NON_ANSWER_WRITE_IN, write_in, re.IGNORECASE)]
             cells[slug] = ParsedCell(raw=answers.get(slug, ""), matched=matched, other=other)
         research_write_in_sources, uncovered = _apply_research_write_ins(cells["research"])
         uncovered_research_write_ins.extend(uncovered)
@@ -176,18 +182,18 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
 
         # Item non-response: a bot that left the source question blank is coded
         # None (missing), not a definitive "no", so it is dropped from that
-        # correlation exactly like a blank numeric answer. A non-blank answer with
-        # only a write-in still counts as "no" for the canonical habit.
+        # correlation exactly like a blank numeric answer. An answer with only a
+        # write-in (other than a non-answer) still counts as "no" for the habit.
         variables: dict[str, float | None] = {}
         for feature in config.BOOLEAN_FEATURES:
-            answered = bool(cells[feature.column_slug].raw.strip())
+            answered = cells[feature.column_slug].answered
             variables[feature.key] = (1.0 if booleans[feature.key] else 0.0) if answered else None
         variables["frontier"] = _frontier_variable(final_models)
         variables["frontier_support"] = _frontier_variable(support_models)
         variables["final_model_release"] = _high_power_release_ordinal(final_models)
         variables["n_research_sources"] = (
             float(len(cells["research"].matched) + len(research_write_in_sources))
-            if answers.get("research")
+            if cells["research"].answered
             else None
         )
         n_research_sources = variables["n_research_sources"]

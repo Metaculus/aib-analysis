@@ -57,7 +57,7 @@ def _answered(features: list[RespondentFeatures], slug: str, group: str) -> list
         for feature in features
         if (group == "everyone" or group in feature.respondent.groups)
         and feature.cells.get(slug)
-        and feature.cells[slug].raw.strip()
+        and feature.cells[slug].answered
     ]
 
 
@@ -65,7 +65,7 @@ def _has_any_other(features: list[RespondentFeatures], slug: str) -> bool:
     return any(
         feature.cells[slug].other
         for feature in features
-        if feature.cells.get(slug) and feature.cells[slug].raw.strip()
+        if feature.cells.get(slug) and feature.cells[slug].answered
     )
 
 

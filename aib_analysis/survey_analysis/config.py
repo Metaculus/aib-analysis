@@ -407,6 +407,10 @@ MULTISELECT_VOCAB: dict[str, list[str]] = {
     ],
 }
 
+# Multi-select write-ins that decline to answer. They are dropped, so an answer
+# made only of them counts as blank (missing), not as "none of the options".
+NON_ANSWER_WRITE_IN = r"some of the above|^proprietary\.?$"
+
 # Research write-ins ("Other" answers) are handled only by the three rule lists
 # below, all case-insensitive regexes. Extend them each season from that season's
 # write-ins; the run stops on any research write-in that no rule covers.
@@ -419,6 +423,7 @@ RESEARCH_WRITE_IN_OPTIONS: dict[str, str] = {
     r"wayback machine|archive\.org": "Static web scraping (Only HTML, possibly converted to markdown)",
     r"firecrawl": "Static web scraping (Only HTML, possibly converted to markdown)",
     r"serp ?api|\bnimble\b|you\.com": "Google/Bing/DuckDuckGo Search API (or equivalent like Serp API)",
+    r"\bcodex\b.*search": "OpenAI web search",
 }
 
 # Sources with no form option. Each one a bot's write-ins name adds one to its
@@ -433,13 +438,11 @@ RESEARCH_WRITE_IN_SOURCES: dict[str, str] = {
         r"|congress\.gov|\bnvd\b|odds api|\bbls\b|\beia\b|binance|government registers"
     ),
     "Prediction-market data": r"polymarket|kalshi|manifol|prediction[- ]markets?\b",
-    "Coding-agent web search": r"\b(codex|claude code)\b.*search",
 }
 
 # Write-ins that are not a research source. They stay "Other" and count nowhere.
 # Reason -> pattern.
 RESEARCH_WRITE_INS_NOT_COUNTED: dict[str, str] = {
-    "Says it used some of the listed sources without naming them": r"some of the above",
     "Says the bot did no research": r"\bno (external )?research\b",
     "Usage limits of a source named in the same answer": r"snippets per question|calls in total|used up in",
     "An unnamed in-house system": r"\bown\b.*\bsystem\b",

@@ -110,7 +110,9 @@ def generate_parsing_decisions() -> str:
         "each known option is matched as a substring (longest first) and removed; whatever is left is "
         "recorded as an 'Other' write-in. Write-ins are aggregated into an 'Other (write-in)' bar in "
         "the distribution charts, but they do not feed the habit features or the correlations, except "
-        "for the research write-in sources listed after the vocabularies. Option vocabularies:"
+        "for the research write-ins handled by the rules listed after the vocabularies. A write-in that "
+        f"declines to answer (matching `{config.NON_ANSWER_WRITE_IN}`) is dropped, so an answer made "
+        "only of such write-ins counts as blank rather than as none of the options. Option vocabularies:"
     )
     lines.append("")
     for slug, vocab in config.MULTISELECT_VOCAB.items():

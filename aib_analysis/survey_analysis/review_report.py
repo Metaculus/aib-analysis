@@ -134,7 +134,7 @@ def _multiselect_audit(features: list[RespondentFeatures]) -> list[str]:
         write_ins: list[str] = []
         for feature in features:
             cell = feature.cells[slug]
-            if cell.raw.strip():
+            if cell.answered:
                 answered += 1
             for option in cell.matched:
                 counts[option] += 1

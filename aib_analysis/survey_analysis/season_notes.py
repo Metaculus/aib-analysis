@@ -58,9 +58,10 @@ PRECOMMIT_LATE_DEFINITION_NOTE = (
     "hypothesis result: the research-source count also counts sources named in write-ins (see "
     "below), and checking similar questions or markets counts only the strategy checkbox. After the "
     "results had been seen, hand corrections of write-ins were dropped in favor of the keyword list "
-    "alone, the list was extended, and a write-in naming a listed option was counted as ticking it. "
-    "Across these versions the research-source correlation ranged from +0.10 to +0.16 and was never "
-    "significant."
+    "alone, the list was extended, a write-in naming a listed option was counted as ticking it, and an "
+    "answer made only of write-ins that decline to answer (such as \"some of the above\") was treated "
+    "as blank. Across these versions the research-source correlation ranged from +0.10 to +0.16 and was "
+    "never significant."
 )
 # Caveat bullets for definitions changed or features added after the download,
 # rendered verbatim in Appendix B.
@@ -74,8 +75,8 @@ LATE_DEFINITION_CAVEATS: list[str] = [
     "best-scoring bots.",
     "Rules revised after seeing results: After the Summer results had been seen, we revised the "
     "write-in rules (Appendix A) and counted Gemini 3.1 Pro as frontier, since it was Google's newest Pro "
-    "model all season. Web scraping passes the correction only under the revised write-in rules "
-    "(r = +0.40, vs +0.33 when only ticked boxes count).",
+    "model all season. With the revised write-in rules web scraping's correlation is +0.43; counting "
+    "only ticked boxes it is +0.35.",
     "Features added after seeing results: The \"Uses 2 to 5 research sources\" feature was added after "
     "the Summer results had been seen, since it seemed that at past 5 sources people might be adding "
     "lower quality or poorly configured data providers. Thus its p-value and q-value may be inflated.",
