@@ -140,6 +140,8 @@ def _multiselect_audit(features: list[RespondentFeatures]) -> list[str]:
                 counts[option] += 1
             if cell.other:
                 write_ins.append(f"{feature.bot_name}: " + "; ".join(cell.other))
+            if cell.non_answers:
+                write_ins.append(f"{feature.bot_name} (non-answer, treated as blank): " + "; ".join(cell.non_answers))
         lines.append(f"Answered by {answered} of {len(features)} respondents.")
         lines.append("")
         lines.append("| Option | Times selected |")

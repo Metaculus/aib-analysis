@@ -29,6 +29,7 @@ class ParsedCell:
     matched: list[str] = field(default_factory=list)
     other: list[str] = field(default_factory=list)
     numeric: float | None = None
+    non_answers: list[str] = field(default_factory=list)
 
     @property
     def answered(self) -> bool:
@@ -116,8 +117,13 @@ def build_features(respondents: list[Respondent]) -> list[RespondentFeatures]:
         # Multi-select columns
         for slug, vocab in config.MULTISELECT_VOCAB.items():
             matched, other = parsing.parse_multiselect(answers.get(slug, ""), vocab)
-            other = [write_in for write_in in other if not re.search(config.NON_ANSWER_WRITE_IN, write_in, re.IGNORECASE)]
-            cells[slug] = ParsedCell(raw=answers.get(slug, ""), matched=matched, other=other)
+            non_answers = [write_in for write_in in other if re.search(config.NON_ANSWER_WRITE_IN, write_in, re.IGNORECASE)]
+            cells[slug] = ParsedCell(
+                raw=answers.get(slug, ""),
+                matched=matched,
+                other=[write_in for write_in in other if write_in not in non_answers],
+                non_answers=non_answers,
+            )
         research_write_in_sources, uncovered = _apply_research_write_ins(cells["research"])
         uncovered_research_write_ins.extend(uncovered)
 
