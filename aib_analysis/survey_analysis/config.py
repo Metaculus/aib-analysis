@@ -81,7 +81,9 @@ EVIDENCE_SIGNIFICANT_Q = 0.05
 # high_power marks a vendor's flagship line. A flagship line still counts when
 # the vendor adds a pricier tier above it (Claude Opus under Claude Fable, GPT-6
 # Sol under GPT-6 Astra); mid and small tiers (Sonnet, Terra, Luna, Flash,
-# mini, ...) never do. season_notes.FRONTIER_EXCEPTIONS adds models that miss
+# mini, ...) do not, unless the model was its vendor's best released model at
+# launch and beat the vendor's flagship on most published benchmarks (Gemini
+# 3.5-3.8 Flash, while Gemini 3.5 Pro was unreleased). season_notes.FRONTIER_EXCEPTIONS adds models that miss
 # the cutoff but were still their vendor's newest flagship for most of the season.
 FRONTIER_CUTOFF_DAYS_BEFORE_SEASON_START = 65
 
@@ -102,8 +104,8 @@ class ModelInfo:
     """One row of the model registry.
 
     normalized_key : lowercase, spaces/hyphens stripped form used for matching.
-    high_power     : True for full-size flagship models, False for mini / nano /
-                     flash / fast / haiku / free-tier / small variants.
+    high_power     : True for a vendor's top tier (see the frontier comment above),
+                     False for mid tiers and mini / nano / flash / fast / small variants.
     release_date   : looked-up public release date, or None if unknown/unspecified.
     """
 
@@ -158,9 +160,8 @@ def _m(
 
 
 # Registry. Release dates were looked up online. Order matters only for
-# readability; matching sorts by key length. high_power is False whenever the name carries a small-tier marker
-# (mini/nano/flash/fast/haiku/free/small/lite) and for mid tiers (Sonnet, Terra,
-# Luna).
+# readability; matching sorts by key length.
+_BEST_GEMINI_AT_LAUNCH = "beat Gemini 3.1 Pro on most of Google's benchmarks; Google's best released model at launch"
 MODEL_REGISTRY: list[ModelInfo] = [
     # OpenAI GPT-6 and GPT-5.6 (tier names: Astra > Sol > Terra > Luna in GPT-6;
     # Sol > Terra > Luna in GPT-5.6)
@@ -211,11 +212,11 @@ MODEL_REGISTRY: list[ModelInfo] = [
     _m("Claude Haiku 4.5", high_power=False, release_date=date(2025, 10, 15)),
     _m("claude-3-haiku", high_power=False, release_date=date(2024, 3, 13)),
     # Google Gemini
-    _m("Gemini 3.8 Flash", high_power=False, release_date=date(2026, 9, 2)),
-    _m("Gemini 3.7 Flash", high_power=False, release_date=date(2026, 8, 13)),
-    _m("Gemini 3.6 Flash", high_power=False, release_date=date(2026, 7, 21)),
+    _m("Gemini 3.8 Flash", high_power=True, release_date=date(2026, 9, 2), note=_BEST_GEMINI_AT_LAUNCH),
+    _m("Gemini 3.7 Flash", high_power=True, release_date=date(2026, 8, 13), note=_BEST_GEMINI_AT_LAUNCH),
+    _m("Gemini 3.6 Flash", high_power=True, release_date=date(2026, 7, 21), note=_BEST_GEMINI_AT_LAUNCH),
     _m("Gemini 3.5 Flash Lite", high_power=False, release_date=date(2026, 7, 21)),
-    _m("Gemini 3.5 Flash", high_power=False, release_date=date(2026, 5, 19)),
+    _m("Gemini 3.5 Flash", high_power=True, release_date=date(2026, 5, 19), note=_BEST_GEMINI_AT_LAUNCH),
     _m("Gemini 3.1 Pro", high_power=True, release_date=date(2026, 2, 19)),
     _m("Gemini 3.1 Flash Lite", high_power=False, release_date=date(2026, 3, 3),
        note="preview; general availability 2026-05-07"),

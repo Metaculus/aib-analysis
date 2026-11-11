@@ -586,7 +586,8 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
         _precommitted_methodology(),
         "",
         "For the frontier model chart, a bot is called \"frontier\" if the model it used for its final "
-        "prediction is a flagship model (not a mini, flash, or fast variant) and was "
+        "prediction is a flagship model (not a mini, flash, or fast variant, unless it beat the vendor's "
+        "flagship and was its best model at launch, as Gemini 3.5 to 3.8 Flash did) and was "
         f"{config.FRONTIER_RELEASE_CUTOFF_LABEL}. A vendor's flagship line still counts when the vendor "
         "adds a pricier tier above it (for example Claude Opus below Claude Fable, or GPT-6 Sol below "
         "GPT-6 Astra), while mid tiers such as Claude Sonnet do not."

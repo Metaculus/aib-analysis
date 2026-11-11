@@ -68,12 +68,18 @@ def test_no_empty_normalized_keys():
     assert all(m.normalized_key for m in MODEL_REGISTRY)
 
 
-def test_small_tier_markers_are_never_high_power():
+# Small-tier models that were their vendor's best released model at launch and
+# beat its flagship on most published benchmarks.
+_HIGH_POWER_SMALL_TIERS = {"Gemini 3.5 Flash", "Gemini 3.6 Flash", "Gemini 3.7 Flash", "Gemini 3.8 Flash"}
+
+
+def test_small_tier_markers_are_high_power_only_when_listed():
     # Whole-word markers only: "mini" inside "geMINI" must not trip this.
     marker = re.compile(r"\b(mini|nano|flash|fast|haiku|lite|small|free)\b")
     for model in MODEL_REGISTRY:
         if marker.search(model.display.lower()):
-            assert model.high_power is False, f"{model.display} carries a small-tier marker"
+            expected = model.display in _HIGH_POWER_SMALL_TIERS
+            assert model.high_power is expected, f"{model.display} carries a small-tier marker"
 
 
 # --------------------------------------------------------------------------- #

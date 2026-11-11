@@ -75,7 +75,9 @@ LATE_DEFINITION_CAVEATS: list[str] = [
     "best-scoring bots.",
     "Rules revised after seeing results: After the Summer results had been seen, we revised the "
     "write-in rules (Appendix A) and counted Gemini 3.1 Pro as frontier, since it was Google's newest Pro "
-    "model all season. With the revised write-in rules web scraping's correlation is +0.43; counting "
+    "model all season, along with Gemini 3.5 to 3.8 Flash, each of which beat it on most of Google's "
+    "benchmarks and was Google's best released model at launch. The Flash change lowered the frontier "
+    "final model correlation from +0.45 to +0.37. With the revised write-in rules web scraping's correlation is +0.43; counting "
     "only ticked boxes it is +0.35.",
     "Features added after seeing results: The \"Uses 2 to 5 research sources\" feature was added after "
     "the Summer results had been seen, since it seemed that at past 5 sources people might be adding "
