@@ -159,8 +159,10 @@ def _m(
     )
 
 
-# Registry. Release dates were looked up online. Order matters only for
-# readability; matching sorts by key length.
+# Registry. A release date is the model's first public API availability (the
+# vendor's API or OpenRouter, UTC), checked against OpenRouter's public model list
+# (https://openrouter.ai/api/v1/models), which drops retired model ids. Order
+# matters only for readability; matching sorts by key length.
 _BEST_GEMINI_AT_LAUNCH = "beat Gemini 3.1 Pro on most of Google's benchmarks; Google's best released model at launch"
 MODEL_REGISTRY: list[ModelInfo] = [
     # OpenAI GPT-6 and GPT-5.6 (tier names: Astra > Sol > Terra > Luna in GPT-6;
@@ -176,11 +178,11 @@ MODEL_REGISTRY: list[ModelInfo] = [
     # OpenAI GPT-5 family
     _m("GPT-5.5 Instant", high_power=False, release_date=date(2026, 5, 5),
        note="fast non-reasoning ChatGPT default"),
-    _m("GPT-5.5", high_power=True, release_date=date(2026, 4, 23)),
+    _m("GPT-5.5", high_power=True, release_date=date(2026, 4, 24), note="ChatGPT 2026-04-23"),
     _m("GPT-5.4 mini", high_power=False, release_date=date(2026, 3, 17)),
     _m("GPT-5.4 nano", high_power=False, release_date=date(2026, 3, 17)),
     _m("GPT-5.4", high_power=True, release_date=date(2026, 3, 5)),
-    _m("GPT-5.2", high_power=True, release_date=date(2025, 12, 11)),
+    _m("GPT-5.2", high_power=True, release_date=date(2025, 12, 10)),
     _m("GPT-5.1", high_power=True, release_date=date(2025, 11, 13)),
     _m("GPT-5 Mini", high_power=False, release_date=date(2025, 8, 7)),
     _m("GPT-5 nano", high_power=False, release_date=date(2025, 8, 7)),
@@ -201,9 +203,9 @@ MODEL_REGISTRY: list[ModelInfo] = [
     _m("Claude Opus 5", high_power=True, release_date=date(2026, 7, 24),
        note="Anthropic's Opus flagship line, now below Fable 5"),
     _m("Claude Sonnet 5", high_power=False, release_date=date(2026, 6, 30)),
-    _m("Claude Opus 4.8", high_power=True, release_date=date(2026, 5, 28)),
+    _m("Claude Opus 4.8", high_power=True, release_date=date(2026, 5, 27)),
     _m("Claude Opus 4.7", high_power=True, release_date=date(2026, 4, 16)),
-    _m("Claude Opus 4.6", high_power=True, release_date=date(2026, 2, 5)),
+    _m("Claude Opus 4.6", high_power=True, release_date=date(2026, 2, 4)),
     _m("Claude Opus 4.5", high_power=True, release_date=date(2025, 11, 24)),
     _m("Claude Sonnet 4.6", high_power=False, release_date=date(2026, 2, 17),
        note="Sonnet is Anthropic's mid tier below Opus; not counted as highest-power/frontier"),
@@ -231,11 +233,11 @@ MODEL_REGISTRY: list[ModelInfo] = [
        note="Google's small open-weight line, separate from Gemini"),
     # xAI Grok
     _m("Grok 4.6", high_power=True, release_date=date(2026, 8, 12)),
-    _m("Grok 4.5", high_power=True, release_date=date(2026, 7, 16)),
-    _m("Grok 4.3", high_power=True, release_date=date(2026, 4, 17),
-       note="paid in-app beta; API about 2026-04-30"),
-    _m("Grok 4.20", high_power=True, release_date=date(2026, 2, 17),
-       note="beta; API 2026-03-09"),
+    _m("Grok 4.5", high_power=True, release_date=date(2026, 7, 8)),
+    _m("Grok 4.3", high_power=True, release_date=date(2026, 4, 30),
+       note="paid in-app beta from 2026-04-17"),
+    _m("Grok 4.20", high_power=True, release_date=date(2026, 3, 10),
+       note="xAI API beta (app beta 2026-02-17); OpenRouter lists only the later non-beta model, 2026-03-31"),
     _m("Grok 4.1 Fast", high_power=False, release_date=date(2025, 11, 19)),
     # DeepSeek / others
     _m("DeepSeek V4 Pro", high_power=True, release_date=date(2026, 4, 24)),
@@ -243,21 +245,20 @@ MODEL_REGISTRY: list[ModelInfo] = [
     _m("DeepSeek V3.2", high_power=True, release_date=date(2025, 12, 1)),
     _m("DeepSeek R1", high_power=True, release_date=date(2025, 1, 20)),
     _m("DeepSeek-R1-Distill-Llama-70B", high_power=False, release_date=date(2025, 1, 20)),
-    _m("Qwen 3.8 Max", high_power=True, release_date=date(2026, 8, 2)),
+    _m("Qwen 3.8 Max", high_power=True, release_date=date(2026, 8, 3),
+       note="OpenRouter lists only the 0902 revision, 2026-09-03"),
     _m("Qwen 3.7 Max", high_power=True, release_date=date(2026, 5, 21)),
-    _m("Qwen 3.7 Plus", high_power=False, release_date=date(2026, 6, 1),
-       note="date approximate; Plus is the tier below Max"),
+    _m("Qwen 3.7 Plus", high_power=False, release_date=date(2026, 6, 3),
+       note="Plus is the tier below Max"),
     _m("Qwen2.5-32B", high_power=False, release_date=date(2024, 9, 19)),
-    _m("MiniMax M3", high_power=True, release_date=date(2026, 6, 1)),
-    _m("GLM 5.2", high_power=True, release_date=date(2026, 6, 13),
-       note="Coding Plan date; open weights and API 2026-06-16"),
-    _m("GLM 5.1", high_power=True, release_date=date(2026, 3, 27),
-       note="Coding Plan date; open weights and API 2026-04-07"),
-    _m("MiMo V2.5 Pro", high_power=True, release_date=date(2026, 4, 23)),
+    _m("MiniMax M3", high_power=True, release_date=date(2026, 5, 31)),
+    _m("GLM 5.2", high_power=True, release_date=date(2026, 6, 16), note="Coding Plan from 2026-06-13"),
+    _m("GLM 5.1", high_power=True, release_date=date(2026, 4, 7), note="Coding Plan from 2026-03-27"),
+    _m("MiMo V2.5 Pro", high_power=True, release_date=date(2026, 4, 22)),
     _m("NVIDIA Nemotron 3 Ultra", high_power=True, release_date=date(2026, 6, 4)),
     _m("Thinking Machines Inkling", high_power=True, release_date=date(2026, 7, 15),
        note="the lab's flagship, though it says Inkling is not the strongest model available"),
-    _m("Solar Pro 4", high_power=True, release_date=date(2026, 8, 6)),
+    _m("Solar Pro 4", high_power=True, release_date=date(2026, 8, 6), note="OpenRouter 2026-08-10"),
     _m("gpt-oss-120b", high_power=False, release_date=date(2025, 8, 5),
        note="open-weight model at about o4-mini level, well below OpenAI's flagship"),
     _m("Llama 3.3 70B", high_power=False, release_date=date(2024, 12, 6),

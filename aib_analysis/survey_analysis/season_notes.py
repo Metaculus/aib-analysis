@@ -27,8 +27,9 @@ SEASON_REVIEW_CHECKLIST: list[str] = [
     "precommitted.py: hypotheses chosen and committed before the responses are downloaded, then a --blind run.",
     "config.py option lists: the run checks them against the form PDF; midpoints for new buckets and the "
     "BOOLEAN_FEATURES substrings are choices to review.",
-    "config.MODEL_REGISTRY: release date and flagship tier for every new model (the form check forces an "
-    "entry for each), and FRONTIER_EXCEPTIONS below, reviewed together each season.",
+    "config.MODEL_REGISTRY: release date (checked against OpenRouter's model list) and tier for every new "
+    "model (the form check forces an entry for each), and FRONTIER_EXCEPTIONS below, reviewed together "
+    "each season.",
     "config.RESEARCH_WRITE_IN_*: the run stops on any research write-in no rule covers; decide for each new "
     "one whether it names a form option, counts as an extra source, or is not counted.",
     "BOT_NAME_ALIASES below: survey names the matcher cannot join (see the join warnings in the log).",
