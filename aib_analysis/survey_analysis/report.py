@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 _FUTUREEVAL_URL = "https://www.metaculus.com/futureeval/"
 _PEER_SCORE_URL = "https://www.metaculus.com/help/scores-faq/#peer-score"
 _MINIBENCH_URL = "https://www.metaculus.com/aib/minibench/"
+_MULTIPLE_COMPARISONS_URL = "https://en.wikipedia.org/wiki/Multiple_comparisons_problem"
 
 _WITHHELD = "withheld until the precommitted hypotheses are reviewed"
 
@@ -225,12 +226,12 @@ def _correlation_chart(
             features, key, value_fmt=_NUMERIC_LABEL_FMT.get(key, _fmt_num)
         )
     else:
-        return None, "Graph excluded: this variable is not bucketed for a group chart"
+        return None, "this variable is not bucketed for a group chart"
 
     created = plots.plot_group_means(labeled, f"{spec.label}: average peer score", out_path)
     if created:
         return filename, None
-    return None, "Graph excluded due to low bucket count"
+    return None, "too few bots in a bucket"
 
 
 def _spec_effect_size(
@@ -323,11 +324,9 @@ def _evidence_summary_section(
     q_by_key: dict[str, float],
     hidden_keys: frozenset[str],
 ) -> str:
-    tested = sum(1 for res in results.values() if res.p_value is not None)
     exploratory_tested = sum(
         1 for key, res in results.items() if key not in precommitted.PRECOMMITTED_KEYS and res.p_value is not None
     )
-    n_obs = max((res.n for res in results.values()), default=0)
     labels = dict(_all_feature_keys())
 
     def effect(key: str) -> float:
@@ -352,10 +351,10 @@ def _evidence_summary_section(
         f"Benjamini-Hochberg p-value adjusted for testing all {exploratory_tested} exploratory features. "
         f"For the {len(precommitted.PRECOMMITTED_KEYS)} precommitted hypotheses (marked \"precommitted: "
         "yes\"), p is one-sided and q is Holm-adjusted across those hypotheses (see Appendix A). \"Significant\" means "
-        f"q < {config.EVIDENCE_SIGNIFICANT_Q}. This analysis aims to be primarily hypothesis-generating. "
-        f"We can't conclude much with n ≈ {n_obs} bots and {tested} features tested. We also expect "
-        "many of these features to be confounded. However, FutureEval hosts the largest group of "
-        "publicly competing AI forecasters, and so the results are worth indexing on."
+        f"q < {config.EVIDENCE_SIGNIFICANT_Q}. We expect many of these features to be confounded and suffer "
+        "from one or more biases listed in our caveats list. However, FutureEval hosts the largest group of "
+        "publicly competing AI forecasters, so these results give some of the best available evidence for "
+        "the effect on accuracy of many of these features."
     )
     lines.append("")
     for key in ordered_keys:
@@ -367,9 +366,11 @@ def _evidence_summary_section(
             continue
         significant = q_value is not None and q_value < config.EVIDENCE_SIGNIFICANT_Q
         precommitted_marker = " · precommitted: yes" if key in precommitted.PRECOMMITTED_KEYS else ""
+        post_hoc_marker = "* (see caveats)" if key in season_notes.POST_HOC_FEATURE_KEYS else ""
         lines.append(
             f"- **{label}**: r = {res.coefficient:+.2f} · p = {_fmt_pq(res.p_value)} · "
-            f"q = {_fmt_pq(q_value)} · significant: {'yes' if significant else 'no'}{precommitted_marker}"
+            f"q = {_fmt_pq(q_value)} · significant: {'yes' if significant else 'no'}{post_hoc_marker}"
+            f"{precommitted_marker}"
         )
     hidden_labels = [label for key, label in _all_feature_keys() if key in hidden_keys]
     if hidden_labels:
@@ -426,7 +427,7 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
     lines.append(
         "The question sections below are ordered by their strongest correlation with performance "
         f"(largest |r| first). Questions {no_correlation} come last. The evidence summary above is "
-        "ordered by |r| alone."
+        "ordered the same way, but feature by feature rather than by question."
     )
     lines.append("")
 
@@ -435,7 +436,7 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
         lines.append(f"## {spec.title}")
         lines.append("")
         if spec.slug in config.DERIVED_SPEC_SOURCES:
-            lines.append(f"> {config.DERIVED_SPEC_SOURCES[spec.slug]}")
+            lines.append(config.DERIVED_SPEC_SOURCES[spec.slug])
         else:
             lines.append(f"> Survey question: *{config.COLUMNS[spec.slug]}*")
         lines.append("")
@@ -461,8 +462,10 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
                 sentence = _correlation_sentence(result, q_by_key.get(key))
                 if key in precommitted.PRECOMMITTED_KEYS:
                     sentence += " Precommitted: p is one-sided and q is Holm-adjusted."
+                if key in season_notes.POST_HOC_FEATURE_KEYS:
+                    sentence += f" {season_notes.POST_HOC_FEATURE_NOTE}"
                 if chart is None:
-                    sentence += f" [{reason}]"
+                    logger.info("No score chart for %s: %s", key, reason)
                 lines.append(sentence)
                 lines.append("")
                 if chart is not None:
@@ -487,7 +490,7 @@ def _intro(in_scope, excluded, corr_pool) -> str:
     takeaway_bullets = "\n".join(f"* {item}" for item in season_notes.MAIN_TAKEAWAYS)
     return "\n".join(
         [
-            f"Every season Metaculus sends out a survey to bot makers who participated in the "
+            f"Every season, Metaculus sends out a survey to bot makers who participated in the "
             f"[FutureEval]({_FUTUREEVAL_URL}) AI forecasting benchmark. This analysis compares answers to "
             f"this survey with performance in the "
             f"[{season_notes.TOURNAMENT_NAME}]({season_notes.TOURNAMENT_URL}) to help surface what works "
@@ -500,30 +503,36 @@ def _intro(in_scope, excluded, corr_pool) -> str:
             "## Introduction",
             "",
             f"{len(in_scope) + len(excluded)} bot makers answered the {season_notes.SEASON_LABEL} survey, and "
-            f"this analysis covers the {len(in_scope)} whose bots competed in the scored tournament. For each "
-            "survey question, we show how answers were spread across winners, non-winners, and the top 10, "
-            "and how each feature of a bot (for example its final model, research tools, or cost per "
-            "question) relates to its performance, measured by its average spot peer score. Correlations use "
-            f"the {len(corr_pool)} bots that forecast at least {config.MIN_QUESTIONS_FOR_CORRELATION} scored "
+            f"this analysis covers the {len(in_scope)} whose bots competed in the primary "
+            f"{season_notes.SEASON_LENGTH_LABEL} FutureEval tournament. For each survey question, we show how "
+            "answers were spread across winners, non-winners, and the top 10, and how each feature of a bot "
+            "(for example, its final model, research tools, or cost per question) relates to its performance, "
+            f"measured by its average [spot peer score]({_PEER_SCORE_URL}). Correlations use the "
+            f"{len(corr_pool)} bots that forecast at least {config.MIN_QUESTIONS_FOR_CORRELATION} scored "
             "questions.",
             "",
-            f"We committed in advance to {len(precommitted.PRECOMMITTED_KEYS)} hypotheses from past surveys and "
-            "treat every other feature as exploratory, adjusting both groups for the number of tests we ran. "
-            f"With about {len(corr_pool)} bots, the results are suggestive rather than conclusive, and a "
-            "correlation does not show that a feature caused a better score. **Appendix A** describes the "
-            "methodology in full, and **Appendix B** lists the caveats.",
+            f"In addition, we chose and precommitted to {len(precommitted.PRECOMMITTED_KEYS)} hypotheses from "
+            "past surveys we thought would prove to be significant. Every other feature is exploratory. Each "
+            "hypothesis group's significance rating is adjusted for the number of tests we ran to avoid "
+            f"[multiple comparison problems]({_MULTIPLE_COMPARISONS_URL}). There are many caveats to the "
+            "results we show, most notably that a statistically significant correlation does not necessarily "
+            "imply a feature caused a better score. **Appendix A** describes the methodology in full, and "
+            "**Appendix B** lists the caveats.",
         ]
     )
+
+
+def _long_date(day: date) -> str:
+    return f"{day.strftime('%B')} {day.day}, {day.year}"
 
 
 def _frontier_exceptions_sentence() -> str:
     if not season_notes.FRONTIER_EXCEPTIONS:
         return ""
-    names = " and ".join(season_notes.FRONTIER_EXCEPTIONS)
-    return (
-        f" We also count {names} as frontier this season: released before the cutoff, but still its "
-        "vendor's newest flagship for most of the season."
+    exceptions = " and ".join(
+        f"{model}, which was {reason}" for model, reason in season_notes.FRONTIER_EXCEPTIONS.items()
     )
+    return f", except for {exceptions}"
 
 
 def _precommitted_methodology() -> str:
@@ -534,10 +543,10 @@ def _precommitted_methodology() -> str:
     listed = ", ".join(names[:-1]) + f", and {names[-1]}" if len(names) > 1 else names[0]
     late_note = f" {season_notes.PRECOMMIT_LATE_DEFINITION_NOTE}" if season_notes.PRECOMMIT_LATE_DEFINITION_NOTE else ""
     return (
-        f"We chose {len(names)} hypotheses from past surveys before downloading the responses, and confirmed "
-        f"them before looking at any hypothesis result: {listed}. Each is tested only in the predicted "
-        f"direction (a one-sided test), and the {len(names)} are corrected together with Holm's method "
-        "instead of joining the false-discovery correction, so their q-values are Holm-adjusted p-values. "
+        f"We chose and precommitted to {len(names)} hypotheses from past surveys that we wanted to examine "
+        f"with higher statistical power: {listed}. Each is tested in one predicted direction (a one-sided "
+        f"test), and the {len(names)} are corrected together with Holm's method instead of joining the "
+        "larger false-discovery correction, so their q-values are Holm-adjusted p-values. "
         f"They are marked \"precommitted: yes\" in the evidence summary.{late_note}"
     )
 
@@ -549,7 +558,7 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
         "",
         f"{total} bot makers answered the {season_notes.SEASON_LABEL} survey. This report covers the "
         f"{len(in_scope)} whose bots competed in the scored FutureEval tournament (the other "
-        f"{len(excluded)} were {_excluded_detail()}). It shows, for each "
+        f"{len(excluded)} were {season_notes.EXCLUDED_MINIBENCH_LABEL}). It shows, for each "
         "structured question, how answers were distributed and how they relate to bot performance.",
         "",
         "We show 2 types of graphs. The first is the raw distribution of answers for each option for "
@@ -585,26 +594,20 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
         "",
         _precommitted_methodology(),
         "",
-        "For the frontier model chart, a bot is called \"frontier\" if the model it used for its final "
-        "prediction is a flagship model (not a mini, flash, or fast variant, unless it beat the vendor's "
-        "flagship and was its best model at launch, as Gemini 3.5 to 3.8 Flash did) and was "
-        f"{config.FRONTIER_RELEASE_CUTOFF_LABEL}. A vendor's flagship line still counts when the vendor "
-        "adds a pricier tier above it (for example Claude Opus below Claude Fable, or GPT-6 Sol below "
-        "GPT-6 Astra), while mid tiers such as Claude Sonnet do not."
-        + _frontier_exceptions_sentence(),
+        "For the frontier questions, a model is called \"frontier\" if it was a provider's flagship variant "
+        "(not a mini, flash, or fast variant). Exceptions were made for Gemini Flash models that beat their "
+        "Pro variants on benchmarks. A vendor's flagship line still counts when the vendor adds a pricier "
+        "tier above it (for example, Claude Opus still counts as frontier despite being below Claude Fable, "
+        "and similarly GPT-6 Sol despite being below GPT-6 Astra). Mid tiers such as Claude Sonnet do not "
+        f"count. Models released on or before {_long_date(config.FRONTIER_RELEASE_CUTOFF)} "
+        f"({config.FRONTIER_CUTOFF_DAYS_BEFORE_SEASON_START} days before the season's first question) do "
+        f"not count as frontier{_frontier_exceptions_sentence()}.",
         "",
-        "The number of research sources counts each option a bot maker ticked, plus each category on "
-        "our list of write-in sources that their \"Other\" answer names (for example RSS feeds, public "
-        "data APIs, or prediction-market data). A write-in that names a listed option (for example "
-        "\"Exa (neural news search)\") or an equivalent on our list (for example a Wayback Machine "
-        "snapshot for static web scraping) counts as ticking that option, once. Write-ins are matched "
-        "only by these keywords and are never re-coded by hand; the full list is in the parsing "
-        "decisions document. We add categories to the list each season from that season's write-ins.",
-        "",
-        "One feature does not come from the survey: questions missed, the number of scored questions "
-        "still open after a bot's first forecast that the bot did not forecast. It is a rough measure "
-        "of engineering effort, since a bot that crashes, runs out of credits, or stops early misses "
-        "questions. Questions that closed before a bot started do not count against it.",
+        "The number of research sources a bot used counts each option a bot maker ticked, plus each "
+        "category on our list of write-in sources that their \"Other\" answer names (for example RSS "
+        "feeds, public data APIs, or prediction-market data). A write-in that names a listed option or an "
+        "equivalent on our list counts as ticking that option, once (for example, \"Exa neural news "
+        "search\" maps to \"Exa\", and \"Wayback Machine snapshot\" maps to \"static web scraping\").",
         "",
         "How to read the correlations: r runs from -1 to +1. Values near 0 mean no relationship, "
         "positive means the trait is associated with a higher average peer score, and negative with a "
@@ -615,7 +618,7 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
         parts.append("")
         parts.append(
             f"{len(excluded)} respondents are excluded from this report since they made no forecasts "
-            f"in the scored FutureEval tournament ({_excluded_detail()})."
+            f"in the primary seasonal FutureEval tournament ({_excluded_detail()})."
         )
     return "\n".join(parts)
 
@@ -674,8 +677,8 @@ def _caveats_section(features, corr_pool, counts, leaderboard_rows) -> str:
     lines.append(
         "- Correlation is not causation: None of these links prove that a survey feature caused a better score. "
         "For instance, if it is only compute on a forecast that matters, teams with more money to "
-        "spend on compute may also fine-tune an open-source model. This may exaggerate the correlation "
-        "of fine-tuned models with score."
+        "spend on compute may also pay for web scraping tools. This may exaggerate the correlation of "
+        "web scraping with score."
     )
     lines.append(
         "- Bar chart averages: In the per-question performance charts, each bar is the mean of the "

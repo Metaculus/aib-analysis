@@ -40,6 +40,14 @@ def test_evidence_summary_marks_only_precommitted_features(monkeypatch):
     assert "**Shown trait**: r = +0.10 · p = 0.500 · q = 0.500 · significant: no\n" in summary + "\n"
 
 
+def test_evidence_summary_points_post_hoc_features_to_caveats(monkeypatch):
+    monkeypatch.setattr(report, "_all_feature_keys", lambda: [(HIDDEN_KEY, "Hidden trait"), (SHOWN_KEY, "Shown trait")])
+    monkeypatch.setattr(report.season_notes, "POST_HOC_FEATURE_KEYS", frozenset({SHOWN_KEY}))
+    summary = report._evidence_summary_section(_results(), {HIDDEN_KEY: 0.002, SHOWN_KEY: 0.5}, frozenset())
+    assert "**Shown trait**: r = +0.10 · p = 0.500 · q = 0.500 · significant: no* (see caveats)\n" in summary + "\n"
+    assert "significant: yes · precommitted: yes" in summary
+
+
 def test_evidence_summary_unblinded_shows_everything(monkeypatch):
     monkeypatch.setattr(report, "_all_feature_keys", lambda: [(HIDDEN_KEY, "Hidden trait"), (SHOWN_KEY, "Shown trait")])
     summary = report._evidence_summary_section(_results(), {HIDDEN_KEY: 0.002, SHOWN_KEY: 0.5}, frozenset())
