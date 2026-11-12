@@ -549,7 +549,8 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
         "## Appendix A: Methodology",
         "",
         f"{total} bot makers answered the {season_notes.SEASON_LABEL} survey. This report covers the "
-        f"{len(in_scope)} whose bots competed in the scored FutureEval tournament. It shows, for each "
+        f"{len(in_scope)} whose bots competed in the scored FutureEval tournament (the other "
+        f"{len(excluded)} were {_excluded_detail(excluded)}). It shows, for each "
         "structured question, how answers were distributed and how they relate to bot performance.",
         "",
         "We show 2 types of graphs. The first is the raw distribution of answers for each option for "
@@ -566,7 +567,7 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
         f"* Non-winners: {counts['non_winner']} FutureEval participants who did not perform well enough "
         "to win a prize.",
         f"* Winners: {counts['winner']} participants who won prize money in the tournament.",
-        f"* Top 10 (by peer score): {counts['top_10']} participants who filled the survey and whose bot "
+        f"* Top 10 (by spot peer score): {counts['top_10']} participants who filled the survey and whose bot "
         f"placed in the top 10 of the full {leaderboard_size}-bot leaderboard by sum of spot peer score. "
         "This group overlaps with winners.",
         "",
@@ -574,7 +575,7 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
         "",
         f"Correlations use a stricter set of the {len(corr_pool)} bots that forecast at least "
         f"{config.MIN_QUESTIONS_FOR_CORRELATION} scored questions, so a bot with only a few questions "
-        "cannot swing a result due to lucky forecasting. The distribution charts still use all "
+        "cannot swing a result due to lucky forecasting. The distributions above still use all "
         f"{len(in_scope)} participants, and only the performance correlations apply the question floor.",
         "",
         "Each feature is correlated with a bot's average spot peer score using Pearson's r for yes/no "
@@ -674,8 +675,8 @@ def _caveats_section(features, corr_pool, counts, leaderboard_rows) -> str:
     lines.append(
         "- Correlation is not causation: None of these links prove that a survey feature caused a better score. "
         "For instance, if it is only compute on a forecast that matters, teams with more money to "
-        "spend on compute may also fine-tune an open source model. This may exaggerate the correlation "
-        "of finetuned models with score."
+        "spend on compute may also fine-tune an open-source model. This may exaggerate the correlation "
+        "of fine-tuned models with score."
     )
     lines.append(
         "- Bar chart averages: In the per-question performance charts, each bar is the mean of the "
