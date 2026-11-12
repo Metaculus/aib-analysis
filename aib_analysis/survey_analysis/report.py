@@ -386,11 +386,22 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
             os.remove(os.path.join(config.CHARTS_DIR, stale))
     hidden_keys = precommitted.PRECOMMITTED_KEYS if blind else frozenset()
     # Analysis scope: only bots that actually competed in the scored FutureEval
-    # tournament. MiniBench-only participants (0 FutureEval forecasts) and any
-    # unjoinable bot are excluded from distributions and correlations alike; they
-    # stay listed in the parsing review doc.
+    # tournament. MiniBench-only participants (0 FutureEval forecasts) are excluded
+    # from distributions and correlations alike. A response matching neither the
+    # leaderboard nor the prize sheet (which also covers MiniBench) has no forecasts
+    # under the name it gave, so it is not counted as a respondent at all. Both stay
+    # listed in the parsing review doc.
     in_scope = [f for f in features if f.respondent.matched_leaderboard_name]
-    excluded = [f for f in features if not f.respondent.matched_leaderboard_name]
+    no_record = [
+        f for f in features
+        if not f.respondent.matched_leaderboard_name and f.respondent.prize_match_kind == "none"
+    ]
+    if no_record:
+        logger.warning(
+            "Not counting %d survey responses with no tournament or MiniBench record: %s",
+            len(no_record), [f.bot_name for f in no_record],
+        )
+    excluded = [f for f in features if not f.respondent.matched_leaderboard_name and f not in no_record]
     # Correlations and score charts use only bots with enough scored questions
     # for a stable per-question average. Distributions and groups use all of in_scope.
     corr_pool = [f for f in in_scope if f.respondent.meets_correlation_minimum]
@@ -466,22 +477,10 @@ def generate_report(features: list[RespondentFeatures], blind: bool = False) -> 
     return "\n".join(lines)
 
 
-def _excluded_detail(excluded) -> str:
-    """Characterize the excluded respondents, computing the no-record tail.
-
-    Every excluded bot lacks a scored-leaderboard row; those that also match no
-    prize-sheet owner have no tournament record at all, and that count is derived
-    here so the sentence can never drift from the data.
-    """
-    no_record = sum(1 for f in excluded if f.respondent.prize_match_kind == "none")
-    detail = season_notes.EXCLUDED_MINIBENCH_LABEL.replace(
+def _excluded_detail() -> str:
+    return season_notes.EXCLUDED_MINIBENCH_LABEL.replace(
         "MiniBench-only", f"[MiniBench-only]({_MINIBENCH_URL})", 1
     )
-    if no_record == 1:
-        detail += ", plus one bot with no matching tournament record"
-    elif no_record > 1:
-        detail += f", plus {no_record} bots with no matching tournament record"
-    return detail
 
 
 def _intro(in_scope, excluded, corr_pool) -> str:
@@ -550,7 +549,7 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
         "",
         f"{total} bot makers answered the {season_notes.SEASON_LABEL} survey. This report covers the "
         f"{len(in_scope)} whose bots competed in the scored FutureEval tournament (the other "
-        f"{len(excluded)} were {_excluded_detail(excluded)}). It shows, for each "
+        f"{len(excluded)} were {_excluded_detail()}). It shows, for each "
         "structured question, how answers were distributed and how they relate to bot performance.",
         "",
         "We show 2 types of graphs. The first is the raw distribution of answers for each option for "
@@ -616,7 +615,7 @@ def _methodology_appendix(in_scope, excluded, corr_pool, counts, leaderboard_siz
         parts.append("")
         parts.append(
             f"{len(excluded)} respondents are excluded from this report since they made no forecasts "
-            f"in the scored FutureEval tournament ({_excluded_detail(excluded)})."
+            f"in the scored FutureEval tournament ({_excluded_detail()})."
         )
     return "\n".join(parts)
 
