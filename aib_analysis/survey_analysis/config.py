@@ -689,8 +689,9 @@ QUESTION_SPECS: list[QuestionSpec] = [
 # Explanations shown in place of the survey question for "derived" specs.
 DERIVED_SPEC_SOURCES: dict[str, str] = {
     "questions_missed": (
-        "Not a survey question. Computed from the tournament: the number of scored questions still "
-        "open at or after the bot's first forecast that the bot did not forecast."
+        "This was not a survey question but rather computed from the tournament: \"Questions missed\" is "
+        "the number of scored questions that opened at or after the bot's first forecast that the bot did "
+        "not forecast."
     ),
 }
 
